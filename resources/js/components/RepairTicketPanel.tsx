@@ -26,7 +26,7 @@ interface ServiceCategoryOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[3.4rem_minmax(8rem,0.65fr)_4.8rem_5.8rem_5.4rem_3.7rem_4.4rem_minmax(11rem,1.35fr)_5.8rem_5rem_7.4rem_17.5rem]';
+    'grid-cols-[3.4rem_minmax(8rem,0.65fr)_4.8rem_5.8rem_5.4rem_3.7rem_4.4rem_minmax(12rem,0.7fr)_minmax(12rem,0.7fr)_5.8rem_5rem_7.4rem_17.5rem]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -206,6 +206,18 @@ function FieldSummary({
             <span className={cn('text-sm text-[#0f172a]', strong && 'font-black')}>{value}</span>
         </Wrapper>
     );
+}
+
+function PaymentStatus({ monto, senia }: { monto: number; senia: number }): JSX.Element {
+    if (monto > 0 && senia >= monto) {
+        return (
+            <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-black uppercase text-emerald-800 shadow-sm">
+                PAGADO
+            </span>
+        );
+    }
+
+    return <>{formatCurrency(Math.max(0, monto - senia))}</>;
 }
 
 function EditField({
@@ -397,6 +409,8 @@ function RepairEditCard({
     readOnly,
     ticket,
     variant = 'mobile',
+    rowIndex = 0,
+    rowTotal = 1,
     onAddRepair,
 }: {
     repair: RepairOrderView;
@@ -404,6 +418,8 @@ function RepairEditCard({
     readOnly?: boolean;
     ticket: RepairTicketView;
     variant?: 'mobile' | 'desktop';
+    rowIndex?: number;
+    rowTotal?: number;
     onAddRepair: () => void;
 }): JSX.Element {
     const form = useForm<RepairUpdateFormData>({
@@ -435,13 +451,16 @@ function RepairEditCard({
     const [finalImagePreviews, setFinalImagePreviews] = useState<string[]>([]);
     const monto = Number(repair.monto ?? 0);
     const senia = Number(repair.senia ?? 0);
-    const saldo = Math.max(0, monto - senia);
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'].includes(repair.estado);
     const canDeliver = repair.estado === 'LISTA' && repair.entregado !== 'si';
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
     const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni);
+    const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
+    const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
+    const isLastGroupedDesktopRow = isGroupedDesktopRow && rowIndex === rowTotal - 1;
+    const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
 
     const submitEdit = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -587,7 +606,7 @@ function RepairEditCard({
         </button>
     );
 
-    const ActionButtons = ({ mobile = false }: { mobile?: boolean }): JSX.Element => {
+    const ActionButtons = ({ mobile = false, showGeneralTicketActions = true }: { mobile?: boolean; showGeneralTicketActions?: boolean }): JSX.Element => {
         const iconOnly = !mobile;
         const base = mobile
             ? 'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2.5 text-[0.78rem] font-extrabold no-underline shadow-sm'
@@ -598,12 +617,16 @@ function RepairEditCard({
                 <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                     <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                 </button>
-                <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparacion">
-                    <FaPlus aria-hidden="true" />{iconOnly ? null : 'Agregar reparacion'}
-                </button>
-                <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
-                    <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
-                </Link>
+                {showGeneralTicketActions ? (
+                    <>
+                        <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparacion">
+                            <FaPlus aria-hidden="true" />{iconOnly ? null : 'Agregar reparacion'}
+                        </button>
+                        <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
+                            <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
+                        </Link>
+                    </>
+                ) : null}
                 {canMarkReady ? (
                     <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
                         <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
@@ -619,15 +642,17 @@ function RepairEditCard({
                         <FaTimes aria-hidden="true" />{iconOnly ? null : 'Cancelar'}
                     </button>
                 ) : null}
-                {ticket.whatsappUrl ? (
-                    <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')} title="WhatsApp">
-                        <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
-                    </a>
-                ) : (
-                    <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
-                        <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
-                    </span>
-                )}
+                {showGeneralTicketActions ? (
+                    ticket.whatsappUrl ? (
+                        <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')} title="WhatsApp">
+                            <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
+                        </a>
+                    ) : (
+                        <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
+                            <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
+                        </span>
+                    )
+                ) : null}
                 <button type="button" className={cn(base, 'border border-[#dc3545] bg-[#dc3545] text-white')} onClick={deleteRepair} title="Eliminar">
                     <FaTrashAlt aria-hidden="true" />{iconOnly ? null : 'Eliminar'}
                 </button>
@@ -787,30 +812,34 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('grid min-h-[58px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
+                <div className={cn('grid min-h-[58px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-x-2 border-x-[#bfdbfe]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#bfdbfe]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#bfdbfe]', isGroupedDesktopRow && !isFirstGroupedDesktopRow && 'bg-[#f8fbff]', isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
                     <div className="grid content-center gap-1 text-center">
-                        <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong>
-                        {ticket.repairsCount > 1 ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[0.66rem] font-bold text-slate-600">{ticket.repairsCount} trabajos</span> : null}
+                        {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">—</span>}
                     </div>
-                    <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{repair.nombre_cliente}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{repair.dni === 12345678 ? 'SIN DNI' : repair.dni}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{repair.contacto || '-'}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{formatLegacyDate(repair.fecha)}</button>
-                    <div className="flex items-center justify-center"><span className="rounded-full bg-[#eef2ff] px-2 py-1 text-xs font-black text-[#1d4ed8]">#{repair.reparacion}</span></div>
+                    <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{showDesktopTicketData ? repair.nombre_cliente : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
+                    <div className="flex items-center justify-center"><span className="rounded-full bg-[#eef2ff] px-2 py-1 text-xs font-black text-[#1d4ed8]">{rowTotal > 1 ? `${rowIndex + 1}/${rowTotal}` : `#${repair.reparacion}`}</span></div>
                     <div className="flex items-center justify-center"><Thumb large /></div>
                     <button type="button" className="flex items-center text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repair.modelo || '-'}>{repair.modelo || '-'}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
-                        {formatLegacyDate(repair.fecha_estimada)}
-                        {isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}
-                        {isOverdue(repair) ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">Vencida</span> : null}
+                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.descripcion || '-'}>
+                        <span className="line-clamp-2">{repair.descripcion || '-'}</span>
                     </button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-black text-[#0f172a]" onClick={openInlineEditor}>{formatCurrency(saldo)}</button>
+                    <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
+                        <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>
+                        {isToday(repair.fecha_estimada) ? <span className="w-fit rounded bg-[#ffc107] px-1 text-[0.65rem] font-black leading-tight text-[#111827]">Hoy</span> : null}
+                        {isOverdue(repair) ? <span className="w-fit rounded bg-[#dc3545] px-1 text-[0.65rem] font-black leading-tight text-white">Vencida</span> : null}
+                    </button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-black text-[#0f172a]" onClick={openInlineEditor}>
+                        <PaymentStatus monto={monto} senia={senia} />
+                    </button>
                     <div className="flex items-center justify-center">
                         <button type="button" className={cn('rounded-full px-2.5 py-1 text-[0.68rem] font-black uppercase shadow-sm', repairStatusBadgeClass(repair.estado))} onClick={openInlineEditor}>
                             {compactStatus(repair.estado)}
                         </button>
                     </div>
-                    <div className="flex items-center justify-end">{!readOnly && !inlineOpen ? <ActionButtons /> : null}{!readOnly && inlineOpen ? <span className="text-center text-xs font-bold uppercase text-[#1d4ed8]">Editando</span> : null}</div>
+                    <div className="flex items-center justify-end">{!readOnly && !inlineOpen ? <ActionButtons showGeneralTicketActions={rowIndex === 0} /> : null}{!readOnly && inlineOpen ? <span className="text-center text-xs font-bold uppercase text-[#1d4ed8]">Editando</span> : null}</div>
                 </div>
                 {!readOnly && inlineOpen ? (
                     <div id={`inline-wrap-${repair.registro_id}`} className="border-b border-slate-200 bg-[#f8fbff] p-3">
@@ -864,7 +893,7 @@ function RepairEditCard({
                         {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={repair.dni} onClick={openInlineEditor} /> : null}
                         {repair.contacto ? <FieldSummary label="Contacto" value={repair.contacto} onClick={openInlineEditor} /> : null}
                         {repair.modelo ? <FieldSummary label="Modelo" value={repair.modelo} strong onClick={openInlineEditor} /> : null}
-                        <FieldSummary label="Saldo" value={formatCurrency(saldo)} strong onClick={openInlineEditor} />
+                        <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
                         <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{isOverdue(repair) ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">Vencida</span> : null}</>} onClick={openInlineEditor} />
                         <FieldSummary label="Estado" value={compactStatus(repair.estado)} onClick={openInlineEditor} />
                         {senia > 0 ? <FieldSummary label="Senia" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
@@ -894,17 +923,21 @@ export function RepairDesktopRow({
     repair,
     serviceCategories,
     readOnly = false,
+    rowIndex = 0,
+    rowTotal = ticket.repairs.length,
 }: {
     ticket: RepairTicketView;
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
     readOnly?: boolean;
+    rowIndex?: number;
+    rowTotal?: number;
 }): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
 
     return (
         <>
-            <RepairEditCard repair={repair} serviceCategories={serviceCategories} readOnly={readOnly} ticket={ticket} variant="desktop" onAddRepair={() => setAddOpen(true)} />
+            <RepairEditCard repair={repair} serviceCategories={serviceCategories} readOnly={readOnly} ticket={ticket} variant="desktop" rowIndex={rowIndex} rowTotal={rowTotal} onAddRepair={() => setAddOpen(true)} />
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} onClose={() => setAddOpen(false)} /> : null}
         </>
     );

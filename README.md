@@ -29,7 +29,7 @@ VITE_HMR_HOST=192.168.1.48
 
 Tambien verifica que Windows Defender Firewall permita conexiones entrantes a los puertos `8090` y `5173`.
 
-## Sudoku App para Windows
+## Sudoku Admin para Windows
 
 La app de escritorio esta preparada con Tauri en `src-tauri/` y carga el panel online:
 
@@ -43,6 +43,12 @@ Comandos:
 npm run desktop:dev
 npm run desktop:build
 ```
+
+Atajos de la app:
+
+- `Ctrl+R`: recargar el panel.
+- `Ctrl+L`: volver a `/admin`.
+- `F11`: alternar pantalla completa.
 
 Requisitos para compilar el instalador en Windows:
 

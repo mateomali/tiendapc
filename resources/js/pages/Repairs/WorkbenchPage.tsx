@@ -28,6 +28,8 @@ interface WorkbenchPageProps {
         summary_from?: string;
         summary_to?: string;
         categoria_filter?: number | string;
+        ordenar_por?: string;
+        direccion?: string;
     };
     tickets: RepairTicketView[];
     summary: {
@@ -224,6 +226,8 @@ export default function WorkbenchPage({
         summary_from: filters.summary_from ?? '',
         summary_to: filters.summary_to ?? '',
         categoria_filter: filters.categoria_filter ?? '',
+        ordenar_por: filters.ordenar_por ?? 'ticket',
+        direccion: filters.direccion ?? 'desc',
     });
     const createForm = useForm<WorkbenchCreateFormData>({
         id_orden: String(nextOrderId),
@@ -263,6 +267,8 @@ export default function WorkbenchPage({
             summary_from: filters.summary_from,
             summary_to: filters.summary_to,
             categoria_filter: categoryFilter,
+            ordenar_por: filters.ordenar_por,
+            direccion: filters.direccion,
             ...overrides,
         });
 
@@ -586,7 +592,7 @@ export default function WorkbenchPage({
                     filtersForm.get(route('repairs.workbench'));
                 }}
             >
-                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-center">
+                <div className="grid gap-2 md:grid-cols-[minmax(16rem,0.85fr)_200px_180px_160px_auto] md:items-center">
                     <input
                         className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         placeholder="Buscar por cliente, ticket, modelo, descripción, contacto o DNI"
@@ -607,6 +613,29 @@ export default function WorkbenchPage({
                                 {state}
                             </option>
                         ))}
+                    </select>
+                    <select
+                        className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        value={filtersForm.data.ordenar_por}
+                        onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}
+                        aria-label="Ordenar por"
+                    >
+                        <option value="ticket">Ordenar: ticket</option>
+                        <option value="ingreso">Ordenar: ingreso</option>
+                        <option value="estimada">Ordenar: estimada</option>
+                        <option value="cliente">Ordenar: cliente</option>
+                        <option value="modelo">Ordenar: modelo</option>
+                        <option value="estado">Ordenar: estado</option>
+                        <option value="saldo">Ordenar: saldo</option>
+                    </select>
+                    <select
+                        className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        value={filtersForm.data.direccion}
+                        onChange={(event) => filtersForm.setData('direccion', event.target.value)}
+                        aria-label="Direccion del orden"
+                    >
+                        <option value="desc">DESCENDENTE</option>
+                        <option value="asc">ASCENDENTE</option>
                     </select>
                     <button className="min-h-11 rounded-full border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-bold text-white shadow-[0_10px_20px_rgba(37,99,235,0.18)] transition hover:bg-[#1d4ed8]" type="submit">
                         Buscar
@@ -1006,6 +1035,7 @@ export default function WorkbenchPage({
                             <span className="text-center">Trabajo</span>
                             <span className="text-center">Imagen</span>
                             <span>Modelo</span>
+                            <span>Falla</span>
                             <span>Estimada</span>
                             <span>Saldo</span>
                             <span className="text-center">Estado</span>
@@ -1014,12 +1044,14 @@ export default function WorkbenchPage({
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (
                                 tickets.flatMap((ticket) =>
-                                    ticket.repairs.map((repair) => (
+                                    ticket.repairs.map((repair, repairIndex) => (
                                         <RepairDesktopRow
                                             key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                                             ticket={ticket}
                                             repair={repair}
                                             serviceCategories={serviceCategories}
+                                            rowIndex={repairIndex}
+                                            rowTotal={ticket.repairs.length}
                                         />
                                     )),
                                 )

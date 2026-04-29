@@ -19,7 +19,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
     const [qrUrl, setQrUrl] = useState<string>('');
     const now = new Date();
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, minute: '2-digit' });
 
     useEffect(() => {
         let cancelled = false;
@@ -115,6 +115,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                             const monto = Number(repair.monto ?? 0);
                             const senia = Number(repair.senia ?? 0);
                             const saldo = Math.max(0, monto - senia);
+                            const saldoLabel = monto > 0 && senia >= monto ? 'PAGADO' : formatCurrency(saldo);
 
                             return (
                                 <div key={`${repair.registro_id}-${repair.reparacion}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
@@ -128,7 +129,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                                         <>
                                             <TicketLine label="PRESUPUESTO:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
                                             <TicketLine label="SENA:" value={formatCurrency(senia)} />
-                                            <TicketLine label="SALDO:" value={monto > 0 ? formatCurrency(saldo) : 'A DEFINIR'} />
+                                            <TicketLine label="SALDO:" value={monto > 0 ? saldoLabel : 'A DEFINIR'} />
                                         </>
                                     ) : (
                                         <TicketLine label="TOTAL:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />

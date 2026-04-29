@@ -507,11 +507,8 @@ class RepairService
         $query = RepairOrder::query()
             ->when($delivered, fn ($builder) => $builder->where('entregado', 'si'))
             ->when(! $delivered, fn ($builder) => $builder->where('entregado', 'no'))
-            ->orderBy(
-                'id',
-                strtolower((string) ($filters['orden'] ?? 'desc')) === 'asc' ? 'asc' : 'desc',
-            )
-            ->orderBy('reparacion');
+            ->when(! $delivered, fn ($builder) => $this->applyOrderFilters($builder, $filters))
+            ->when($delivered, fn ($builder) => $builder->orderBy('id', 'desc')->orderBy('reparacion'));
 
         $categoryFilter = (int) ($filters['categoria_filter'] ?? 0);
 
@@ -554,6 +551,22 @@ class RepairService
         }
 
         return $query;
+    }
+
+    private function applyOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
+    {
+        $direction = strtolower((string) ($filters['direccion'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+        $sort = (string) ($filters['ordenar_por'] ?? 'ticket');
+
+        match ($sort) {
+            'ingreso' => $query->orderBy('fecha', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'estimada' => $query->orderByRaw('fecha_estimada IS NULL')->orderBy('fecha_estimada', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'cliente' => $query->orderBy('nombre_cliente', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'modelo' => $query->orderBy('modelo', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'estado' => $query->orderBy('estado', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'saldo' => $query->orderByRaw('(monto - senia) ' . $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            default => $query->orderBy('id', $direction)->orderBy('reparacion'),
+        };
     }
 
     private function summaryQuery(array $filters): \Illuminate\Database\Eloquent\Builder

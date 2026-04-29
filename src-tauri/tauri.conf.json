@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Sudoku App",
+  "productName": "Sudoku Admin",
   "version": "0.1.0",
-  "identifier": "com.sudokumerlo.sudokuapp",
+  "identifier": "com.sudokumerlo.admin",
   "build": {
     "frontendDist": "https://www.sudokumerlo.com/admin",
     "devUrl": "https://www.sudokumerlo.com/admin"
@@ -10,7 +10,7 @@
   "app": {
     "windows": [
       {
-        "title": "Sudoku App",
+        "title": "Sudoku Admin",
         "width": 1280,
         "height": 820,
         "minWidth": 1024,
@@ -27,6 +27,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "Sudoku Merlo",
+    "shortDescription": "Panel de administracion de Sudoku Merlo.",
+    "longDescription": "Aplicacion de escritorio para administrar tienda, reparaciones, ventas y contenidos de Sudoku Merlo.",
     "icon": [
       "icons/32x32.png",
       "icons/64x64.png",

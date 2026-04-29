@@ -45,6 +45,8 @@ class WorkbenchController extends Controller
             'summary_from' => ['nullable', 'date'],
             'summary_to' => ['nullable', 'date'],
             'categoria_filter' => ['nullable', 'integer', 'min:0'],
+            'ordenar_por' => ['nullable', 'string'],
+            'direccion' => ['nullable', 'string'],
         ]);
 
         $orders = $repairService->activeOrders($filters);
