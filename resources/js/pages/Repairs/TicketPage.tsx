@@ -5,6 +5,8 @@ import type { RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass } from '../../repairUi';
 import { formatCurrency } from '../../utils';
 
+const DEFAULT_REPAIR_DNI = 12345678;
+
 interface TicketPageProps {
     ticket: RepairTicketView;
     summary: {
@@ -20,6 +22,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
     const now = new Date();
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, minute: '2-digit' });
+    const hasClientDni = Number(ticket.dni) > 0 && Number(ticket.dni) !== DEFAULT_REPAIR_DNI;
 
     useEffect(() => {
         let cancelled = false;
@@ -103,7 +106,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                         <div className="mb-[3px] text-[12px]">COMPROBANTE DE INGRESO</div>
                         <TicketLine label="ORDEN N:" value={`#${ticket.id}`} />
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
-                        <TicketLine label="DNI:" value={String(ticket.dni)} />
+                        {hasClientDni ? <TicketLine label="DNI:" value={String(ticket.dni)} /> : null}
                         <TicketLine label="FECHA:" value={fecha} />
                         <TicketLine label="HORA:" value={hora} />
                     </section>
