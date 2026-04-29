@@ -2,7 +2,7 @@ import { useForm } from '@inertiajs/react';
 import { RepairTicketPanel } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
-import { buttonClass, ui } from '../../ui';
+import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
 
 interface DeliveredPageProps {
     filters: {

@@ -17,7 +17,7 @@ import {
 } from 'react-icons/fa';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
-import { buttonClass, ui } from '../ui';
+import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
 import { cn, formatCurrency } from '../utils';
 
 interface ServiceCategoryOption {
@@ -607,13 +607,13 @@ function RepairEditCard({
     );
 
     const ActionButtons = ({ mobile = false, showGeneralTicketActions = true }: { mobile?: boolean; showGeneralTicketActions?: boolean }): JSX.Element => {
-        const iconOnly = !mobile;
+        const iconOnly = true;
         const base = mobile
-            ? 'inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-2.5 text-[0.78rem] font-extrabold no-underline shadow-sm'
+            ? 'grid h-9 w-9 place-items-center rounded-xl text-[0.78rem] no-underline shadow-sm'
             : 'grid h-8 w-8 place-items-center rounded-lg text-[0.78rem] no-underline shadow-sm transition hover:-translate-y-0.5';
 
         return (
-            <div className={cn(mobile ? 'grid grid-cols-2 gap-1.5' : 'flex items-center justify-end gap-1')}>
+            <div className={cn(mobile ? 'flex flex-wrap justify-end gap-1.5' : 'flex items-center justify-end gap-1')}>
                 <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                     <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                 </button>
@@ -853,24 +853,30 @@ function RepairEditCard({
 
     return (
         <>
-            <details className="overflow-hidden rounded-[18px] border border-white/80 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.10)]">
-                <summary className={cn('cursor-pointer list-none px-3 py-2.5', repairStatusHeaderClass(repair.estado))}>
+            <details className="overflow-hidden rounded-[14px] border border-white/80 bg-white/95 shadow-[0_8px_22px_rgba(15,23,42,0.09)]">
+                <summary className={cn('cursor-pointer list-none px-2.5 py-2', repairStatusHeaderClass(repair.estado))}>
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                             <div className="mb-1 flex items-center gap-1.5">
-                                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[0.7rem] font-black text-[#0f172a]">#{repair.id}</span>
-                                <span className="rounded-full bg-white/80 px-2 py-0.5 text-[0.7rem] font-black text-[#1d4ed8]">R{repair.reparacion}</span>
-                                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[0.66rem] font-black uppercase text-[#0f172a]">{compactStatus(repair.estado)}</span>
+                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[0.66rem] font-black text-[#0f172a]">#{repair.id}</span>
+                                <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[0.66rem] font-black text-[#1d4ed8]">{rowIndex + 1}/{rowTotal}</span>
+                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[0.62rem] font-black uppercase text-[#0f172a]">{compactStatus(repair.estado)}</span>
                             </div>
-                            <h4 className="truncate text-[0.98rem] font-black uppercase leading-tight">{repair.nombre_cliente}</h4>
-                            <p className="truncate text-[0.82rem] font-bold opacity-90">{repair.modelo ? `${repair.modelo} - ` : ''}{formatCurrency(monto)}</p>
+                            <h4 className="truncate text-[0.92rem] font-black uppercase leading-tight">{repair.nombre_cliente}</h4>
+                            <p className="truncate text-[0.78rem] font-bold opacity-90">{repair.modelo ? `${repair.modelo} - ` : ''}{repair.descripcion || 'Sin descripcion'}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
+                                <span className="rounded-full bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
+                                {isToday(repair.fecha_estimada) ? <span className="rounded-full bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
+                                {isOverdue(repair) ? <span className="rounded-full bg-[#dc3545] px-1.5 py-0.5 text-white">Vencida</span> : null}
+                                <PaymentStatus monto={monto} senia={senia} />
+                            </div>
                         </div>
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/25 ring-1 ring-white/35">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/25 ring-1 ring-white/35">
                             <FaChevronDown aria-hidden="true" />
                         </span>
                     </div>
                 </summary>
-                <div className="grid gap-3 p-3">
+                <div className="grid gap-2.5 p-2.5">
                     {galleryImages.length > 0 ? (
                         <div className="grid gap-2 rounded-xl bg-slate-50 p-2">
                             <div className="flex items-center justify-between text-xs font-black uppercase text-slate-600">
@@ -887,7 +893,7 @@ function RepairEditCard({
                             </div>
                         </div>
                     ) : null}
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
                         <FieldSummary label="ID orden" value={`#${repair.id}`} strong onClick={openInlineEditor} />
                         <FieldSummary label="Cliente" value={repair.nombre_cliente} strong onClick={openInlineEditor} />
                         {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={repair.dni} onClick={openInlineEditor} /> : null}

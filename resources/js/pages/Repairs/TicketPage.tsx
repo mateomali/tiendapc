@@ -2,7 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toDataURL } from 'qrcode';
 import type { RepairTicketView } from '../../types';
-import { buttonClass } from '../../ui';
+import { repairButtonClass as buttonClass } from '../../repairUi';
 import { formatCurrency } from '../../utils';
 
 interface TicketPageProps {

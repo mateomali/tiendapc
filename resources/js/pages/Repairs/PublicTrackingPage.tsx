@@ -7,7 +7,7 @@ import type {
     PublicRepairTicketResultView,
     PublicRepairViewConfig,
 } from '../../types';
-import { buttonClass, surfaceClass } from '../../ui';
+import { repairButtonClass as buttonClass, repairSurfaceClass as surfaceClass } from '../../repairUi';
 import { cn } from '../../utils';
 
 interface PublicTrackingPageProps {

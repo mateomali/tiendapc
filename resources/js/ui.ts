@@ -134,54 +134,6 @@ export const ui = {
     printCard: 'overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white',
     printCardThumb: 'flex aspect-square items-center justify-center overflow-hidden bg-slate-100',
     printCardBody: 'grid gap-1 p-4',
-    repairGrid: 'grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]',
-    repairGridSingle: 'grid gap-4',
-    repairSide: 'grid gap-4',
-    repairList: 'grid gap-4',
-    repairCard: 'rounded-[22px] border border-white/75 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-[0_18px_40px_rgba(15,23,42,0.09)] md:p-5',
-    repairCardHeading: 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between',
-    repairFormGrid: 'grid gap-3 md:grid-cols-2',
-    repairFull: 'md:col-span-full',
-    repairUploadField:
-        'flex min-h-32 flex-col justify-center gap-2 rounded-[1.4rem] border border-dashed border-sky-300 bg-sky-50/70 px-4 py-4 text-sm font-semibold text-ink-800',
-    repairShell:
-        'rounded-[24px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(244,248,255,0.96)_100%)] p-3 shadow-[0_20px_48px_rgba(15,23,42,0.10)] md:p-4',
-    repairPanel:
-        'rounded-[20px] border border-[#dbeafe] bg-white/95 shadow-[0_14px_32px_rgba(15,23,42,0.08)]',
-    repairToolbar:
-        'rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,#ffffff_0%,#eef6ff_100%)] p-3 shadow-[0_12px_30px_rgba(15,23,42,0.08)]',
-    repairTicketPanel: 'rounded-[22px] border border-white/75 bg-white/92 p-3 shadow-[0_16px_36px_rgba(15,23,42,0.09)] md:p-4',
-    repairTicketHeader: 'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between',
-    repairTicketRepairs: 'grid gap-4',
-    repairRepairCard: 'rounded-[18px] border border-[#dbeafe] bg-white/95 p-4 shadow-[0_12px_28px_rgba(15,23,42,0.07)]',
-    repairRepairHead: 'flex flex-col gap-4 md:flex-row md:items-start md:justify-between',
-    repairStateStack: 'flex flex-wrap items-center gap-2',
-    repairStatusChip:
-        'inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-brand-700',
-    repairMiniChip:
-        'inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-slate-600',
-    repairMeta: 'flex flex-wrap gap-3 text-sm font-semibold text-ink-700/85',
-    repairHistory: 'grid gap-3 rounded-[1.3rem] border border-sky-100 bg-sky-50/55 p-4',
-    repairHistoryItem: 'flex flex-col gap-1 text-sm text-ink-800 md:flex-row md:items-center md:justify-between',
-    repairOrderActions: 'flex flex-wrap items-center gap-2',
-    repairFieldShort: 'min-w-0 md:col-span-1 lg:max-w-[9rem]',
-    repairFieldMedium: 'min-w-0 md:col-span-1 lg:max-w-[13rem]',
-    repairFieldWide: 'min-w-0 md:col-span-2',
-    repairFieldFluid: 'min-w-0 md:col-span-1',
-    repairDenseInput:
-        'min-h-10 w-full rounded-xl border border-[#cbdff7] bg-white px-3 py-2 text-sm font-bold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb1f] disabled:bg-slate-100 disabled:text-slate-500',
-    repairDenseTextarea:
-        'min-h-24 w-full rounded-xl border border-[#cbdff7] bg-white px-3 py-2 text-sm font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb1f] disabled:bg-slate-100 disabled:text-slate-500',
-    repairImageBlock: 'grid gap-3',
-    repairImageBlockTitle: 'text-sm font-black uppercase tracking-[0.16em] text-brand-700/75',
-    repairImageGrid: 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3',
-    repairImageCard:
-        'overflow-hidden rounded-[1.2rem] border border-sky-100 bg-white/92 p-3 shadow-[0_10px_24px_rgba(18,58,132,0.08)]',
-    repairAddPanel:
-        'rounded-[1.5rem] border border-sky-100 bg-white/88 p-5 shadow-[0_14px_26px_rgba(18,58,132,0.08)]',
-    repairLoginShell:
-        'flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_right,rgba(74,172,255,0.28),transparent_26%),linear-gradient(180deg,#eff5ff_0%,#dce9ff_22%,#d4e3ff_100%)] px-4 py-10',
-    repairLoginCard: `${cardSurface} grid w-full max-w-lg gap-5 p-8`,
 };
 
 export function pickerRowClass(active: boolean): string {

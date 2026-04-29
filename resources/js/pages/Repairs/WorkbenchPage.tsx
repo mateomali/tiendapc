@@ -1,10 +1,10 @@
 import { Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardList, FaCopy, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
-import { buttonClass, ui } from '../../ui';
+import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
 import { cn } from '../../utils';
 
 interface ServiceCategoryOption {
@@ -240,6 +240,7 @@ export default function WorkbenchPage({
     const [lookupBusy, setLookupBusy] = useState(false);
     const [imagePreviews, setImagePreviews] = useState<Record<number, string[]>>({});
     const [duplicateNotice, setDuplicateNotice] = useState('');
+    const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const summaryRange = filters.summary_range ?? 'month';
     const categoryFilter = String(filters.categoria_filter ?? '');
@@ -258,6 +259,15 @@ export default function WorkbenchPage({
         { label: 'Consolas', value: '3' },
         { label: 'Otros', value: '4' },
     ];
+    const activeMobileFilters = [
+        filters.q,
+        filters.estado,
+        filters.prioridad,
+        categoryFilter,
+        summaryRange !== 'month' ? summaryRange : '',
+        filters.ordenar_por && filters.ordenar_por !== 'ticket' ? filters.ordenar_por : '',
+        filters.direccion && filters.direccion !== 'desc' ? filters.direccion : '',
+    ].filter((value) => value !== undefined && value !== '').length;
     const filterQuery = (overrides: Record<string, string | number | undefined> = {}): Record<string, string | number> =>
         cleanQuery({
             q: filters.q,
@@ -492,7 +502,40 @@ export default function WorkbenchPage({
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
-            <section className="rounded-[22px] border border-white/70 bg-white/92 px-3.5 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.08)] backdrop-blur-md">
+            <section className="sticky top-2 z-20 grid gap-2 rounded-[18px] border border-white/70 bg-white/95 p-2 shadow-[0_10px_24px_rgba(15,23,42,0.10)] backdrop-blur-md xl:hidden">
+                <form
+                    className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        filtersForm.get(route('repairs.workbench'), { preserveScroll: true });
+                    }}
+                >
+                    <input
+                        className="min-h-10 min-w-0 rounded-full border border-[#bfdbfe] bg-white px-3 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        placeholder="Buscar"
+                        value={filtersForm.data.q}
+                        onChange={(event) => filtersForm.setData('q', event.target.value)}
+                    />
+                    <button type="submit" className="grid min-h-10 place-items-center rounded-full bg-[#2563eb] text-white shadow-[0_8px_18px_rgba(37,99,235,0.22)]" aria-label="Buscar">
+                        <FaSearch aria-hidden="true" />
+                    </button>
+                    <button type="button" className="relative grid min-h-10 place-items-center rounded-full border border-[#bfdbfe] bg-white text-[#1d4ed8]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
+                        <FaFilter aria-hidden="true" />
+                        {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#ef4444] px-1 text-[0.65rem] font-black text-white">{activeMobileFilters}</span> : null}
+                    </button>
+                </form>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-black uppercase text-[#334155]">
+                    <span className="rounded-full bg-[#eff6ff] px-2 py-1">Todas {summary.active}</span>
+                    <span className="rounded-full bg-[#fff7ed] px-2 py-1">Pend. {summary.pending}</span>
+                    <span className="rounded-full bg-[#ecfdf5] px-2 py-1">Listas {summary.ready}</span>
+                    <span className="rounded-full bg-[#fff1f2] px-2 py-1">Venc. {summary.overdue}</span>
+                    <span className="rounded-full bg-[#fefce8] px-2 py-1">Hoy {summary.today}</span>
+                </div>
+            </section>
+            ) : null}
+
+            {isConsultas ? (
+            <section className="hidden rounded-[22px] border border-white/70 bg-white/92 px-3.5 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.08)] backdrop-blur-md xl:block">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="mr-1 text-[0.78rem] font-black uppercase tracking-[0.08em] text-[#64748b]">Periodo:</span>
@@ -529,7 +572,7 @@ export default function WorkbenchPage({
 
             {isConsultas && summaryRange === 'custom' ? (
                 <form
-                    className="grid gap-2 rounded-[18px] border border-[#bfdbfe] bg-white/90 p-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)] md:grid-cols-[180px_180px_auto] md:items-end"
+                    className="hidden gap-2 rounded-[18px] border border-[#bfdbfe] bg-white/90 p-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)] md:grid-cols-[180px_180px_auto] md:items-end xl:grid"
                     onSubmit={(event) => {
                         event.preventDefault();
                         filtersForm.get(route('repairs.workbench'), { preserveScroll: true });
@@ -563,7 +606,7 @@ export default function WorkbenchPage({
             ) : null}
 
             {isConsultas ? (
-            <section className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
+            <section className="hidden grid-cols-2 gap-2 md:grid-cols-4 xl:grid xl:grid-cols-8">
                 <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench', filterQuery({ estado: undefined, prioridad: undefined }))} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
                 <SummaryFilterCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" href={route('repairs.workbench', filterQuery({ estado: 'PENDIENTE', prioridad: undefined }))} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
                 <SummaryFilterCard label="En reparación" value={summary.inRepair} trend="Espera / repuesto" tone="purple" href={route('repairs.workbench', filterQuery({ estado: 'EN REPARACION / ESPERA REPUESTO', prioridad: undefined }))} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
@@ -586,7 +629,7 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <form
-                className="rounded-[22px] border border-white/60 bg-white/90 px-4 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.08)] backdrop-blur-md"
+                className="hidden rounded-[22px] border border-white/60 bg-white/90 px-4 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.08)] backdrop-blur-md xl:block"
                 onSubmit={(event) => {
                     event.preventDefault();
                     filtersForm.get(route('repairs.workbench'));
@@ -642,6 +685,107 @@ export default function WorkbenchPage({
                     </button>
                 </div>
             </form>
+            ) : null}
+
+            {isConsultas && mobileFiltersOpen ? (
+                <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 xl:hidden" role="dialog" aria-modal="true">
+                    <form
+                        className="max-h-[86vh] w-full overflow-y-auto rounded-t-[24px] bg-white p-4 shadow-[0_-18px_46px_rgba(15,23,42,0.24)]"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            filtersForm.get(route('repairs.workbench'), {
+                                preserveScroll: true,
+                                onFinish: () => setMobileFiltersOpen(false),
+                            });
+                        }}
+                    >
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <h2 className="text-base font-black uppercase tracking-[0.08em] text-[#0f172a]">Filtros</h2>
+                            <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-[#334155]" onClick={() => setMobileFiltersOpen(false)} aria-label="Cerrar filtros">
+                                <FaTimes aria-hidden="true" />
+                            </button>
+                        </div>
+
+                        <div className="grid gap-3">
+                            <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                Estado
+                                <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.estado} onChange={(event) => { filtersForm.setData('estado', event.target.value); filtersForm.setData('prioridad', ''); }}>
+                                    <option value="">Todos los estados</option>
+                                    {states.map((state) => <option key={state} value={state}>{state}</option>)}
+                                </select>
+                            </label>
+
+                            <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                Prioridad
+                                <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.prioridad} onChange={(event) => { filtersForm.setData('prioridad', event.target.value); filtersForm.setData('estado', ''); }}>
+                                    <option value="">Todas</option>
+                                    <option value="vencidas">Vencidas</option>
+                                    <option value="hoy">Retiran hoy</option>
+                                </select>
+                            </label>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                    Categoria
+                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.categoria_filter} onChange={(event) => filtersForm.setData('categoria_filter', event.target.value)}>
+                                        {categoryOptions.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
+                                    </select>
+                                </label>
+
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                    Periodo
+                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.summary_range} onChange={(event) => filtersForm.setData('summary_range', event.target.value)}>
+                                        {periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                                    </select>
+                                </label>
+                            </div>
+
+                            {filtersForm.data.summary_range === 'custom' ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                        Desde
+                                        <input className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" type="date" value={filtersForm.data.summary_from} onChange={(event) => filtersForm.setData('summary_from', event.target.value)} />
+                                    </label>
+                                    <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                        Hasta
+                                        <input className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" type="date" value={filtersForm.data.summary_to} onChange={(event) => filtersForm.setData('summary_to', event.target.value)} />
+                                    </label>
+                                </div>
+                            ) : null}
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                    Ordenar
+                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.ordenar_por} onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}>
+                                        <option value="ticket">Ticket</option>
+                                        <option value="ingreso">Ingreso</option>
+                                        <option value="estimada">Estimada</option>
+                                        <option value="cliente">Cliente</option>
+                                        <option value="modelo">Modelo</option>
+                                        <option value="estado">Estado</option>
+                                        <option value="saldo">Saldo</option>
+                                    </select>
+                                </label>
+                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                    Direccion
+                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.direccion} onChange={(event) => filtersForm.setData('direccion', event.target.value)}>
+                                        <option value="desc">DESCENDENTE</option>
+                                        <option value="asc">ASCENDENTE</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="sticky bottom-0 mt-4 grid grid-cols-[1fr_1.2fr] gap-2 bg-white pt-3">
+                            <Link href={route('repairs.workbench')} className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bfdbfe] bg-white px-4 text-sm font-black text-[#1d4ed8] no-underline">
+                                Limpiar
+                            </Link>
+                            <button type="submit" className="min-h-11 rounded-full bg-[#2563eb] px-4 text-sm font-black text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)]">
+                                Aplicar
+                            </button>
+                        </div>
+                    </form>
+                </div>
             ) : null}
 
             {isIngreso ? (
