@@ -1,0 +1,396 @@
+<?php
+
+namespace App\Http\Controllers\Repairs;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Repairs\RepairOrderRequest;
+use App\Models\RepairEvent;
+use App\Models\RepairOrder;
+use App\Services\RepairService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Inertia\Inertia;
+use Inertia\Response;
+use RuntimeException;
+
+class WorkbenchController extends Controller
+{
+    public function consultations(Request $request, RepairService $repairService): Response
+    {
+        $user = $request->user();
+        $isAdmin = $user !== null && in_array($user->role, ['admin', 'editor'], true);
+
+        if (! $isAdmin && ! $request->session()->get('repair_tech_authenticated', false)) {
+            return Inertia::render('Repairs/TechLoginPage');
+        }
+
+        return $this->workbenchResponse($request, $repairService, 'consultas');
+    }
+
+    public function index(Request $request, RepairService $repairService): Response
+    {
+        return $this->workbenchResponse($request, $repairService, 'ingreso');
+    }
+
+    private function workbenchResponse(Request $request, RepairService $repairService, string $pageMode): Response
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string'],
+            'estado' => ['nullable', 'string'],
+            'prioridad' => ['nullable', 'string'],
+            'summary_range' => ['nullable', 'string'],
+            'summary_from' => ['nullable', 'date'],
+            'summary_to' => ['nullable', 'date'],
+            'categoria_filter' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $orders = $repairService->activeOrders($filters);
+
+        return Inertia::render('Repairs/WorkbenchPage', [
+            'filters' => $filters,
+            'tickets' => $this->groupTickets($orders, false),
+            'summary' => $repairService->summary($filters),
+            'states' => $repairService->availableStates(false),
+            'serviceCategories' => $this->serviceCategories(),
+            'serviceTemplates' => $repairService->serviceTemplates(),
+            'nextOrderId' => $repairService->nextOrderId(),
+            'pageMode' => $pageMode,
+        ]);
+    }
+
+    public function delivered(Request $request, RepairService $repairService): Response
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string'],
+            'estado' => ['nullable', 'string'],
+            'orden' => ['nullable', 'string'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $orders = $repairService->deliveredOrders($filters);
+        $allTickets = collect($this->groupTickets($orders, true));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $perPage = 12;
+        $tickets = $allTickets->forPage($page, $perPage)->values()->all();
+
+        return Inertia::render('Repairs/DeliveredPage', [
+            'filters' => $filters,
+            'tickets' => $tickets,
+            'summary' => $repairService->summary(),
+            'states' => $repairService->availableStates(true),
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $allTickets->count(),
+                'totalPages' => max(1, (int) ceil(max(1, $allTickets->count()) / $perPage)),
+            ],
+        ]);
+    }
+
+    public function lookupByDni(Request $request, RepairService $repairService): JsonResponse
+    {
+        $validated = $request->validate([
+            'dni' => ['required', 'integer', 'min:1'],
+        ]);
+
+        return response()->json($repairService->lookupClientByDni((int) $validated['dni']));
+    }
+
+    public function store(RepairOrderRequest $request, RepairService $repairService): RedirectResponse
+    {
+        try {
+            $order = $repairService->create($request->validated(), $request->allFiles());
+        } catch (RuntimeException $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        }
+
+        return redirect()
+            ->route('repairs.tickets.show', ['orderId' => $order->id])
+            ->with('success', 'Orden de reparacion creada.');
+    }
+
+    public function addRepair(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'modelo' => ['required', 'string', 'max:255'],
+            'descripcion' => ['required', 'string'],
+            'observaciones' => ['nullable', 'string'],
+            'monto' => ['nullable', 'numeric', 'min:0'],
+            'senia' => ['nullable', 'numeric', 'min:0'],
+            'fecha_estimada' => ['required', 'date'],
+            'repuesto' => ['nullable', 'string', 'max:255'],
+            'categorias_reparacion' => ['nullable', 'integer', 'min:1'],
+            'images.*' => ['nullable', 'file', 'image', 'max:8192'],
+        ]);
+
+        $repairService->addRepair($repairOrder, $validated, $request->file('images', []));
+
+        return back()->with('success', 'Nueva reparacion agregada al ticket.');
+    }
+
+    public function update(RepairOrderRequest $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        try {
+            $repairService->update(
+                $repairOrder,
+                $request->validated(),
+                $request->file('images', []),
+                $request->file('final_images', []),
+            );
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Orden actualizada.');
+    }
+
+    public function showTicket(int $orderId, RepairService $repairService): Response
+    {
+        $orders = $repairService->ticketOrders($orderId);
+        abort_if($orders->isEmpty(), 404);
+
+        $ticket = $this->groupTickets($orders, false)[0];
+
+        return Inertia::render('Repairs/TicketPage', [
+            'ticket' => $ticket,
+            'summary' => [
+                'totalMonto' => $ticket['totalMonto'],
+                'totalSenia' => $ticket['totalSenia'],
+                'saldo' => max(0, (float) $ticket['totalMonto'] - (float) $ticket['totalSenia']),
+            ],
+            'returnUrl' => route('repairs.workbench'),
+        ]);
+    }
+
+    public function addOriginalImages(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'images.*' => ['required', 'file', 'image', 'max:8192'],
+        ]);
+
+        $repairService->addOriginalImages($repairOrder, $request->file('images', []));
+
+        return back()->with('success', 'Imagenes iniciales agregadas.');
+    }
+
+    public function removeOriginalImage(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'filename' => ['required', 'string'],
+        ]);
+
+        $repairService->removeOriginalImage($repairOrder, $validated['filename']);
+
+        return back()->with('success', 'Imagen inicial eliminada.');
+    }
+
+    public function addFinalImages(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'images.*' => ['required', 'file', 'image', 'max:8192'],
+        ]);
+
+        $repairService->addFinalImages($repairOrder, $request->file('images', []));
+
+        return back()->with('success', 'Imagenes finales agregadas.');
+    }
+
+    public function removeFinalImage(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'filename' => ['required', 'string'],
+        ]);
+
+        $repairService->removeFinalImage($repairOrder, $validated['filename']);
+
+        return back()->with('success', 'Imagen final eliminada.');
+    }
+
+    public function deliver(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'fecha_entregado' => ['nullable', 'date'],
+            'entrega_via' => ['nullable', 'string', 'in:dni,ticket,otra'],
+            'entrega_detalle' => ['nullable', 'required_if:entrega_via,otra', 'string', 'max:500'],
+        ]);
+
+        $repairService->deliver(
+            $repairOrder,
+            $validated['fecha_entregado'] ?? null,
+            $validated['entrega_via'] ?? null,
+            $validated['entrega_detalle'] ?? null,
+        );
+
+        return back()->with('success', 'Orden marcada como entregada.');
+    }
+
+    public function markReady(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $repairService->markReady($repairOrder);
+
+        return back()->with('success', 'Orden marcada como lista.');
+    }
+
+    public function cancel(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $repairService->cancel($repairOrder);
+
+        return back()->with('success', 'Orden cancelada.');
+    }
+
+    public function moveBack(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $repairService->moveBackToConsultas($repairOrder);
+
+        return back()->with('success', 'Orden devuelta a consultas.');
+    }
+
+    public function destroy(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $repairService->delete($repairOrder);
+
+        return back()->with('success', 'Orden eliminada.');
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function groupTickets(Collection $orders, bool $delivered): array
+    {
+        return $orders
+            ->groupBy('id')
+            ->map(function (Collection $ticketOrders) use ($delivered): array {
+                /** @var RepairOrder $base */
+                $base = $ticketOrders->sortBy('reparacion')->first();
+
+                return [
+                    'id' => $base->id,
+                    'nombre_cliente' => $base->nombre_cliente,
+                    'dni' => $base->dni,
+                    'contacto' => $base->contacto,
+                    'fecha' => optional($base->fecha)->format('Y-m-d'),
+                    'repairsCount' => $ticketOrders->count(),
+                    'totalMonto' => $ticketOrders->sum(fn (RepairOrder $order): float => (float) $order->monto),
+                    'totalSenia' => $ticketOrders->sum(fn (RepairOrder $order): float => (float) $order->senia),
+                    'trackingUrl' => route('repairs.tracking', [
+                        'id_buscado' => $base->id,
+                        'dni_buscado' => $base->trackingDni(),
+                    ]),
+                    'ticketUrl' => route('repairs.tickets.show', ['orderId' => $base->id]),
+                    'whatsappUrl' => $this->customerWhatsappUrl($base),
+                    'repairs' => $ticketOrders
+                        ->sortBy('reparacion')
+                        ->map(fn (RepairOrder $order): array => $this->serializeRepair($order, $delivered))
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function serializeRepair(RepairOrder $order, bool $delivered): array
+    {
+        return [
+            'registro_id' => $order->registro_id,
+            'id' => $order->id,
+            'reparacion' => $order->reparacion,
+            'fecha' => optional($order->fecha)->format('Y-m-d'),
+            'nombre_cliente' => $order->nombre_cliente,
+            'dni' => $order->dni,
+            'contacto' => $order->contacto,
+            'modelo' => $order->modelo,
+            'descripcion' => $order->descripcion,
+            'observaciones' => $order->observaciones,
+            'monto' => $order->monto,
+            'senia' => $order->senia,
+            'fecha_estimada' => optional($order->fecha_estimada)->format('Y-m-d'),
+            'estado' => $order->estado,
+            'entregado' => $order->entregado,
+            'fecha_entregado' => optional($order->fecha_entregado)->format('Y-m-d'),
+            'repuesto' => $order->repuesto,
+            'categorias_reparacion' => $order->categorias_reparacion,
+            'imagenes' => $this->serializeImages($order->originalImages(), $order, false),
+            'imagenes_finales' => $this->serializeImages($order->finalImages(), $order, true),
+            'events' => $order->events()->get()->map(fn (RepairEvent $event): array => [
+                'id' => $event->id,
+                'evento' => $event->evento,
+                'estado_anterior' => $event->estado_anterior,
+                'estado_nuevo' => $event->estado_nuevo,
+                'created_at' => optional($event->created_at)->format('Y-m-d H:i'),
+                'usuario' => $event->usuario,
+            ])->all(),
+            'actions' => [
+                'update' => route('repairs.orders.update', $order),
+                'deliver' => route('repairs.orders.deliver', $order),
+                'markReady' => route('repairs.orders.mark_ready', $order),
+                'cancel' => route('repairs.orders.cancel', $order),
+                'moveBack' => route('repairs.orders.move_back', $order),
+                'delete' => route('repairs.orders.delete', $order),
+                'addOriginalImages' => route('repairs.orders.images.add', $order),
+                'removeOriginalImage' => route('repairs.orders.images.remove', $order),
+                'addFinalImages' => route('repairs.orders.final_images.add', $order),
+                'removeFinalImage' => route('repairs.orders.final_images.remove', $order),
+            ],
+            'availableStates' => app(RepairService::class)->availableStates($delivered),
+        ];
+    }
+
+    /**
+     * @param array<int, string> $filenames
+     * @return array<int, array<string, string>>
+     */
+    private function serializeImages(array $filenames, RepairOrder $order, bool $final): array
+    {
+        return array_values(array_map(function (string $filename) use ($order, $final): array {
+            return [
+                'filename' => $filename,
+                'url' => asset(trim((string) config('tienda.uploads.repairs'), '/') . '/' . $filename),
+                'thumbnailUrl' => asset(trim((string) config('tienda.uploads.repairs_thumbnails'), '/') . '/thumb_' . $filename),
+                'deleteAction' => $final
+                    ? route('repairs.orders.final_images.remove', $order)
+                    : route('repairs.orders.images.remove', $order),
+            ];
+        }, $filenames));
+    }
+
+    /**
+     * @return array<int, array{value:int,label:string}>
+     */
+    private function serviceCategories(): array
+    {
+        return [
+            ['value' => 1, 'label' => 'Celulares'],
+            ['value' => 2, 'label' => 'Consolas'],
+            ['value' => 3, 'label' => 'Accesorios'],
+            ['value' => 4, 'label' => 'Varios'],
+        ];
+    }
+
+    private function customerWhatsappUrl(RepairOrder $order): ?string
+    {
+        $phone = preg_replace('/\D+/', '', (string) ($order->contacto ?? '')) ?? '';
+
+        if ($phone === '') {
+            return null;
+        }
+
+        if (!Str::startsWith($phone, '54') && strlen($phone) >= 10) {
+            $phone = '54' . $phone;
+        }
+
+        $message = sprintf(
+            'Hola %s, te escribimos por la orden de reparacion #%d.',
+            trim((string) $order->nombre_cliente),
+            (int) $order->id,
+        );
+
+        return 'https://wa.me/' . $phone . '?text=' . rawurlencode($message);
+    }
+}
