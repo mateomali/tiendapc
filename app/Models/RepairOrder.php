@@ -44,6 +44,9 @@ class RepairOrder extends Model
         'imagen3',
         'imagen4',
         'repuesto',
+        'repuesto_pedido',
+        'repuesto_pedido_at',
+        'repuesto_pedido_oculto_at',
         'categorias_reparacion',
     ];
 
@@ -59,6 +62,9 @@ class RepairOrder extends Model
             'fecha' => 'date',
             'fecha_estimada' => 'date',
             'fecha_entregado' => 'date',
+            'repuesto_pedido' => 'boolean',
+            'repuesto_pedido_at' => 'datetime',
+            'repuesto_pedido_oculto_at' => 'datetime',
         ];
     }
 

@@ -51,6 +51,7 @@ interface RepairUpdateFormData {
     estado: string;
     fecha_entregado: string;
     repuesto: string;
+    repuesto_pedido: boolean;
     categorias_reparacion: string;
     images: File[] | null;
     final_images: File[] | null;
@@ -64,20 +65,12 @@ interface AddRepairFormData {
     senia: string;
     fecha_estimada: string;
     repuesto: string;
+    repuesto_pedido: boolean;
     categorias_reparacion: string;
     images: File[] | null;
 }
 
 type DeliveryVia = 'dni' | 'ticket' | 'otra';
-
-function handleFileSelection<T extends { images: File[] | null }>(
-    form: { setData: (key: keyof T, value: T[keyof T]) => void },
-    key: keyof T,
-    event: ChangeEvent<HTMLInputElement>,
-): void {
-    const files = event.target.files ? Array.from(event.target.files).slice(0, 2) : [];
-    form.setData(key, (files.length > 0 ? files : null) as T[keyof T]);
-}
 
 function normalizeStatus(status: string): string {
     return status.toUpperCase();
@@ -131,6 +124,12 @@ function isToday(value?: string | null): boolean {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     return value === today;
+}
+
+function todayInputValue(): string {
+    const now = new Date();
+
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function isOverdue(repair: RepairOrderView): boolean {
@@ -253,12 +252,14 @@ function ImageUploadPicker({
     disabled,
     previews,
     onSelect,
+    onRemove,
 }: {
     title: string;
     help: string;
     disabled?: boolean;
     previews: string[];
     onSelect: (event: ChangeEvent<HTMLInputElement>) => void;
+    onRemove?: (index: number) => void;
 }): JSX.Element {
     return (
         <div className={cn('grid gap-3 rounded-xl border border-dashed border-[#7cc7ff] bg-[#f2f9ff] p-3', disabled && 'opacity-60')}>
@@ -285,6 +286,11 @@ function ImageUploadPicker({
                         <div key={`${preview}-${index}`} className="relative overflow-hidden rounded-lg border border-[#bfdbfe] bg-white">
                             <img src={preview} alt={`Vista previa ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
                             <span className="absolute bottom-1 left-1 rounded bg-slate-950/70 px-1.5 py-0.5 text-[0.65rem] font-bold text-white">Nueva {index + 1}</span>
+                            {onRemove ? (
+                                <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-[#ef4444] text-xs font-black text-white shadow-md" onClick={() => onRemove(index)} aria-label={`Quitar imagen ${index + 1}`}>
+                                    <FaTimes aria-hidden="true" />
+                                </button>
+                            ) : null}
                         </div>
                     ))}
                 </div>
@@ -356,10 +362,28 @@ function AddRepairModal({
         senia: '',
         fecha_estimada: '',
         repuesto: '',
+        repuesto_pedido: false,
         categorias_reparacion: '4',
         images: null,
     });
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const action = ticket.repairs[0] ? route('repairs.orders.add_repair', ticket.repairs[0].registro_id) : '';
+
+    const selectImages = (event: ChangeEvent<HTMLInputElement>): void => {
+        const currentFiles = form.data.images ?? [];
+        const selected = [...currentFiles, ...Array.from(event.target.files ?? [])].slice(0, 2);
+
+        form.setData('images', selected.length > 0 ? selected : null);
+        setImagePreviews(selected.map((file) => URL.createObjectURL(file)));
+        event.target.value = '';
+    };
+
+    const removeImage = (index: number): void => {
+        const selected = (form.data.images ?? []).filter((_, fileIndex) => fileIndex !== index);
+
+        form.setData('images', selected.length > 0 ? selected : null);
+        setImagePreviews(selected.map((file) => URL.createObjectURL(file)));
+    };
 
     const submit = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -370,6 +394,7 @@ function AddRepairModal({
             forceFormData: true,
             onSuccess: () => {
                 form.reset();
+                setImagePreviews([]);
                 onClose();
             },
         });
@@ -385,15 +410,24 @@ function AddRepairModal({
                 <input className={ui.input} placeholder="Monto" value={form.data.monto} onChange={(event) => form.setData('monto', event.target.value)} />
                 <input className={ui.input} placeholder="Senia" value={form.data.senia} onChange={(event) => form.setData('senia', event.target.value)} />
                 <input className={ui.input} placeholder="Repuesto" value={form.data.repuesto} onChange={(event) => form.setData('repuesto', event.target.value)} />
+                <label className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#f59e0b33] bg-[#fff8ed] px-3 py-2 text-sm font-black text-[#92400e]">
+                    <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} />
+                    Mandar a pedidos
+                </label>
                 <select className={ui.input} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)}>
                     {serviceCategories.map((category) => (
                         <option key={category.value} value={category.value}>{category.label}</option>
                     ))}
                 </select>
-                <label className={`${ui.repairUploadField} sm:col-span-2`}>
-                    <span>Fotos de ingreso (maximo 2)</span>
-                    <input type="file" accept="image/*" multiple capture="environment" onChange={(event) => handleFileSelection<AddRepairFormData>(form, 'images', event)} />
-                </label>
+                <div className="sm:col-span-2">
+                    <ImageUploadPicker
+                        title="Fotos de ingreso"
+                        help="Podés sacar foto o elegir de galería. Se guardan hasta 2 imágenes iniciales."
+                        previews={imagePreviews}
+                        onSelect={selectImages}
+                        onRemove={removeImage}
+                    />
+                </div>
                 <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
                     <button type="button" className={buttonClass('soft', 'sm')} onClick={onClose}>Cancelar</button>
                     <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>Agregar reparacion</button>
@@ -437,6 +471,7 @@ function RepairEditCard({
         estado: repair.estado,
         fecha_entregado: repair.fecha_entregado ?? '',
         repuesto: repair.repuesto ?? '',
+        repuesto_pedido: Boolean(repair.repuesto_pedido),
         categorias_reparacion: String(repair.categorias_reparacion ?? 4),
         images: null,
         final_images: null,
@@ -480,7 +515,8 @@ function RepairEditCard({
     };
 
     const selectImages = (key: 'images' | 'final_images', event: ChangeEvent<HTMLInputElement>): void => {
-        const files = event.target.files ? Array.from(event.target.files).slice(0, 2) : [];
+        const currentFiles = form.data[key] ?? [];
+        const files = [...currentFiles, ...Array.from(event.target.files ?? [])].slice(0, 2);
         form.setData(key, files.length > 0 ? files : null);
         const previews = files.map((file) => URL.createObjectURL(file));
 
@@ -493,10 +529,27 @@ function RepairEditCard({
         event.target.value = '';
     };
 
+    const removeSelectedImage = (key: 'images' | 'final_images', index: number): void => {
+        const files = (form.data[key] ?? []).filter((_, fileIndex) => fileIndex !== index);
+        form.setData(key, files.length > 0 ? files : null);
+        const previews = files.map((file) => URL.createObjectURL(file));
+
+        if (key === 'images') {
+            setImagePreviews(previews);
+        } else {
+            setFinalImagePreviews(previews);
+        }
+    };
+
     const openInlineEditor = (): void => {
         if (!readOnly) {
             setInlineOpen(true);
         }
+    };
+
+    const openDeliveryModal = (): void => {
+        form.setData('fecha_entregado', form.data.fecha_entregado || todayInputValue());
+        setDeliveryOpen(true);
     };
 
     const cancelInlineEdit = (): void => {
@@ -633,7 +686,7 @@ function RepairEditCard({
                     </button>
                 ) : null}
                 {canDeliver ? (
-                    <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={() => setDeliveryOpen(true)} title="Entregar">
+                    <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
                         <FaDollyFlatbed aria-hidden="true" />{iconOnly ? null : 'Entregar'}
                     </button>
                 ) : null}
@@ -722,6 +775,10 @@ function RepairEditCard({
                                 <EditField label="Repuesto a pedir">
                                     <textarea className={ui.repairDenseTextarea} value={form.data.repuesto} onChange={(event) => form.setData('repuesto', event.target.value)} rows={2} disabled={readOnly} />
                                 </EditField>
+                                <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#f59e0b33] bg-[#fff8ed] px-3 py-2 text-sm font-black text-[#92400e]">
+                                    <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} disabled={readOnly} />
+                                    Mandar a pedidos
+                                </label>
                                 <h4 className="mt-2 border-b border-[#bfdbfe] pb-2 text-sm font-black text-[#0d6efd]">Imágenes Actuales</h4>
                                 <RepairImagesBlock title="Imágenes iniciales" images={repair.imagenes} onOpen={setGalleryIndex} onRemove={(image) => removeImage(image, false)} readOnly={readOnly} />
                                 {!readOnly ? (
@@ -730,6 +787,7 @@ function RepairEditCard({
                                         help="Podés sacar foto o elegir de galería. Se guardan hasta 2 imágenes iniciales."
                                         previews={imagePreviews}
                                         onSelect={(event) => selectImages('images', event)}
+                                        onRemove={(index) => removeSelectedImage('images', index)}
                                     />
                                 ) : null}
                                 <h4 className="mt-2 border-b border-[#86efac] pb-2 text-sm font-black text-[#198754]">Imágenes del resultado final</h4>
@@ -741,6 +799,7 @@ function RepairEditCard({
                                         disabled={repair.estado !== 'LISTA' && repair.entregado !== 'si'}
                                         previews={finalImagePreviews}
                                         onSelect={(event) => selectImages('final_images', event)}
+                                        onRemove={(index) => removeSelectedImage('final_images', index)}
                                     />
                                 ) : null}
                             </EditSection>

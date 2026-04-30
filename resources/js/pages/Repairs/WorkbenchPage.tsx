@@ -233,7 +233,7 @@ export default function WorkbenchPage({
         id_orden: String(nextOrderId),
         nombre_cliente: '',
         dni: '',
-        contacto: '1128974824',
+        contacto: '',
         jobs: [createEmptyJob(states[0] ?? 'PENDIENTE')],
     });
     const [lookupFeedback, setLookupFeedback] = useState<string>('');
@@ -393,7 +393,6 @@ export default function WorkbenchPage({
 
     const applyTemplate = (index: number, serviceType: string): void => {
         const template = serviceTemplates.find((item) => item.value === serviceType);
-        const shouldRequestPart = ['modulo', 'bateria', 'placa'].includes(serviceType);
         const description = template?.description ?? '';
 
         updateJob(index, (job) => ({
@@ -405,8 +404,6 @@ export default function WorkbenchPage({
                     .join('\n')
                 : job.descripcion,
             repuesto: job.repuesto.trim() === '' ? template?.repuesto ?? '' : job.repuesto,
-            pedir_repuesto: shouldRequestPart ? true : job.pedir_repuesto,
-            estado: shouldRequestPart && job.estado === 'PENDIENTE' ? 'EN REPARACION / ESPERA REPUESTO' : job.estado,
         }));
     };
 
@@ -831,7 +828,7 @@ export default function WorkbenchPage({
                                 onSuccess: () => {
                                     createForm.reset();
                                     createForm.setData('id_orden', String(nextOrderId + 1));
-                                    createForm.setData('contacto', '1128974824');
+                                    createForm.setData('contacto', '');
                                     createForm.setData('jobs', [createEmptyJob(states[0] ?? 'PENDIENTE')]);
                                     setImagePreviews({});
                                     setLookupFeedback('');
@@ -851,7 +848,7 @@ export default function WorkbenchPage({
                             <label className={repairLabelClass}>ID de orden *<input className={compactInputClass} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required /><span className="text-xs font-semibold text-[#64748b]">Editable si esta libre.</span></label>
                             <label className={repairLabelClass}>Nombre del cliente *<input className={compactInputClass} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required /></label>
                             <label className={repairLabelClass}>DNI<div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => createForm.setData('dni', event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
-                            <label className={repairLabelClass}>Telefono / contacto<input className={compactInputClass} value={createForm.data.contacto} onFocus={() => { if (createForm.data.contacto === '1128974824') createForm.setData('contacto', ''); }} onChange={(event) => createForm.setData('contacto', event.target.value)} /><span className="text-xs font-semibold text-[#64748b]">Opcional, recomendado.</span></label>
+                            <label className={repairLabelClass}>Telefono / contacto<input className={compactInputClass} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Si queda vacio se guarda sin contacto.</span></label>
                             {lookupFeedback !== '' ? <p className="md:col-span-4 rounded-xl bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
                         </div>
 
@@ -874,7 +871,7 @@ export default function WorkbenchPage({
 
                                     <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
                                         <div className={cn(fieldPanelBlue, 'md:col-span-2')}>
-                                            <label className={repairLabelClass}>Modelo / equipo *<input className={compactInputClass} value={job.modelo} onChange={(event) => updateJob(index, (current) => ({ ...current, modelo: event.target.value }))} required /></label>
+                                            <label className={repairLabelClass}>Modelo / equipo<input className={compactInputClass} value={job.modelo} onChange={(event) => updateJob(index, (current) => ({ ...current, modelo: event.target.value }))} /></label>
                                         </div>
                                         <div className={fieldPanelPurple}>
                                             <label className={repairLabelClass}>Categoria<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => updateJob(index, (current) => ({ ...current, categorias_reparacion: event.target.value }))}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
@@ -893,13 +890,13 @@ export default function WorkbenchPage({
                                             <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Monto ($) *<input className={compactInputClass} type="number" step="100" min="0" value={job.monto} onFocus={() => clearZeroAmount(index, 'monto')} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} required /><span className="text-xs font-semibold text-[#64748b]">0 si se presupuesta.</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.monto} onFocus={() => clearZeroAmount(index, 'monto')} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
                                         </div>
                                         <div className={fieldPanelGreen}>
                                             <label className={repairLabelClass}>Sena ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.senia} onFocus={() => clearZeroAmount(index, 'senia')} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
                                         </div>
                                         <div className={fieldPanelAmber}>
-                                            <label className={repairLabelClass}>Fecha estimada *<input className={compactInputClass} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} required /></label>
+                                            <label className={repairLabelClass}>Fecha estimada<input className={compactInputClass} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
                                         </div>
                                         <div className={fieldPanelPurple}>
                                             <label className={repairLabelClass}>Observaciones<textarea className={compactTextareaClass} rows={4} value={job.observaciones} onFocus={() => { if (job.observaciones.trim().toLowerCase() === 'sin observaciones') updateJob(index, (current) => ({ ...current, observaciones: '' })); }} onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))} /></label>
@@ -938,8 +935,8 @@ export default function WorkbenchPage({
                                                     Mandar a pedidos
                                                 </label>
                                             </div>
-                                            <textarea className={compactTextareaClass} rows={2} placeholder="Detalle del repuesto. Ej: modulo Samsung A54 negro" value={job.repuesto} onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value, pedir_repuesto: event.target.value.trim() !== '' ? true : current.pedir_repuesto }))} />
-                                            <span className="mt-1 block text-xs font-semibold text-[#92400e]">Si se marca, queda como espera de repuesto en consulta.</span>
+                                            <textarea className={compactTextareaClass} rows={2} placeholder="Detalle del repuesto. Ej: modulo Samsung A54 negro" value={job.repuesto} onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value }))} />
+                                            <span className="mt-1 block text-xs font-semibold text-[#92400e]">Solo se guarda si marcas Mandar a pedidos.</span>
                                         </div>
                                     </div>
                                 </article>

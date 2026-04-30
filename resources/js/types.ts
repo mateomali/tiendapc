@@ -193,6 +193,8 @@ export interface RepairOrderView {
     entregado: string;
     fecha_entregado?: string | null;
     repuesto?: string | null;
+    repuesto_pedido?: boolean;
+    repuesto_pedido_at?: string | null;
     categorias_reparacion: number;
     imagenes: RepairImageView[];
     imagenes_finales: RepairImageView[];

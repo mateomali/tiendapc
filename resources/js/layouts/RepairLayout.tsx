@@ -27,6 +27,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
         { href: route('admin.products.index'), label: 'Productos y ventas', shortLabel: 'Prod.', match: '/admin/productos', icon: <FaExternalLinkAlt aria-hidden="true" /> },
         { href: route('repairs.workbench'), label: 'Consultas', shortLabel: 'Cons.', match: '/consulta', icon: <FaSearch aria-hidden="true" /> },
         { href: route('repairs.ingress'), label: 'Nueva Orden', shortLabel: 'Ingreso', match: '/ingreso', icon: <FaInbox aria-hidden="true" /> },
+        { href: route('repairs.parts'), label: 'Repuestos', shortLabel: 'Rep.', match: '/repuestos', icon: <FaTools aria-hidden="true" /> },
         { href: route('repairs.delivered'), label: 'Entregados', shortLabel: 'Entreg.', match: '/entregados', icon: <FaTools aria-hidden="true" /> },
         { href: route('repairs.tracking'), label: 'Consulta publica', shortLabel: 'Publica', match: '/reparacion', icon: <FaSearch aria-hidden="true" /> },
     ];

@@ -54,6 +54,9 @@ Route::middleware(['auth', 'role:admin,editor'])->group(function (): void {
     Route::get('/consulta/ticket/{orderId}', [WorkbenchController::class, 'showTicket']);
     Route::get('/entregados', [WorkbenchController::class, 'delivered'])->name('repairs.delivered');
     Route::get('/entregados.php', [WorkbenchController::class, 'delivered']);
+    Route::get('/repuestos', [WorkbenchController::class, 'parts'])->name('repairs.parts');
+    Route::get('/repuestos.php', [WorkbenchController::class, 'parts']);
+    Route::post('/repairs/orders/{repairOrder}/parts/remove', [WorkbenchController::class, 'removePartRequest'])->name('repairs.parts.remove');
     Route::get('/repairs/api/client/by-dni', [WorkbenchController::class, 'lookupByDni'])->name('repairs.lookup');
     Route::post('/repairs/orders/{repairOrder}', [WorkbenchController::class, 'update'])->name('repairs.orders.update');
     Route::post('/repairs/orders/{repairOrder}/add-repair', [WorkbenchController::class, 'addRepair'])->name('repairs.orders.add_repair');

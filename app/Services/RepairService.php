@@ -167,6 +167,9 @@ class RepairService
                 'estado' => $job['estado'],
                 'entregado' => 'no',
                 'repuesto' => $job['repuesto'],
+                'repuesto_pedido' => $job['pedir_repuesto'],
+                'repuesto_pedido_at' => $job['pedir_repuesto'] ? now() : null,
+                'repuesto_pedido_oculto_at' => null,
                 'categorias_reparacion' => $job['categorias_reparacion'],
                 'imagen' => implode('|', $storedImages),
             ]);
@@ -183,6 +186,9 @@ class RepairService
         $repairNumber = ((int) RepairOrder::query()->where('id', $order->id)->max('reparacion')) + 1;
         $storedImages = $this->storeImages($images, $order->id, $repairNumber, 'orig');
 
+        $partRequested = filter_var($payload['repuesto_pedido'] ?? false, FILTER_VALIDATE_BOOL);
+        $part = trim((string) ($payload['repuesto'] ?? ''));
+
         $repair = RepairOrder::query()->create([
             'id' => $order->id,
             'reparacion' => $repairNumber,
@@ -190,7 +196,7 @@ class RepairService
             'nombre_cliente' => $order->nombre_cliente,
             'dni' => $order->dni,
             'contacto' => $order->contacto,
-            'modelo' => $payload['modelo'],
+            'modelo' => $payload['modelo'] ?? null,
             'descripcion' => $payload['descripcion'],
             'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
             'monto' => $payload['monto'] ?? 0,
@@ -198,7 +204,10 @@ class RepairService
             'fecha_estimada' => $payload['fecha_estimada'] ?? null,
             'estado' => 'PENDIENTE',
             'entregado' => 'no',
-            'repuesto' => $payload['repuesto'] ?? null,
+            'repuesto' => $partRequested && $part !== '' ? $part : null,
+            'repuesto_pedido' => $partRequested && $part !== '',
+            'repuesto_pedido_at' => $partRequested && $part !== '' ? now() : null,
+            'repuesto_pedido_oculto_at' => null,
             'categorias_reparacion' => $payload['categorias_reparacion'] ?? 4,
             'imagen' => implode('|', $storedImages),
         ]);
@@ -240,6 +249,10 @@ class RepairService
             $originalImages = array_slice(array_merge($order->originalImages(), $this->storeImages($images, $newOrderId, $order->reparacion, 'orig')), 0, 2);
             $finalStored = array_slice(array_merge($order->finalImages(), $this->storeImages($finalImages, $newOrderId, $order->reparacion, 'final')), 0, 2);
 
+            $partRequested = filter_var($payload['repuesto_pedido'] ?? false, FILTER_VALIDATE_BOOL);
+            $part = trim((string) ($payload['repuesto'] ?? ''));
+            $activePartRequest = $partRequested && $part !== '';
+
             $order->fill([
                 'id' => $newOrderId,
                 'nombre_cliente' => $payload['nombre_cliente'],
@@ -254,7 +267,10 @@ class RepairService
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => $payload['estado'] ?? $order->estado,
                 'fecha_entregado' => $payload['fecha_entregado'] ?? $order->fecha_entregado,
-                'repuesto' => $payload['repuesto'] ?? null,
+                'repuesto' => $activePartRequest ? $part : null,
+                'repuesto_pedido' => $activePartRequest,
+                'repuesto_pedido_at' => $activePartRequest ? ($order->repuesto_pedido_at ?? now()) : null,
+                'repuesto_pedido_oculto_at' => $activePartRequest ? null : $order->repuesto_pedido_oculto_at,
                 'categorias_reparacion' => $payload['categorias_reparacion'] ?? 4,
                 'imagen' => implode('|', $originalImages),
                 'imagen3' => $finalStored[0] ?? null,
@@ -451,7 +467,11 @@ class RepairService
             'delivered' => $orders->where('entregado', 'si')->count(),
             'pending' => $orders->where('entregado', 'no')->where('estado', 'PENDIENTE')->count(),
             'inRepair' => $orders->where('entregado', 'no')->whereIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])->count(),
-            'waitingParts' => 0,
+            'waitingParts' => $orders
+                ->where('entregado', 'no')
+                ->where('repuesto_pedido', true)
+                ->whereNull('repuesto_pedido_oculto_at')
+                ->count(),
             'overdue' => $orders
                 ->where('entregado', 'no')
                 ->whereIn('estado', ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])
@@ -688,6 +708,7 @@ class RepairService
      *     fecha_estimada:?string,
      *     estado:string,
      *     repuesto:?string,
+     *     pedir_repuesto:bool,
      *     categorias_reparacion:int
      * }>
      */
@@ -712,9 +733,16 @@ class RepairService
                 $model = trim((string) ($job['modelo'] ?? ''));
                 $description = trim((string) ($job['descripcion'] ?? ''));
                 $fallbackDescription = trim((string) ($template['description'] ?? ''));
+                $shouldRequestPart = filter_var($job['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
+                $part = trim((string) ($job['repuesto'] ?? ''));
 
                 if ($description === '' && $fallbackDescription !== '') {
                     $description = $model !== '' ? trim($fallbackDescription . ' ' . $model) : $fallbackDescription;
+                }
+
+                $state = (string) ($job['estado'] ?? 'PENDIENTE');
+                if (! $shouldRequestPart && $state === 'EN REPARACION / ESPERA REPUESTO') {
+                    $state = 'PENDIENTE';
                 }
 
                 return [
@@ -724,27 +752,36 @@ class RepairService
                     'monto' => $job['monto'] ?? 0,
                     'senia' => $job['senia'] ?? 0,
                     'fecha_estimada' => $job['fecha_estimada'] ?? null,
-                    'estado' => $job['estado'] ?? 'PENDIENTE',
-                    'repuesto' => trim((string) ($job['repuesto'] ?? '')) !== ''
-                        ? trim((string) ($job['repuesto'] ?? ''))
-                        : (($template['repuesto'] ?? '') !== '' ? (string) $template['repuesto'] : null),
+                    'estado' => $state,
+                    'repuesto' => $shouldRequestPart && $part !== '' ? $part : null,
+                    'pedir_repuesto' => $shouldRequestPart,
                     'categorias_reparacion' => max(1, (int) ($job['categorias_reparacion'] ?? 4)),
                 ];
             })
-            ->filter(fn (array $job): bool => trim((string) $job['descripcion']) !== '' || trim((string) ($job['modelo'] ?? '')) !== '')
+            ->filter(fn (array $job): bool => trim((string) $job['descripcion']) !== '')
             ->values()
             ->all();
 
         if ($jobs === []) {
+            $description = trim((string) ($payload['descripcion'] ?? ''));
+
+            if ($description === '') {
+                throw new \RuntimeException('Completa el tipo de servicio o descripcion de la falla.');
+            }
+
+            $shouldRequestPart = filter_var($payload['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
+            $part = trim((string) ($payload['repuesto'] ?? ''));
+
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
-                'descripcion' => trim((string) ($payload['descripcion'] ?? '')) !== '' ? trim((string) $payload['descripcion']) : 'Revision general del equipo',
+                'descripcion' => $description,
                 'observaciones' => trim((string) ($payload['observaciones'] ?? '')) !== '' ? trim((string) $payload['observaciones']) : 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => $payload['senia'] ?? 0,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
-                'estado' => $payload['estado'] ?? 'PENDIENTE',
-                'repuesto' => trim((string) ($payload['repuesto'] ?? '')) !== '' ? trim((string) $payload['repuesto']) : null,
+                'estado' => ! $shouldRequestPart && ($payload['estado'] ?? null) === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : ($payload['estado'] ?? 'PENDIENTE'),
+                'repuesto' => $shouldRequestPart && $part !== '' ? $part : null,
+                'pedir_repuesto' => $shouldRequestPart,
                 'categorias_reparacion' => max(1, (int) ($payload['categorias_reparacion'] ?? 4)),
             ]];
         }

@@ -92,6 +92,64 @@ class WorkbenchController extends Controller
         ]);
     }
 
+    public function parts(Request $request): Response
+    {
+        $period = (string) $request->query('periodo', 'week');
+        if (! in_array($period, ['week', 'month', 'all'], true)) {
+            $period = 'week';
+        }
+
+        $query = RepairOrder::query()
+            ->where('repuesto_pedido', true)
+            ->whereNull('repuesto_pedido_oculto_at')
+            ->whereNotNull('repuesto')
+            ->where('repuesto', '<>', '');
+
+        if ($period === 'week') {
+            $query->where('repuesto_pedido_at', '>=', now()->subDays(6)->startOfDay());
+        } elseif ($period === 'month') {
+            $query->where('repuesto_pedido_at', '>=', now()->startOfMonth());
+        }
+
+        $categoryLabels = collect($this->serviceCategories())->pluck('label', 'value')->all();
+
+        return Inertia::render('Repairs/PartsPage', [
+            'period' => $period,
+            'rows' => $query
+                ->orderByDesc('repuesto_pedido_at')
+                ->orderByDesc('id')
+                ->orderBy('reparacion')
+                ->get()
+                ->map(fn (RepairOrder $order): array => [
+                    'registro_id' => $order->registro_id,
+                    'tipo_repuesto' => $categoryLabels[(int) $order->categorias_reparacion] ?? 'Varios',
+                    'repuesto' => $order->repuesto,
+                    'pedido' => sprintf('#%d - Reparacion %d', $order->id, $order->reparacion),
+                    'cliente' => $order->nombre_cliente,
+                    'fecha' => optional($order->repuesto_pedido_at)->format('Y-m-d'),
+                    'ticket_url' => route('repairs.tickets.show', ['orderId' => $order->id]),
+                    'remove_url' => route('repairs.parts.remove', $order),
+                ])
+                ->values()
+                ->all(),
+            'filters' => [
+                'week' => route('repairs.parts', ['periodo' => 'week']),
+                'month' => route('repairs.parts', ['periodo' => 'month']),
+                'all' => route('repairs.parts', ['periodo' => 'all']),
+            ],
+        ]);
+    }
+
+    public function removePartRequest(RepairOrder $repairOrder): RedirectResponse
+    {
+        $repairOrder->update([
+            'repuesto_pedido' => false,
+            'repuesto_pedido_oculto_at' => now(),
+        ]);
+
+        return back()->with('success', 'Repuesto quitado de la lista de pedidos.');
+    }
+
     public function lookupByDni(Request $request, RepairService $repairService): JsonResponse
     {
         $validated = $request->validate([
@@ -117,13 +175,14 @@ class WorkbenchController extends Controller
     public function addRepair(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
         $validated = $request->validate([
-            'modelo' => ['required', 'string', 'max:255'],
+            'modelo' => ['nullable', 'string', 'max:255'],
             'descripcion' => ['required', 'string'],
             'observaciones' => ['nullable', 'string'],
             'monto' => ['nullable', 'numeric', 'min:0'],
             'senia' => ['nullable', 'numeric', 'min:0'],
-            'fecha_estimada' => ['required', 'date'],
+            'fecha_estimada' => ['nullable', 'date'],
             'repuesto' => ['nullable', 'string', 'max:255'],
+            'repuesto_pedido' => ['nullable', 'boolean'],
             'categorias_reparacion' => ['nullable', 'integer', 'min:1'],
             'images.*' => ['nullable', 'file', 'image', 'max:8192'],
         ]);
@@ -317,6 +376,8 @@ class WorkbenchController extends Controller
             'entregado' => $order->entregado,
             'fecha_entregado' => optional($order->fecha_entregado)->format('Y-m-d'),
             'repuesto' => $order->repuesto,
+            'repuesto_pedido' => (bool) $order->repuesto_pedido,
+            'repuesto_pedido_at' => optional($order->repuesto_pedido_at)->format('Y-m-d H:i'),
             'categorias_reparacion' => $order->categorias_reparacion,
             'imagenes' => $this->serializeImages($order->originalImages(), $order, false),
             'imagenes_finales' => $this->serializeImages($order->finalImages(), $order, true),
