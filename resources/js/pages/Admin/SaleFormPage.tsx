@@ -30,7 +30,7 @@ interface SaleItemForm {
 interface ManualDraft {
     name: string;
     quantity: number;
-    unit_price: number;
+    unit_price: number | '';
 }
 
 interface SaleFormPageProps {
@@ -61,10 +61,8 @@ interface TicketAsideProps {
     customerLabel: string;
     issuedAtLabel: string;
     items: SaleItemForm[];
-    notes: string;
     saving: boolean;
     onCustomerLabelChange: (value: string) => void;
-    onNotesChange: (value: string) => void;
     onUpdateItem: (index: number, patch: Partial<SaleItemForm>) => void;
     onChangeQuantity: (index: number, delta: number) => void;
     onRemoveItem: (index: number) => void;
@@ -75,6 +73,16 @@ declare global {
     interface Window {
         BarcodeDetector?: new (options?: { formats?: string[] }) => BarcodeDetectorLike;
     }
+}
+
+function capitalizeFirstLetter(value: string, trimValue = true): string {
+    const trimmedValue = trimValue ? value.trim() : value;
+
+    if (trimmedValue === '') {
+        return '';
+    }
+
+    return trimmedValue.charAt(0).toLocaleUpperCase('es-AR') + trimmedValue.slice(1);
 }
 
 export default function SaleFormPage({ defaults, features, suggestedProducts, urls }: SaleFormPageProps): JSX.Element {
@@ -106,18 +114,19 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
     const addProduct = useCallback((product: ProductLookup): void => {
         setItems((current) => {
             const existing = current.find((item) => item.product_id === product.id);
+            const productName = capitalizeFirstLetter(product.name);
 
             if (existing) {
-                setFeedback(`Cantidad actualizada: ${product.name}`);
+                setFeedback(`Cantidad actualizada: ${productName}`);
                 return current.map((item) => (item.product_id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
             }
 
-            setFeedback(`Agregado: ${product.name}`);
+            setFeedback(`Agregado: ${productName}`);
             return [
                 ...current,
                 {
                     product_id: product.id,
-                    name: product.name,
+                    name: productName,
                     sku: product.sku ?? '',
                     category_name: product.category_name ?? '',
                     image_url: product.image_url ?? '',
@@ -215,22 +224,31 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
             return;
         }
 
+        const manualName = capitalizeFirstLetter(manualDraft.name);
+
         setItems((current) => [
             ...current,
             {
                 product_id: null,
-                name: manualDraft.name.trim(),
+                name: manualName,
                 sku: '',
                 category_name: 'Manual',
                 image_url: '',
                 quantity: Math.max(1, manualDraft.quantity),
-                unit_price: Math.max(0, manualDraft.unit_price),
-                manual_name: manualDraft.name.trim(),
+                unit_price: Math.max(0, Number(manualDraft.unit_price)),
+                manual_name: manualName,
             },
         ]);
-        setFeedback(`Agregado manual: ${manualDraft.name.trim()}`);
+        setFeedback(`Agregado manual: ${manualName}`);
         setManualDraft({ name: '', quantity: 1, unit_price: 0 });
         setManualOpen(false);
+    }
+
+    function changeManualQuantity(delta: number): void {
+        setManualDraft((current) => ({
+            ...current,
+            quantity: Math.max(1, current.quantity + delta),
+        }));
     }
 
     const updateItem = useCallback((index: number, patch: Partial<SaleItemForm>): void => {
@@ -270,28 +288,52 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
         }
 
         setSaving(true);
-        const response = await window.fetch(urls.saveApi, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': csrfToken,
-                Accept: 'application/json',
-            },
-            body: JSON.stringify({
-                customer_label: customerLabel,
-                notes,
-                items: items.map((item) => ({
-                    product_id: item.product_id,
-                    manual_name: item.product_id === null ? item.name : undefined,
-                    quantity: item.quantity,
-                    unit_price: Math.round(item.unit_price),
-                })),
-            }),
-        });
+        try {
+            const response = await window.fetch(urls.saveApi, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrfToken,
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({
+                    customer_label: customerLabel,
+                    notes,
+                    items: items.map((item) => ({
+                        product_id: item.product_id,
+                        manual_name: item.product_id === null ? item.name : undefined,
+                        quantity: item.quantity,
+                        unit_price: Math.round(item.unit_price),
+                    })),
+                }),
+            });
 
-        const payload = (await response.json()) as { ticket_url?: string; id: number };
-        router.visit(`${payload.ticket_url ?? route('admin.sales.ticket', payload.id)}#print`);
+            const payload = (await response.json().catch(() => ({}))) as {
+                message?: string;
+                ticket_url?: string;
+                id?: number;
+            };
+
+            if (!response.ok) {
+                setFeedback(payload.message ?? 'No se pudo emitir el ticket. Revisa los datos e intenta nuevamente.');
+                setSaving(false);
+                return;
+            }
+
+            const ticketUrl = payload.ticket_url ?? (payload.id ? route('admin.sales.ticket', { sale: payload.id }) : null);
+
+            if (!ticketUrl) {
+                setFeedback('La venta se guardo, pero no llego la URL del ticket. Revisa ventas para imprimirlo.');
+                setSaving(false);
+                return;
+            }
+
+            router.visit(`${ticketUrl}#print`);
+        } catch {
+            setFeedback('No se pudo emitir el ticket. Revisa la conexion e intenta nuevamente.');
+            setSaving(false);
+        }
     }, [csrfToken, customerLabel, items, notes, saving, urls.saveApi]);
 
     const handleEmitTicket = useCallback((): void => {
@@ -477,34 +519,53 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
                                     x
                                 </button>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                            <button type="button" className={buttonClass('soft', 'sm')} onClick={openScanner}>
-                                <FaVideo aria-hidden="true" />
-                                Camara
-                            </button>
-                            <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setManualOpen(!manualOpen)}>
-                                Item manual
-                            </button>
+                            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+                                <button type="button" className={buttonClass('soft', 'sm', 'w-full sm:w-auto')} onClick={openScanner}>
+                                    <FaVideo aria-hidden="true" />
+                                    Camara
+                                </button>
+                                <button type="button" className={buttonClass('soft', 'sm', 'w-full sm:w-auto')} onClick={() => setManualOpen(!manualOpen)}>
+                                    Item manual
+                                </button>
                             </div>
                         </div>
                         <div className="rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-2 text-sm font-bold text-ink-800">
                             {feedback || scannerStatus}
                         </div>
                         {manualOpen ? (
-                            <div className="grid gap-2 rounded-xl border border-sky-100 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_90px_120px_auto] sm:items-end">
-                                <label className="grid gap-1">
+                            <div className="grid grid-cols-2 items-end gap-2 rounded-xl border border-sky-100 bg-white p-3 shadow-[0_10px_22px_rgba(18,58,132,0.06)] lg:grid-cols-[minmax(0,1fr)_144px_132px_94px]">
+                                <label className="col-span-2 grid gap-1 lg:col-span-1">
                                     <span className={ui.fieldLabel}>Descripcion</span>
-                                    <input className={ui.input} placeholder="Nombre del item" value={manualDraft.name} onChange={(event) => setManualDraft((current) => ({ ...current, name: event.target.value }))} />
+                                    <input className={`${ui.input} min-h-9 rounded-xl px-3 py-2`} placeholder="Nombre del item" value={manualDraft.name} onChange={(event) => setManualDraft((current) => ({ ...current, name: event.target.value }))} />
                                 </label>
-                                <label className="grid gap-1">
+                                <div className="grid gap-1">
                                     <span className={ui.fieldLabel}>Cantidad</span>
-                                    <input className={ui.input} type="number" min="1" value={manualDraft.quantity} onChange={(event) => setManualDraft((current) => ({ ...current, quantity: Math.max(1, Number(event.target.value)) }))} />
-                                </label>
+                                    <div className="grid h-9 grid-cols-[38px_minmax(44px,1fr)_38px] overflow-hidden rounded-xl border border-sky-200/90 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] lg:grid-cols-[38px_minmax(56px,1fr)_38px]">
+                                        <button type="button" className="grid place-items-center text-brand-700 hover:bg-brand-50" onClick={() => changeManualQuantity(-1)} aria-label="Restar cantidad manual">
+                                            <FaMinus aria-hidden="true" />
+                                        </button>
+                                        <div className="grid place-items-center border-x border-sky-100 bg-sky-50 text-base font-black text-ink-950" title="Cantidad">
+                                            {manualDraft.quantity}
+                                        </div>
+                                        <button type="button" className="grid place-items-center text-brand-700 hover:bg-brand-50" onClick={() => changeManualQuantity(1)} aria-label="Sumar cantidad manual">
+                                            <FaPlus aria-hidden="true" />
+                                        </button>
+                                    </div>
+                                </div>
                                 <label className="grid gap-1">
                                     <span className={ui.fieldLabel}>Precio</span>
-                                    <input className={ui.input} type="number" min="0" value={manualDraft.unit_price} onChange={(event) => setManualDraft((current) => ({ ...current, unit_price: Math.max(0, Number(event.target.value)) }))} />
+                                    <input
+                                        className={`${ui.input} min-h-9 rounded-xl px-3 py-2`}
+                                        type="number"
+                                        min="0"
+                                        value={manualDraft.unit_price}
+                                        onChange={(event) => {
+                                            const value = event.target.value;
+                                            setManualDraft((current) => ({ ...current, unit_price: value === '' ? '' : Math.max(0, Number(value)) }));
+                                        }}
+                                    />
                                 </label>
-                                <button type="button" className={buttonClass('primary')} onClick={addManualItem}>
+                                <button type="button" className={buttonClass('primary', 'sm', 'col-span-2 h-9 min-h-9 w-full rounded-xl px-3 py-0 lg:col-span-1')} onClick={addManualItem}>
                                     Agregar
                                 </button>
                             </div>
@@ -548,10 +609,8 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
                     customerLabel={customerLabel}
                     issuedAtLabel={defaults.issuedAtLabel}
                     items={items}
-                    notes={notes}
                     saving={saving}
                     onCustomerLabelChange={setCustomerLabel}
-                    onNotesChange={setNotes}
                     onUpdateItem={updateItem}
                     onChangeQuantity={changeQuantity}
                     onRemoveItem={removeItem}
@@ -566,10 +625,8 @@ const TicketAside = memo(function TicketAside({
     customerLabel,
     issuedAtLabel,
     items,
-    notes,
     saving,
     onCustomerLabelChange,
-    onNotesChange,
     onUpdateItem,
     onChangeQuantity,
     onRemoveItem,
@@ -609,7 +666,10 @@ const TicketAside = memo(function TicketAside({
                         </div>
                         <div className="grid min-w-0 gap-1">
                             {item.product_id === null ? (
-                                <input className={`${ui.input} min-h-9 rounded-lg px-2 py-1 text-xs`} placeholder="Nombre del item manual" value={item.name} onChange={(event) => onUpdateItem(index, { name: event.target.value, manual_name: event.target.value })} />
+                                <input className={`${ui.input} min-h-9 rounded-lg px-2 py-1 text-xs`} placeholder="Nombre del item manual" value={item.name} onChange={(event) => {
+                                    const itemName = capitalizeFirstLetter(event.target.value, false);
+                                    onUpdateItem(index, { name: itemName, manual_name: itemName });
+                                }} />
                             ) : (
                                 <strong className="line-clamp-2 text-sm leading-tight text-ink-950">{item.name}</strong>
                             )}
@@ -642,10 +702,6 @@ const TicketAside = memo(function TicketAside({
             </div>
 
             <div className="sticky bottom-0 z-10 grid gap-2 rounded-xl border border-brand-100 bg-white/98 p-3 shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
-                <label className="grid gap-1">
-                    <span className={ui.fieldLabel}>Notas</span>
-                    <textarea className={`${ui.textarea} min-h-20`} value={notes} onChange={(event) => onNotesChange(event.target.value)} />
-                </label>
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-black uppercase tracking-[0.16em] text-brand-700">Total</span>
                     <strong className="text-3xl font-black text-ink-950">{formatCurrency(total)}</strong>
