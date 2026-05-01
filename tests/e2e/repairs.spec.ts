@@ -5,7 +5,7 @@ test('public repairs tracking renders the legacy-like public shell', async ({ pa
 
     await expect(page.getByRole('heading', { name: /Estado de su repar/i })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Consultar' })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Consultas:/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Tenés alguna duda/i })).toBeVisible();
     await expect(page.getByText('SUDOKU -')).toBeVisible();
 });
 
@@ -24,6 +24,6 @@ test('public repairs tracking renders found and not found states', async ({ page
 test('repair tech login screen is reachable', async ({ page }) => {
     await page.goto('/consulta');
 
-    await expect(page.getByText('Mesa de reparaciones')).toBeVisible();
-    await expect(page.getByPlaceholder('Clave tecnica')).toBeVisible();
+    await expect(page.getByText('Acceso tecnico')).toBeVisible();
+    await expect(page.getByLabel('Clave de acceso')).toBeVisible();
 });

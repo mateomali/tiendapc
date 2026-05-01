@@ -1,98 +1,9 @@
 @import 'tailwindcss';
 
-html,
-body,
-#app {
-    min-width: 100%;
-    min-height: 100%;
-    overflow-x: hidden;
-    overflow-x: clip;
-    background: #d6e4ff;
-    overscroll-behavior-x: none;
-}
-
-body {
-    margin: 0;
-}
-
-@keyframes marquee {
-    0% {
-        transform: translateX(100%);
-    }
-
-    100% {
-        transform: translateX(-100%);
-    }
-}
-
-@media (max-width: 860px) {
-    html,
-    body {
-        scroll-behavior: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-}
-
-.sale-ticket-total-row {
-    display: flex;
-    width: 100%;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.sale-ticket-total-row strong {
-    margin-left: auto;
-    text-align: right;
-}
-
 @media print {
     @page {
         size: 80mm auto;
         margin: 0;
-    }
-
-    html,
-    body,
-    #app {
-        min-width: 80mm !important;
-        width: 80mm !important;
-        background: #ffffff !important;
-    }
-
-    body * {
-        visibility: hidden !important;
-    }
-
-    .sale-ticket-thermal,
-    .sale-ticket-thermal *,
-    .thermal-ticket,
-    .thermal-ticket * {
-        visibility: visible !important;
-    }
-
-    .sale-ticket-thermal,
-    .thermal-ticket {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 80mm !important;
-        margin: 0 !important;
-        padding: 4mm !important;
-        box-shadow: none !important;
-    }
-
-    .sale-ticket-total-row {
-        display: flex !important;
-        width: 100% !important;
-        align-items: baseline !important;
-        justify-content: space-between !important;
-        gap: 8px !important;
-    }
-
-    .sale-ticket-total-row strong {
-        margin-left: auto !important;
-        text-align: right !important;
     }
 }
 
@@ -102,6 +13,7 @@ body {
 @source '../**/*.js';
 @source '../**/*.ts';
 @source '../**/*.tsx';
+@source '../../src-tauri/src/**/*.rs';
 
 @theme {
     --font-sans: 'Trebuchet MS', 'Verdana', ui-sans-serif, system-ui, sans-serif;
@@ -130,6 +42,18 @@ body {
     --color-ink-900: #102146;
     --color-ink-950: #071a38;
 
+    --animate-marquee: marquee 28s linear infinite;
+
+    @keyframes marquee {
+        0% {
+            transform: translateX(100%);
+        }
+
+        100% {
+            transform: translateX(-100%);
+        }
+    }
+
     @keyframes siteAnnouncementAuraPulse {
         0% {
             opacity: 0.58;
@@ -156,173 +80,4 @@ body {
             opacity: 0.42;
         }
     }
-}
-
-.admin-density {
-    color-scheme: light;
-}
-
-.admin-density :where(main, form, section, article, aside, div, nav) {
-    min-width: 0;
-}
-
-.admin-density :where(section, article, aside, form) {
-    border-radius: 0.75rem !important;
-}
-
-.admin-density :where(main > section, main > form, main > article, main > aside, main > div > section, main > div > form, main > div > article, main > div > aside) {
-    border-color: rgba(148, 180, 226, 0.72) !important;
-    box-shadow: 0 8px 18px rgba(15, 45, 103, 0.08) !important;
-}
-
-.admin-density :where(section, article, aside, form):not(:where(header *)) {
-    padding: 0.75rem !important;
-}
-
-.admin-density :where(.space-y-5 > :not([hidden]) ~ :not([hidden]),
-.space-y-4 > :not([hidden]) ~ :not([hidden]),
-.space-y-3 > :not([hidden]) ~ :not([hidden]),
-.space-y-2 > :not([hidden]) ~ :not([hidden])) {
-    margin-top: 0.45rem !important;
-}
-
-.admin-density :where(.grid) {
-    gap: 0.55rem;
-}
-
-.admin-density :where(.flex) {
-    gap: 0.45rem;
-}
-
-.admin-density :where(h1, h2, h3, p) {
-    margin-top: 0;
-    margin-bottom: 0;
-}
-
-.admin-density :where(h2) {
-    font-size: 1.25rem !important;
-    line-height: 1.15 !important;
-}
-
-.admin-density :where(h3) {
-    font-size: 1.05rem !important;
-    line-height: 1.15 !important;
-}
-
-.admin-density :where(p, span, label, small) {
-    line-height: 1.25;
-}
-
-.admin-density :where(input:not([type='checkbox']):not([type='radio']), select) {
-    min-height: 2.15rem !important;
-    border-radius: 0.45rem !important;
-    padding: 0.4rem 0.55rem !important;
-    font-size: 0.8rem !important;
-}
-
-.admin-density :where(textarea) {
-    min-height: 4.75rem !important;
-    border-radius: 0.45rem !important;
-    padding: 0.45rem 0.55rem !important;
-    font-size: 0.8rem !important;
-}
-
-.admin-density textarea.product-description-textarea {
-    height: 32rem !important;
-    min-height: 32rem !important;
-}
-
-@media (min-width: 1024px) {
-    .admin-density textarea.product-description-textarea {
-        height: 30rem !important;
-        min-height: 30rem !important;
-    }
-}
-
-.admin-density :where(button, a[role='button'], input[type='submit']) {
-    border-radius: 0.45rem !important;
-}
-
-.admin-density :where(table) {
-    width: 100%;
-    border-collapse: collapse !important;
-    border-spacing: 0 !important;
-    font-size: 0.78rem !important;
-}
-
-.admin-density :where(th) {
-    border-right: 1px solid rgba(148, 180, 226, 0.74) !important;
-    border-bottom: 1px solid rgba(112, 153, 214, 0.82) !important;
-    padding: 0.42rem 0.5rem !important;
-    white-space: nowrap;
-}
-
-.admin-density :where(td) {
-    border-right: 1px solid rgba(192, 211, 238, 0.9) !important;
-    border-bottom: 1px solid rgba(192, 211, 238, 0.9) !important;
-    padding: 0.45rem 0.5rem !important;
-    vertical-align: top;
-}
-
-.admin-density :where(th:last-child, td:last-child) {
-    border-right-width: 0 !important;
-}
-
-.admin-density :where(tbody tr:nth-child(even)) {
-    background: rgba(248, 251, 255, 0.72);
-}
-
-.admin-density :where(tbody tr:hover) {
-    background: rgba(229, 241, 255, 0.82);
-}
-
-.admin-density :where(img) {
-    max-width: 100%;
-}
-
-.admin-density :where(main article h3, main button h3) {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-}
-
-.admin-density :where(main article p, main button p) {
-    display: -webkit-box;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-}
-
-.admin-density :where(main article .inline-flex, main article a, main article button) {
-    min-height: 1.85rem !important;
-    padding-top: 0.25rem !important;
-    padding-bottom: 0.25rem !important;
-}
-
-.admin-density :where(.overflow-x-auto) {
-    border-radius: 0.6rem !important;
-}
-
-.admin-density :where(.rounded-2xl, .rounded-\[1\.4rem\], .rounded-\[1\.5rem\], .rounded-\[1\.75rem\], .rounded-\[22px\], .rounded-\[24px\]) {
-    border-radius: 0.65rem !important;
-}
-
-.admin-density :where(.p-6, .p-5, .p-4) {
-    padding: 0.75rem !important;
-}
-
-.admin-density :where(.px-6, .px-5, .px-4) {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-}
-
-.admin-density :where(.py-8, .py-6, .py-5, .py-4) {
-    padding-top: 0.75rem !important;
-    padding-bottom: 0.75rem !important;
-}
-
-.admin-density :where(.min-h-40, .min-h-48, .min-h-32) {
-    min-height: 5rem !important;
 }

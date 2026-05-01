@@ -328,7 +328,7 @@ function RepairImagesBlock({
                         <div key={image.filename} className="relative overflow-hidden rounded-lg border border-slate-200 bg-white">
                             <button type="button" className="block aspect-[4/3] w-full" onClick={() => onOpen(index)}>
                                 <FaImage className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-slate-300" aria-hidden="true" />
-                                <img src={image.thumbnailUrl || image.url} alt={image.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.style.opacity = '0'; }} />
+                                <img src={image.thumbnailUrl || image.url} alt={image.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
                             </button>
                             {!readOnly ? (
                                 <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-[#dc3545] text-xs text-white" onClick={() => onRemove(image)} title="Quitar imagen">
@@ -650,7 +650,7 @@ function RepairEditCard({
             {firstImage ? (
                 <>
                     <FaImage className="absolute text-slate-400" aria-hidden="true" />
-                    <img src={firstImage.thumbnailUrl || firstImage.url} alt={firstImage.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.style.opacity = '0'; }} />
+                    <img src={firstImage.thumbnailUrl || firstImage.url} alt={firstImage.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
                     {galleryImages.length > 1 ? <span className="absolute right-1 top-1 rounded-full bg-slate-950/75 px-1.5 py-0.5 text-[0.68rem] font-bold text-white">+{galleryImages.length - 1}</span> : null}
                 </>
             ) : (
@@ -945,7 +945,7 @@ function RepairEditCard({
                             <div className="flex gap-2 overflow-x-auto">
                                 {galleryImages.map((image, index) => (
                                     <button key={`${image.filename}-${index}`} type="button" className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white" onClick={() => setGalleryIndex(index)}>
-                                        <img src={image.thumbnailUrl || image.url} alt={image.filename} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.opacity = '0'; }} />
+                                        <img src={image.thumbnailUrl || image.url} alt={image.filename} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
                                         <span className="absolute bottom-0 inset-x-0 bg-slate-950/65 py-0.5 text-[0.58rem] font-bold text-white">{index < repair.imagenes.length ? 'Inicial' : 'Final'}</span>
                                     </button>
                                 ))}

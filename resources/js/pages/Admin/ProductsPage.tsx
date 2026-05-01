@@ -1173,7 +1173,7 @@ export default function ProductsPage({
     const sortLabel = (key: string): string => (sort === key ? (order === 'asc' ? ' ↑' : ' ↓') : '');
     const sortHeaderClass = (key: string): string =>
         cn(
-            'rounded-md px-1.5 py-1 font-inherit text-left transition',
+            'inline-flex min-h-8 items-center rounded-md px-2 py-1 font-inherit text-left transition',
             sort === key ? 'bg-brand-100 text-brand-900 ring-1 ring-brand-200' : 'hover:bg-brand-50',
         );
     const updatePendingProduct = useCallback((productId: number, isPending: boolean): void => {
@@ -1514,11 +1514,11 @@ export default function ProductsPage({
             </section>
 
             <section className={ui.sectionCardTight}>
-                <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-xl border border-sky-100 bg-[linear-gradient(90deg,#eff6ff_0%,#ffffff_50%,#eff6ff_100%)] px-3 py-2 shadow-[0_8px_18px_rgba(15,45,103,0.08)]">
-                    <div className="min-w-0 overflow-hidden">
-                        <div className="flex min-w-0 items-center gap-3 whitespace-nowrap">
+                <div className="mb-2 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-xl border border-sky-100 bg-[linear-gradient(90deg,#eff6ff_0%,#ffffff_50%,#eff6ff_100%)] px-3 py-2 shadow-[0_8px_18px_rgba(15,45,103,0.08)] sm:items-center">
+                    <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                             <span className="shrink-0 text-xs font-black uppercase tracking-[0.16em] text-brand-700">Productos filtrados</span>
-                            <span className="min-w-0 truncate text-sm font-bold text-ink-900">
+                            <span className="min-w-0 text-sm font-bold leading-snug text-ink-900">
                                 {products.length} visibles de {stats.total}
                                 {activeFilterSummary.length > 0 ? ` - ${activeFilterSummary.join(' - ')}` : ' - Sin filtros activos'}
                             </span>

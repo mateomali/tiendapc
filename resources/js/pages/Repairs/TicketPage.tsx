@@ -44,40 +44,9 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
     return (
         <>
             <Head title={`Ticket #${ticket.id}`} />
-            <style>{`
-                @media print {
-                    html, body {
-                        width: 80mm;
-                        margin: 0;
-                        padding: 0;
-                        background: #fff !important;
-                    }
-                    @page {
-                        size: 80mm auto;
-                        margin: 0;
-                    }
-                    .ticket-toolbar {
-                        display: none !important;
-                    }
-                    .thermal-ticket {
-                        width: 80mm !important;
-                        margin: 0 auto !important;
-                        padding: 4mm 4mm 6mm !important;
-                        box-shadow: none !important;
-                    }
-                    .print-top-gap {
-                        display: block !important;
-                        height: 4mm;
-                    }
-                    .ticket-cut-space {
-                        display: block !important;
-                        height: 22mm;
-                    }
-                }
-            `}</style>
 
-            <div className="min-h-screen bg-[#f3f4f6] px-3 py-2 text-black">
-                <div className="ticket-toolbar mx-auto mb-2 flex w-[80mm] flex-wrap justify-center gap-1.5">
+            <div className="min-h-screen bg-[#f3f4f6] px-3 py-2 text-black print:w-[80mm] print:bg-white print:p-0">
+                <div className="mx-auto mb-2 flex w-[80mm] flex-wrap justify-center gap-1.5 print:hidden">
                     <Link href={returnUrl} className={buttonClass('soft', 'sm')}>
                         Volver
                     </Link>
@@ -91,8 +60,8 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                     ) : null}
                 </div>
 
-                <main className="thermal-ticket mx-auto w-[80mm] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
-                    <div className="print-top-gap hidden" />
+                <main className="mx-auto w-[80mm] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_10px_24px_rgba(15,23,42,0.16)] print:mx-auto print:w-[80mm] print:px-[4mm] print:pt-[4mm] print:pb-[6mm] print:shadow-none">
+                    <div className="hidden print:block print:h-[4mm]" />
 
                     <header className="text-center">
                         <div className="text-[14px]">SUDOKU</div>
@@ -162,7 +131,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                         <div className="mt-[6px]">CONSERVAR ESTE TICKET. EN CASO DE EXTRAVIO, EL EQUIPO SOLO PODRA SER RETIRADO PRESENTANDO EL DNI FISICO DEL TITULAR.</div>
                     </footer>
 
-                    <div className="ticket-cut-space hidden" aria-hidden="true" />
+                    <div className="hidden print:block print:h-[22mm]" aria-hidden="true" />
                 </main>
             </div>
         </>

@@ -219,7 +219,9 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
     }
 
     function addManualItem(): void {
-        if (manualDraft.name.trim() === '' || manualDraft.unit_price <= 0) {
+        const manualUnitPrice = Number(manualDraft.unit_price);
+
+        if (manualDraft.name.trim() === '' || manualUnitPrice <= 0) {
             setFeedback('Completa nombre y precio para el item manual.');
             return;
         }
@@ -235,7 +237,7 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
                 category_name: 'Manual',
                 image_url: '',
                 quantity: Math.max(1, manualDraft.quantity),
-                unit_price: Math.max(0, Number(manualDraft.unit_price)),
+                unit_price: Math.max(0, manualUnitPrice),
                 manual_name: manualName,
             },
         ]);

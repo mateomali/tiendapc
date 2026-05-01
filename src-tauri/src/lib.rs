@@ -76,72 +76,27 @@ const DESKTOP_STATUS_SCRIPT: &str = r#"
   window.__sudokuDesktopStatusInstalled = true;
 
   const overlayId = 'sudoku-desktop-status-overlay';
-  const styles = `
-    #${overlayId} {
-      position: fixed;
-      inset: 0;
-      z-index: 2147483647;
-      display: none;
-      place-items: center;
-      padding: 24px;
-      background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
-      color: #0f172a;
-      font-family: Inter, Segoe UI, Arial, sans-serif;
-    }
-    #${overlayId}.is-visible { display: grid; }
-    #${overlayId} .panel {
-      width: min(440px, 100%);
-      border: 1px solid #bfdbfe;
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.96);
-      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
-      padding: 22px;
-      text-align: center;
-    }
-    #${overlayId} h1 {
-      margin: 0 0 8px;
-      font-size: 20px;
-      font-weight: 900;
-    }
-    #${overlayId} p {
-      margin: 0 0 16px;
-      color: #334155;
-      font-size: 14px;
-      font-weight: 650;
-      line-height: 1.5;
-    }
-    #${overlayId} button {
-      min-height: 40px;
-      border: 0;
-      border-radius: 12px;
-      background: #0d6efd;
-      color: white;
-      padding: 0 16px;
-      font: inherit;
-      font-size: 14px;
-      font-weight: 850;
-      cursor: pointer;
-    }
-  `;
-
-  const style = document.createElement('style');
-  style.textContent = styles;
-  document.head.appendChild(style);
-
   const overlay = document.createElement('div');
   overlay.id = overlayId;
+  overlay.className = 'fixed inset-0 z-[2147483647] hidden place-items-center bg-[linear-gradient(180deg,#eff6ff_0%,#dbeafe_100%)] p-6 font-sans text-slate-900';
   overlay.innerHTML = `
-    <div class="panel" role="status" aria-live="polite">
-      <h1>No se pudo conectar con Sudoku Admin</h1>
-      <p>Revisa la conexion a internet. Si el sitio esta tardando, proba recargar el panel.</p>
-      <button type="button">Recargar</button>
+    <div class="w-[min(440px,100%)] rounded-[18px] border border-blue-200 bg-white/95 p-[22px] text-center shadow-[0_24px_60px_rgba(15,23,42,0.14)]" role="status" aria-live="polite">
+      <h1 class="mb-2 text-xl font-black">No se pudo conectar con Sudoku Admin</h1>
+      <p class="mb-4 text-sm font-bold leading-6 text-slate-700">Revisa la conexion a internet. Si el sitio esta tardando, proba recargar el panel.</p>
+      <button class="min-h-10 cursor-pointer rounded-xl bg-blue-600 px-4 text-sm font-black text-white" type="button">Recargar</button>
     </div>
   `;
   overlay.querySelector('button').addEventListener('click', () => window.location.reload());
   document.body.appendChild(overlay);
 
-  const show = () => overlay.classList.add('is-visible');
-  const hide = () => overlay.classList.remove('is-visible');
+  const show = () => {
+    overlay.classList.remove('hidden');
+    overlay.classList.add('grid');
+  };
+  const hide = () => {
+    overlay.classList.add('hidden');
+    overlay.classList.remove('grid');
+  };
 
   if (!navigator.onLine) show();
   window.addEventListener('offline', show);

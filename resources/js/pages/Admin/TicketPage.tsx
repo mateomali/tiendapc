@@ -61,7 +61,7 @@ export default function TicketPage({ sale }: TicketPageProps): JSX.Element {
                     </div>
                 </div>
 
-                <article className="sale-ticket-thermal mx-auto w-[80mm] bg-white p-[4mm] text-black shadow-[0_18px_40px_rgba(15,23,42,0.16)] print:shadow-none">
+                <article className="mx-auto w-[80mm] bg-white p-[4mm] text-black shadow-[0_18px_40px_rgba(15,23,42,0.16)] print:absolute print:left-0 print:top-0 print:m-0 print:w-[80mm] print:shadow-none">
                     <header className="grid justify-items-center gap-1 text-center">
                         <strong className="text-[12px] font-black uppercase leading-tight">SUDOKU JUGUETERIA & ELECTRONICA</strong>
                         <span className="text-[10px] leading-tight">AV. Jose de San Martin 2658.</span>
@@ -110,7 +110,7 @@ export default function TicketPage({ sale }: TicketPageProps): JSX.Element {
                             <span>Productos totales: </span>
                             <strong>{sale.items.length}</strong>
                         </p>
-                        <p className="sale-ticket-total-row border-t border-black pt-1 text-[15px] font-black">
+                        <p className="flex w-full items-baseline justify-between gap-2 border-t border-black pt-1 text-[15px] font-black">
                             <span className="uppercase">Total</span>
                             <strong className="whitespace-nowrap text-right text-[17px]">{formatCurrency(sale.total)}</strong>
                         </p>

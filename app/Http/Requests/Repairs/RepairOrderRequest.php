@@ -15,7 +15,7 @@ class RepairOrderRequest extends FormRequest
     {
         return [
             'nombre_cliente' => ['required', 'string', 'max:160'],
-            'id_orden' => ['required_without:id_nuevo', 'integer', 'min:1'],
+            'id_orden' => ['nullable', 'integer', 'min:1'],
             'id_nuevo' => ['nullable', 'integer', 'min:1'],
             'fecha' => ['nullable', 'date'],
             'dni' => ['nullable', 'integer', 'min:1', 'max:100000000'],
@@ -36,7 +36,7 @@ class RepairOrderRequest extends FormRequest
             'jobs' => ['nullable', 'array', 'min:1'],
             'jobs.*.modelo' => ['nullable', 'string', 'max:255'],
             'jobs.*.tipo_servicio' => ['nullable', 'string', 'max:80'],
-            'jobs.*.descripcion' => ['required_with:jobs', 'string'],
+            'jobs.*.descripcion' => ['nullable', 'string'],
             'jobs.*.observaciones' => ['nullable', 'string'],
             'jobs.*.monto' => ['nullable', 'numeric', 'min:0'],
             'jobs.*.senia' => ['nullable', 'numeric', 'min:0'],

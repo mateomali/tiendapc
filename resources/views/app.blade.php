@@ -35,7 +35,7 @@
         @endif
         @inertiaHead
     </head>
-    <body class="font-sans text-ink-900 antialiased">
+    <body class="m-0 min-h-full min-w-full overflow-x-clip bg-ink-200 font-sans text-ink-900 antialiased [overscroll-behavior-x:none] max-[860px]:scroll-auto max-[860px]:[-webkit-overflow-scrolling:touch] [&_#app]:min-h-full [&_#app]:min-w-full">
         @inertia
     </body>
 </html>

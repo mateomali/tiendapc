@@ -31,7 +31,7 @@ class AppHomeController extends Controller
                     'tone' => 'repairs',
                 ],
             ],
-            'logoUrl' => asset('favicon.ico'),
+            'logoUrl' => asset('assets/img/logo-sudoku.png'),
         ]);
     }
 }

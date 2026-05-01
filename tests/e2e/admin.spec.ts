@@ -11,9 +11,9 @@ async function loginAsAdmin(page: import('@playwright/test').Page): Promise<void
 test('admin login and dashboard shortcuts render', async ({ page }) => {
     await loginAsAdmin(page);
 
-    await expect(page.getByText(/panel de control/i)).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Navegacion administrativa' }).getByRole('link', { name: 'Productos' })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Navegacion administrativa' }).getByRole('link', { name: 'Backups' })).toBeVisible();
+    await expect(page.getByText(/centro de trabajo/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /abrir productos/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /abrir consultas/i })).toBeVisible();
 });
 
 test('admin products table and inline save affordances are visible', async ({ page }) => {

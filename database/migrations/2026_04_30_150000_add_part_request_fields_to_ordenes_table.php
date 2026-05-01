@@ -20,7 +20,7 @@ return new class extends Migration
             ->where('repuesto', '<>', '')
             ->update([
                 'repuesto_pedido' => true,
-                'repuesto_pedido_at' => DB::raw('COALESCE(updated_at, created_at, NOW())'),
+                'repuesto_pedido_at' => DB::raw('COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)'),
             ]);
     }
 

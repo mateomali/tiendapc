@@ -253,7 +253,7 @@ export default function ProductFormPage({ product, categories }: ProductFormPage
                             </div>
                             <textarea
                                 ref={descriptionRef}
-                                className={`${ui.textarea} product-description-textarea min-h-[320px] resize-y text-[0.96rem] leading-7 lg:min-h-[560px] xl:min-h-[640px]`}
+                                className={`${ui.textarea} !h-[32rem] !min-h-[32rem] resize-y text-[0.96rem] leading-7 lg:!h-[30rem] lg:!min-h-[30rem]`}
                                 value={form.data.description}
                                 onChange={(event) => form.setData('description', event.target.value)}
                             />

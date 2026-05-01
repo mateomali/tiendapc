@@ -33,6 +33,7 @@ export interface SiteLayoutData {
 }
 
 export interface SharedPageProps {
+    [key: string]: unknown;
     auth: {
         user: AuthUser | null;
         isRepairTech: boolean;

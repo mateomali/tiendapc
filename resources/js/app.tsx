@@ -2,7 +2,16 @@ import '../css/app.css';
 
 import { createInertiaApp } from '@inertiajs/react';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import type { ComponentType, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+
+type LayoutComponent = ComponentType<{ children: ReactNode }>;
+type LayoutFunction = (page: ReactNode) => ReactNode;
+type ReactComponent = ComponentType<any> & {
+    layout?: LayoutComponent | LayoutComponent[] | LayoutFunction | ((props: any) => any);
+};
+
+const pages = import.meta.glob<{ default: ReactComponent }>('./pages/**/*.tsx');
 
 function renderBootError(error: unknown): void {
     const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -34,11 +43,14 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 createInertiaApp({
-    resolve: (name) =>
-        resolvePageComponent(
+    resolve: async (name) => {
+        const page = await resolvePageComponent<{ default: ReactComponent }>(
             `./pages/${name}.tsx`,
-            import.meta.glob('./pages/**/*.tsx'),
-        ),
+            pages,
+        );
+
+        return page.default;
+    },
     setup({ el, App, props }) {
         try {
             createRoot(el).render(<App {...props} />);

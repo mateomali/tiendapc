@@ -30,6 +30,7 @@ class PublicTrackingController extends Controller
         unset($validated['orden'], $validated['dni']);
 
         $searched = ($validated['id_buscado'] ?? null) !== null && ($validated['dni_buscado'] ?? null) !== null;
+        $filters = array_filter($validated, static fn ($value): bool => $value !== null);
         $tickets = [];
 
         if ($searched) {
@@ -39,7 +40,7 @@ class PublicTrackingController extends Controller
         }
 
         return Inertia::render('Repairs/PublicTrackingPage', [
-            'filters' => $validated,
+            'filters' => $filters,
             'searched' => $searched,
             'tickets' => $tickets,
             'publicView' => $this->publicView($validated),

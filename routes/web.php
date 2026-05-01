@@ -41,11 +41,12 @@ Route::match(['get', 'post'], '/reparaciones.php', PublicTrackingController::cla
 Route::get('/salir-tecnico', [TechAuthController::class, 'logout'])->name('repairs.logout');
 Route::get('/logout.php', [TechAuthController::class, 'logout']);
 
-Route::middleware(['auth', 'role:admin,editor'])->group(function (): void {
-    Route::get('/consulta', [WorkbenchController::class, 'consultations'])->name('repairs.workbench');
-    Route::post('/consulta', fn () => redirect()->route('repairs.workbench'))->name('repairs.login.submit');
-    Route::get('/consulta.php', [WorkbenchController::class, 'consultations']);
-    Route::post('/consulta.php', fn () => redirect()->route('repairs.workbench'));
+Route::get('/consulta', [WorkbenchController::class, 'consultations'])->name('repairs.workbench');
+Route::post('/consulta', [TechAuthController::class, 'login'])->name('repairs.login.submit');
+Route::get('/consulta.php', [WorkbenchController::class, 'consultations']);
+Route::post('/consulta.php', [TechAuthController::class, 'login']);
+
+Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/ingreso', [WorkbenchController::class, 'index'])->name('repairs.ingress');
     Route::post('/ingreso', [WorkbenchController::class, 'store'])->name('repairs.orders.store');
     Route::get('/ingreso.php', [WorkbenchController::class, 'index']);

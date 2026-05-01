@@ -284,11 +284,11 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
             }
         };
 
-        document.body.style.overflow = 'hidden';
+        document.body.classList.add('overflow-hidden');
         window.addEventListener('keydown', handleKeyDown);
 
         return () => {
-            document.body.style.overflow = '';
+            document.body.classList.remove('overflow-hidden');
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [activeIndex, hasGallery, product.imageUrl, product.images, zoomOpen]);
