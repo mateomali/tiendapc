@@ -97,6 +97,20 @@ function Get-ServerEnvValue {
     throw "Falta configurar $Name. Crea tools/hostinger.env.local o defini la variable de entorno antes de usar -IncludeServerEnv."
 }
 
+function New-RandomBase64Token {
+    param([int]$ByteCount = 32)
+
+    $randomBytes = New-Object byte[] $ByteCount
+    $randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $randomGenerator.GetBytes($randomBytes)
+    } finally {
+        $randomGenerator.Dispose()
+    }
+
+    return [Convert]::ToBase64String($randomBytes)
+}
+
 function Copy-DirectorySafe {
     param(
         [string]$Source,
@@ -116,6 +130,23 @@ function Remove-IfExists {
 
     if (Test-Path -LiteralPath $Path) {
         Remove-Item -LiteralPath $Path -Recurse -Force
+    }
+}
+
+function Remove-MatchingFiles {
+    param(
+        [string]$Path,
+        [string[]]$Patterns
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    foreach ($pattern in $Patterns) {
+        Get-ChildItem -LiteralPath $Path -Filter $pattern -File -Recurse -Force | ForEach-Object {
+            Remove-Item -LiteralPath $_.FullName -Force
+        }
     }
 }
 
@@ -153,6 +184,18 @@ $privateDirs = @(
 foreach ($dir in $privateDirs) {
     Copy-DirectorySafe -Source (Join-Path $repoRoot $dir) -Destination $privateAppPath
 }
+
+Remove-MatchingFiles -Path (Join-Path $privateAppPath 'database') -Patterns @(
+    '*.sqlite',
+    '*.sqlite-*',
+    '*.sqlite.bak*',
+    '*.db',
+    '*.db-*',
+    '*.bak'
+)
+Remove-IfExists -Path (Join-Path $privateAppPath 'bootstrap\cache\packages.php')
+Remove-IfExists -Path (Join-Path $privateAppPath 'bootstrap\cache\services.php')
+Ensure-Directory -Path (Join-Path $privateAppPath 'bootstrap\cache')
 
 $privateFiles = @(
     'artisan',
@@ -201,6 +244,7 @@ Remove-Item -LiteralPath $publicTarget -Force
 
 Remove-IfExists -Path (Join-Path $publicHtmlPath 'hot')
 Remove-IfExists -Path (Join-Path $publicHtmlPath 'backups')
+Remove-IfExists -Path (Join-Path $publicHtmlPath 'debug-repairs.php')
 
 $manifestPath = Join-Path $publicHtmlPath 'build\manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) {
@@ -281,7 +325,7 @@ Set-Content -LiteralPath (Join-Path $privateAppPath '.htaccess') -Value $private
 if ($IncludeServerEnv) {
     $serverEnv = Read-LocalEnvFile -Path (Join-Path $PSScriptRoot 'hostinger.env.local')
     $appUrl = Get-ServerEnvValue -Values $serverEnv -Name 'APP_URL' -Default 'https://www.sudokumerlo.com'
-    $debugKey = Get-ServerEnvValue -Values $serverEnv -Name 'APP_DEBUG_KEY' -Default 'SudokuDebug_2026_Real'
+    $debugKey = Get-ServerEnvValue -Values $serverEnv -Name 'APP_DEBUG_KEY' -Default (New-RandomBase64Token -ByteCount 24)
     $dbHost = Get-ServerEnvValue -Values $serverEnv -Name 'DB_HOST' -Default 'localhost'
     $dbPort = Get-ServerEnvValue -Values $serverEnv -Name 'DB_PORT' -Default '3306'
     $dbDatabase = Get-ServerEnvValue -Values $serverEnv -Name 'DB_DATABASE'
@@ -290,14 +334,7 @@ if ($IncludeServerEnv) {
     $repairTechPassword = Get-ServerEnvValue -Values $serverEnv -Name 'REPAIR_TECH_PASSWORD'
     $whatsappNumber = Get-ServerEnvValue -Values $serverEnv -Name 'TIENDA_WHATSAPP_NUMBER' -Default '5490000000000'
 
-    $randomBytes = New-Object byte[] 32
-    $randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
-    try {
-        $randomGenerator.GetBytes($randomBytes)
-    } finally {
-        $randomGenerator.Dispose()
-    }
-    $appKey = 'base64:' + [Convert]::ToBase64String($randomBytes)
+    $appKey = 'base64:' + (New-RandomBase64Token -ByteCount 32)
 
     $envContent = @"
 APP_NAME="Sudokumerlo Custom"
