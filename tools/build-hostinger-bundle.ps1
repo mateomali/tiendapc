@@ -245,6 +245,12 @@ Remove-Item -LiteralPath $publicTarget -Force
 Remove-IfExists -Path (Join-Path $publicHtmlPath 'hot')
 Remove-IfExists -Path (Join-Path $publicHtmlPath 'backups')
 Remove-IfExists -Path (Join-Path $publicHtmlPath 'debug-repairs.php')
+Remove-MatchingFiles -Path $publicHtmlPath -Patterns @(
+    '*.bak',
+    '*.bak.*',
+    '*.backup',
+    '*.backup.*'
+)
 
 $manifestPath = Join-Path $publicHtmlPath 'build\manifest.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) {
@@ -299,6 +305,8 @@ $publicHtaccess = @'
     RewriteRule (^|/)\.(?!well-known/) - [F,L]
     RewriteRule ^(?:laravel_app)(?:/|$) - [F,L,NC]
     RewriteRule ^(?:composer\.(?:json|lock)|package(?:-lock)?\.json|vite\.config\.(?:js|ts)|tsconfig\.json)$ - [F,L,NC]
+    RewriteRule ^reparacion/?$ reparacion.php [L,QSA,NC]
+    RewriteRule ^reparaciones/?$ reparaciones.php [L,QSA,NC]
 
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$

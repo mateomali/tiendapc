@@ -4,7 +4,7 @@ $uri = urldecode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/')
 $publicPath = __DIR__ . '/public';
 $requestedPath = realpath($publicPath . $uri);
 
-if ($uri !== '/' && $requestedPath !== false && str_starts_with($requestedPath, realpath($publicPath)) && is_file($requestedPath)) {
+if ($uri !== '/' && $requestedPath !== false && str_starts_with($requestedPath, realpath($publicPath)) && is_file($requestedPath) && strtolower(pathinfo($requestedPath, PATHINFO_EXTENSION)) !== 'php') {
     $extension = strtolower(pathinfo($requestedPath, PATHINFO_EXTENSION));
     $mimeType = match ($extension) {
         'js', 'mjs' => 'application/javascript',

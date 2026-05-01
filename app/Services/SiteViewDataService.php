@@ -30,7 +30,7 @@ class SiteViewDataService
      */
     public function layout(Request $request): array
     {
-        $repairUrl = url('/reparaciones.php');
+        $repairUrl = '/reparaciones';
         $whatsappNumber = $this->contactWhatsapp();
         $whatsappDisplay = $this->formatWhatsappDisplay($whatsappNumber);
 

@@ -371,12 +371,12 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     {item.label}
                                 </Link>
                             ))}
-                            <Link href={layout.repairUrl} className={siteNavPillClass(false, false, 'repair')} prefetch={['hover', 'click']} cacheFor="30s">
+                            <a href={layout.repairUrl} className={siteNavPillClass(false, false, 'repair')}>
                                 Reparaciones
                                 <span className={site.mobileMenuIcon}>
                                     <RepairNavIcon />
                                 </span>
-                            </Link>
+                            </a>
                         </nav>
                     </div>
 
@@ -423,12 +423,12 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                         <div className={site.mobileMenuOverlay} role="presentation" onClick={() => setMobileMenuOpen(false)}>
                             <nav id="site-mobile-nav" className={site.mobileMenuSheet} aria-label="Principal" onClick={(event) => event.stopPropagation()}>
                                 <strong className={site.mobileMenuTitle}>Menú</strong>
-                                <Link href={layout.repairUrl} className={`${siteNavPillClass(false, false, 'repair')} col-span-full`} prefetch={['hover', 'click']} cacheFor="30s" onClick={() => setMobileMenuOpen(false)}>
+                                <a href={layout.repairUrl} className={`${siteNavPillClass(false, false, 'repair')} col-span-full`} onClick={() => setMobileMenuOpen(false)}>
                                     Reparaciones
                                     <span className={site.mobileMenuIcon}>
                                         <RepairNavIcon />
                                     </span>
-                                </Link>
+                                </a>
                                 {layout.navItems.map((item) => (
                                     <Link
                                         key={item.label}

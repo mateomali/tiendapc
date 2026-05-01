@@ -13,6 +13,10 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # Legacy repair aliases must enter Laravel even if hosting sees matching folders.
+    RewriteRule ^reparacion/?$ reparacion.php [L,QSA,NC]
+    RewriteRule ^reparaciones/?$ reparaciones.php [L,QSA,NC]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
