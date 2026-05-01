@@ -75,6 +75,7 @@ const adminDensityClasses = [
     '[&_:where(h1,h2,h3,p)]:my-0 [&_:where(h2)]:!text-xl [&_:where(h2)]:!leading-[1.15] [&_:where(h3)]:!text-[1.05rem] [&_:where(h3)]:!leading-[1.15]',
     '[&_:where(p,span,label,small)]:leading-tight',
     '[&_:where(input:not([type=checkbox]):not([type=radio]),select)]:!min-h-[2.15rem] [&_:where(input:not([type=checkbox]):not([type=radio]),select)]:!rounded-[0.45rem] [&_:where(input:not([type=checkbox]):not([type=radio]),select)]:!px-[0.55rem] [&_:where(input:not([type=checkbox]):not([type=radio]),select)]:!py-[0.4rem] [&_:where(input:not([type=checkbox]):not([type=radio]),select)]:!text-[0.8rem]',
+    '[&_:where(input[type=checkbox],input[type=radio])]:h-4 [&_:where(input[type=checkbox],input[type=radio])]:w-4 [&_:where(label:has(input[type=checkbox]),label:has(input[type=radio]))]:cursor-pointer [&_:where(label:has(input[type=checkbox]),label:has(input[type=radio]))]:select-none',
     '[&_:where(textarea)]:!min-h-[4.75rem] [&_:where(textarea)]:!rounded-[0.45rem] [&_:where(textarea)]:!px-[0.55rem] [&_:where(textarea)]:!py-[0.45rem] [&_:where(textarea)]:!text-[0.8rem]',
     '[&_:where(button,a[role=button],input[type=submit])]:!rounded-[0.45rem]',
     '[&_:where(table)]:w-full [&_:where(table)]:!border-collapse [&_:where(table)]:!border-spacing-0 [&_:where(table)]:!text-[0.78rem]',
@@ -102,55 +103,100 @@ function headerShortcuts(): HeaderShortcut[] {
     ];
 }
 
+function AdminBrand({ userLabel, userEmail }: { userLabel: string; userEmail: string }): JSX.Element {
+    return (
+        <div className="grid min-w-0 gap-1">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                <p className="text-[0.58rem] font-black uppercase tracking-[0.08em] text-[rgba(225,240,255,0.78)] md:text-[0.68rem]">Panel de control</p>
+                <h1 className="text-[1.05rem] font-black leading-none md:text-[1.45rem]">Tienda Sudoku</h1>
+            </div>
+            <p className="flex min-w-0 flex-wrap gap-x-2 text-[0.68rem] font-semibold text-[rgba(230,239,255,0.9)] md:text-[0.78rem]">
+                <span className="truncate">{userLabel}</span>
+                <span className="hidden truncate sm:inline">{userEmail}</span>
+            </p>
+        </div>
+    );
+}
+
 export function AdminLayout({ children, title }: AdminLayoutProps): JSX.Element {
     const { auth, app } = usePage<SharedPageProps>().props;
     const page = usePage();
     const currentUrl = page.url;
+    const userLabel = auth.user?.name ?? 'Administrador';
+    const userEmail = auth.user?.email ?? app.name;
 
     return (
         <>
             <Head title={title} />
             <div className={adminDensityClasses}>
-                <header className="mx-auto mb-2 grid w-full max-w-[1680px] gap-2 rounded-lg border border-[rgba(88,136,210,0.45)] bg-[linear-gradient(160deg,#12357d_0%,#1b4eab_52%,#2467d7_100%)] p-2 text-slate-50 shadow-[0_10px_22px_rgba(14,45,104,0.18)] print:hidden md:gap-2.5 md:p-3">
-                    <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:border-b lg:border-white/15 lg:pb-2">
-                        <div className="grid min-w-0 gap-1">
-                            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-                                <p className="text-[0.58rem] font-black uppercase tracking-[0.08em] text-[rgba(225,240,255,0.78)] md:text-[0.68rem]">Panel de control</p>
-                                <h1 className="text-[1.05rem] font-black leading-none md:text-[1.45rem]">Tienda Sudoku</h1>
+                <div className="mx-auto grid w-full max-w-[1800px] content-start gap-2">
+                    <header className="grid w-full gap-2 rounded-lg border border-[rgba(88,136,210,0.45)] bg-[linear-gradient(160deg,#12357d_0%,#1b4eab_52%,#2467d7_100%)] p-2 text-slate-50 shadow-[0_10px_22px_rgba(14,45,104,0.18)] print:hidden md:gap-2.5 md:p-3">
+                        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:border-b lg:border-white/15 lg:pb-2">
+                            <AdminBrand userLabel={userLabel} userEmail={userEmail} />
+                            <div className="hidden flex-wrap items-center gap-1.5 lg:flex lg:justify-end">
+                                {headerShortcuts().map((shortcut) => (
+                                    <Link key={shortcut.href} href={shortcut.href} className={adminNavLinkClasses}>
+                                        {shortcut.label}
+                                    </Link>
+                                ))}
+                                <Link href={route('logout')} method="post" as="button" className={buttonClass('primary', 'sm', 'min-h-8 rounded-md px-2.5 py-1.5 text-[0.72rem] tracking-[0.02em] sm:w-auto')}>
+                                    Cerrar sesion
+                                </Link>
                             </div>
-                            <p className="flex min-w-0 flex-wrap gap-x-2 text-[0.68rem] font-semibold text-[rgba(230,239,255,0.9)] md:text-[0.78rem]">
-                                <span className="truncate">{auth.user?.name ?? 'Administrador'}</span>
-                                <span className="hidden truncate sm:inline">{auth.user?.email ?? app.name}</span>
-                            </p>
                         </div>
-                        <div className="hidden flex-wrap items-center gap-1.5 lg:flex lg:justify-end">
-                            {headerShortcuts().map((shortcut) => (
-                                <Link key={shortcut.href} href={shortcut.href} className={adminNavLinkClasses}>
-                                    {shortcut.label}
-                                </Link>
-                            ))}
-                            <Link href={route('logout')} method="post" as="button" className={buttonClass('primary', 'sm', 'min-h-8 rounded-md px-2.5 py-1.5 text-[0.72rem] tracking-[0.02em] sm:w-auto')}>
-                                Cerrar sesion
+                        <div className="grid grid-cols-2 gap-1.5 lg:hidden">
+                                <details className="relative">
+                                    <summary className={adminMobileMenuButtonClasses}>
+                                        Navegacion
+                                        <span aria-hidden="true">v</span>
+                                    </summary>
+                                    <nav className="absolute left-0 z-40 mt-1 grid max-h-[70vh] w-[min(92vw,24rem)] gap-2 overflow-y-auto rounded-lg border border-white/20 bg-[#12357d] p-2 shadow-[0_18px_34px_rgba(8,24,60,0.28)]" aria-label="Navegacion administrativa movil">
+                                        <Link href={route('admin.app')} className={cn(adminNavLinkClasses, 'justify-start', currentUrl === '/admin' && adminNavLinkActiveClasses)}>
+                                            Sudoku App
+                                        </Link>
+                                        {linkGroups.map((group) => (
+                                            <div key={group.label} className="grid gap-1.5 rounded-md border border-white/10 bg-white/5 p-1.5">
+                                                <span className="px-1 text-[0.58rem] font-black uppercase tracking-[0.12em] text-[rgba(225,240,255,0.68)]">{group.label}</span>
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    {group.links.map((link) => (
+                                                        <Link key={link.href} href={link.href} className={cn(adminNavLinkClasses, isAdminLinkActive(link, currentUrl) && adminNavLinkActiveClasses)}>
+                                                            {link.label}
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </nav>
+                                </details>
+                                <details className="relative">
+                                    <summary className={adminMobileMenuButtonClasses}>
+                                        Accesos
+                                        <span aria-hidden="true">v</span>
+                                    </summary>
+                                    <div className="absolute right-0 z-40 mt-1 grid w-[min(88vw,17rem)] gap-1.5 rounded-lg border border-white/20 bg-[#12357d] p-2 shadow-[0_18px_34px_rgba(8,24,60,0.28)]">
+                                        {headerShortcuts().map((shortcut) => (
+                                            <Link key={shortcut.href} href={shortcut.href} className={cn(adminNavLinkClasses, 'justify-start')}>
+                                                {shortcut.label}
+                                            </Link>
+                                        ))}
+                                        <Link href={route('logout')} method="post" as="button" className={buttonClass('primary', 'sm', 'min-h-8 justify-start rounded-md px-2.5 py-1.5 text-[0.72rem] tracking-[0.02em]')}>
+                                            Cerrar sesion
+                                        </Link>
+                                    </div>
+                                </details>
+                        </div>
+                        <nav className="hidden gap-2 lg:grid lg:grid-cols-[auto_minmax(0,1fr)]" aria-label="Navegacion administrativa">
+                            <Link
+                                href={route('admin.app')}
+                                className={cn(adminNavLinkClasses, 'justify-self-start', currentUrl === '/admin' && adminNavLinkActiveClasses)}
+                            >
+                                Sudoku App
                             </Link>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1.5 lg:hidden">
-                        <details className="relative">
-                            <summary className={adminMobileMenuButtonClasses}>
-                                Navegacion
-                                <span aria-hidden="true">▾</span>
-                            </summary>
-                            <nav className="absolute left-0 z-40 mt-1 grid max-h-[70vh] w-[min(92vw,24rem)] gap-2 overflow-y-auto rounded-lg border border-white/20 bg-[#12357d] p-2 shadow-[0_18px_34px_rgba(8,24,60,0.28)]" aria-label="Navegacion administrativa movil">
-                                <Link
-                                    href={route('admin.app')}
-                                    className={cn(adminNavLinkClasses, 'justify-start', currentUrl === '/admin' && adminNavLinkActiveClasses)}
-                                >
-                                    Sudoku App
-                                </Link>
+                            <div className="grid gap-2 sm:grid-cols-3">
                                 {linkGroups.map((group) => (
-                                    <div key={group.label} className="grid gap-1.5 rounded-md border border-white/10 bg-white/5 p-1.5">
+                                    <div key={group.label} className="grid gap-1.5 rounded-md border border-white/10 bg-black/5 p-1.5">
                                         <span className="px-1 text-[0.58rem] font-black uppercase tracking-[0.12em] text-[rgba(225,240,255,0.68)]">{group.label}</span>
-                                        <div className="grid grid-cols-2 gap-1.5">
+                                        <div className="flex flex-wrap gap-1.5">
                                             {group.links.map((link) => (
                                                 <Link
                                                     key={link.href}
@@ -163,56 +209,15 @@ export function AdminLayout({ children, title }: AdminLayoutProps): JSX.Element 
                                         </div>
                                     </div>
                                 ))}
-                            </nav>
-                        </details>
-                        <details className="relative">
-                            <summary className={adminMobileMenuButtonClasses}>
-                                Accesos
-                                <span aria-hidden="true">▾</span>
-                            </summary>
-                            <div className="absolute right-0 z-40 mt-1 grid w-[min(88vw,17rem)] gap-1.5 rounded-lg border border-white/20 bg-[#12357d] p-2 shadow-[0_18px_34px_rgba(8,24,60,0.28)]">
-                                {headerShortcuts().map((shortcut) => (
-                                    <Link key={shortcut.href} href={shortcut.href} className={cn(adminNavLinkClasses, 'justify-start')}>
-                                        {shortcut.label}
-                                    </Link>
-                                ))}
-                                <Link href={route('logout')} method="post" as="button" className={buttonClass('primary', 'sm', 'min-h-8 justify-start rounded-md px-2.5 py-1.5 text-[0.72rem] tracking-[0.02em]')}>
-                                    Cerrar sesion
-                                </Link>
                             </div>
-                        </details>
-                    </div>
-                    <nav className="hidden gap-2 lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto]" aria-label="Navegacion administrativa">
-                        <Link
-                            href={route('admin.app')}
-                            className={cn(adminNavLinkClasses, 'justify-self-start', currentUrl === '/admin' && adminNavLinkActiveClasses)}
-                        >
-                            Sudoku App
-                        </Link>
-                        <div className="grid gap-2 sm:grid-cols-3">
-                            {linkGroups.map((group) => (
-                                <div key={group.label} className="grid gap-1.5 rounded-md border border-white/10 bg-black/5 p-1.5">
-                                    <span className="px-1 text-[0.58rem] font-black uppercase tracking-[0.12em] text-[rgba(225,240,255,0.68)]">{group.label}</span>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {group.links.map((link) => (
-                                            <Link
-                                                key={link.href}
-                                                href={link.href}
-                                                className={cn(adminNavLinkClasses, isAdminLinkActive(link, currentUrl) && adminNavLinkActiveClasses)}
-                                            >
-                                                {link.label}
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </nav>
-                </header>
-                <main className="mx-auto grid w-full max-w-[1680px] gap-2 print:block print:max-w-none print:p-0">
-                    <FlashMessages />
-                    {children}
-                </main>
+                        </nav>
+                    </header>
+
+                    <main className="grid w-full gap-2 print:block print:max-w-none print:p-0">
+                        <FlashMessages />
+                        {children}
+                    </main>
+                </div>
             </div>
         </>
     );

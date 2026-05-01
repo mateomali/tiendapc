@@ -80,13 +80,30 @@ export default function SalesPage({ query, period, customRange, metrics, sales, 
         };
     }
 
+    async function deleteSale(sale: SaleRow): Promise<void> {
+        if (!window.confirm(`Se eliminará el ticket ${sale.ticket_number_display}.`)) {
+            return;
+        }
+
+        await window.fetch(route('admin.api.sales.delete', sale.id), {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+                Accept: 'application/json',
+            },
+        });
+
+        router.reload({ only: ['sales', 'pagination'] });
+    }
+
     return (
         <AdminLayout title="Ventas">
             <section className={ui.heroCard}>
                 <div className={ui.heroTitleWrap}>
                     <p className={ui.eyebrow}>Caja y tickets</p>
                     <h2 className={ui.heroTitle}>Ventas registradas</h2>
-                    <p className={ui.heroText}>Busqueda por ticket o cliente, paginacion, acceso al comprobante y borrado operativo desde el panel.</p>
+                    <p className={ui.heroText}>Búsqueda por ticket o cliente, paginación, acceso al comprobante y borrado operativo desde el panel.</p>
                 </div>
                 <div className={ui.heroActions}>
                     <Link href={route('admin.sales.create')} className={buttonClass('primary')}>
@@ -171,7 +188,7 @@ export default function SalesPage({ query, period, customRange, metrics, sales, 
             <section className={ui.sectionCard}>
                 <div className={ui.cardHeading}>
                     <div className={ui.cardTitleWrap}>
-                        <p className={ui.eyebrow}>Historico</p>
+                        <p className={ui.eyebrow}>Histórico</p>
                         <h3 className={ui.cardTitle}>{pagination.total} ventas encontradas</h3>
                     </div>
                     <div className={ui.mediaActions}>
@@ -179,14 +196,59 @@ export default function SalesPage({ query, period, customRange, metrics, sales, 
                             Anterior
                         </button>
                         <span className={ui.inlineCaption}>
-                            Pagina {pagination.page} de {pagination.totalPages}
+                            Página {pagination.page} de {pagination.totalPages}
                         </span>
                         <button type="button" className={buttonClass('soft', 'sm')} onClick={() => router.get(route('admin.sales.index'), { q: query || undefined, ...activePeriodParams(), page: pagination.page + 1 })} disabled={pagination.page >= pagination.totalPages}>
                             Siguiente
                         </button>
                     </div>
                 </div>
-                <div className={ui.tableWrap}>
+                <div className="grid gap-2 md:hidden">
+                    {sales.map((sale) => (
+                        <article key={sale.id} className="grid gap-3 rounded-xl border border-sky-100 bg-white/95 p-3 shadow-[0_8px_18px_rgba(18,58,132,0.07)]">
+                            <div className="flex min-w-0 items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-brand-700/70">Ticket</p>
+                                    <h4 className="truncate text-lg font-black text-ink-950">#{sale.ticket_number_display}</h4>
+                                </div>
+                                <strong className="shrink-0 rounded-lg border border-brand-100 bg-brand-50 px-2.5 py-1 text-sm font-black text-brand-800">{formatCurrency(sale.total)}</strong>
+                            </div>
+                            <dl className="grid grid-cols-2 gap-2 text-sm">
+                                <div className="rounded-lg bg-sky-50/70 p-2">
+                                    <dt className="text-[0.58rem] font-black uppercase tracking-[0.12em] text-brand-700/65">Cliente</dt>
+                                    <dd className="mt-1 break-words font-bold text-ink-900">{sale.customer_label}</dd>
+                                </div>
+                                <div className="rounded-lg bg-sky-50/70 p-2">
+                                    <dt className="text-[0.58rem] font-black uppercase tracking-[0.12em] text-brand-700/65">Fecha</dt>
+                                    <dd className="mt-1 font-bold text-ink-900">{sale.issued_at ?? 'Sin fecha'}</dd>
+                                </div>
+                                <div className="rounded-lg bg-sky-50/70 p-2">
+                                    <dt className="text-[0.58rem] font-black uppercase tracking-[0.12em] text-brand-700/65">Items</dt>
+                                    <dd className="mt-1 font-bold text-ink-900">{sale.items_count}</dd>
+                                </div>
+                                <div className="rounded-lg bg-sky-50/70 p-2">
+                                    <dt className="text-[0.58rem] font-black uppercase tracking-[0.12em] text-brand-700/65">Total</dt>
+                                    <dd className="mt-1 font-bold text-ink-900">{formatCurrency(sale.total)}</dd>
+                                </div>
+                            </dl>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Link href={route('admin.sales.ticket', sale.id)} className={buttonClass('soft', 'sm', 'min-h-10')}>
+                                    Ticket
+                                </Link>
+                                <button type="button" className={buttonClass('danger', 'sm', 'min-h-10')} onClick={() => void deleteSale(sale)}>
+                                    Eliminar
+                                </button>
+                            </div>
+                        </article>
+                    ))}
+                    {sales.length === 0 ? (
+                        <article className={ui.emptyCard}>
+                            <h3 className={ui.emptyTitle}>No hay ventas</h3>
+                            <p className={ui.emptyText}>No hay ventas para la búsqueda actual.</p>
+                        </article>
+                    ) : null}
+                </div>
+                <div className={`${ui.tableWrap} hidden md:block`}>
                     <table className={ui.table}>
                         <thead>
                             <tr>
@@ -218,22 +280,7 @@ export default function SalesPage({ query, period, customRange, metrics, sales, 
                                             <button
                                                 type="button"
                                                 className={buttonClass('danger', 'sm')}
-                                                onClick={async () => {
-                                                    if (!window.confirm(`Se eliminara el ticket ${sale.ticket_number_display}.`)) {
-                                                        return;
-                                                    }
-
-                                                    await window.fetch(route('admin.api.sales.delete', sale.id), {
-                                                        method: 'POST',
-                                                        headers: {
-                                                            'X-Requested-With': 'XMLHttpRequest',
-                                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
-                                                            Accept: 'application/json',
-                                                        },
-                                                    });
-
-                                                    router.reload({ only: ['sales', 'pagination'] });
-                                                }}
+                                                onClick={() => void deleteSale(sale)}
                                             >
                                                 Eliminar
                                             </button>
@@ -243,7 +290,7 @@ export default function SalesPage({ query, period, customRange, metrics, sales, 
                             ))}
                             {sales.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className={ui.tableEmptyCell}>No hay ventas para la busqueda actual.</td>
+                                    <td colSpan={6} className={ui.tableEmptyCell}>No hay ventas para la búsqueda actual.</td>
                                 </tr>
                             ) : null}
                         </tbody>

@@ -1,6 +1,6 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, KeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode } from 'react';
 import { FaCopy, FaEdit, FaSave, FaSearch, FaTrash, FaUndo } from 'react-icons/fa';
 import { AdminLayout } from '../../layouts/AdminLayout';
 import { buttonClass, inlineFeedbackClass, stateChipClass, ui } from '../../ui';
@@ -122,6 +122,8 @@ const quickFilterLabels: Record<string, string> = {
 
 type DensityMode = 'compact' | 'comfortable';
 
+const MOBILE_PRODUCT_BATCH_SIZE = 24;
+
 interface SavedProductFilters {
     search?: string;
     categoryId?: string;
@@ -182,6 +184,242 @@ function CompactPanel({
             </button>
             {open ? <div className="border-t border-sky-100 p-3">{children}</div> : null}
         </section>
+    );
+}
+
+function normalizeSearchValue(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+}
+
+function rankCategories(categories: CategoryOption[], query: string): CategoryOption[] {
+    const term = normalizeSearchValue(query);
+
+    if (term === '') {
+        return categories;
+    }
+
+    return categories
+        .map((category) => {
+            const name = normalizeSearchValue(category.name);
+            const group = normalizeSearchValue(category.group_key);
+            let score = 99;
+
+            if (name === term) {
+                score = 0;
+            } else if (name.startsWith(term)) {
+                score = 1;
+            } else if (name.includes(term)) {
+                score = 2;
+            } else if (group.startsWith(term)) {
+                score = 3;
+            } else if (group.includes(term)) {
+                score = 4;
+            }
+
+            return { category, score };
+        })
+        .filter(({ score }) => score < 99)
+        .sort((left, right) => left.score - right.score || left.category.name.localeCompare(right.category.name, 'es', { sensitivity: 'base' }))
+        .map(({ category }) => category);
+}
+
+function CategoryCombobox({
+    value,
+    categories,
+    onChange,
+    onSaveKeyDown,
+    className,
+}: {
+    value: string;
+    categories: CategoryOption[];
+    onChange: (value: string) => void;
+    onSaveKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
+    className?: string;
+}): JSX.Element {
+    const selectedCategory = categories.find((category) => String(category.id) === value) ?? null;
+    const [query, setQuery] = useState(selectedCategory?.name ?? '');
+    const [hasTypedQuery, setHasTypedQuery] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
+    const wrapRef = useRef<HTMLDivElement>(null);
+    const closeTimerRef = useRef<number | null>(null);
+    const matches = useMemo(() => rankCategories(categories, hasTypedQuery ? query : ''), [categories, hasTypedQuery, query]);
+
+    const syncDropdownPosition = useCallback(() => {
+        const rect = wrapRef.current?.getBoundingClientRect();
+
+        if (!rect) {
+            return;
+        }
+
+        setDropdownStyle({
+            left: rect.left,
+            top: rect.bottom + 4,
+            width: rect.width,
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        syncDropdownPosition();
+        window.addEventListener('resize', syncDropdownPosition);
+        window.addEventListener('scroll', syncDropdownPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', syncDropdownPosition);
+            window.removeEventListener('scroll', syncDropdownPosition, true);
+        };
+    }, [open, syncDropdownPosition]);
+
+    useEffect(() => {
+        if (!open) {
+            setQuery(selectedCategory?.name ?? '');
+        }
+    }, [open, selectedCategory?.name]);
+
+    useEffect(() => {
+        setActiveIndex(hasTypedQuery && normalizeSearchValue(query) !== '' && matches.length > 0 ? 1 : 0);
+    }, [hasTypedQuery, matches.length, query]);
+
+    function chooseCategory(nextValue: string, nextLabel = ''): void {
+        onChange(nextValue);
+        setQuery(nextLabel);
+        setHasTypedQuery(false);
+        setOpen(false);
+    }
+
+    function closeAndRestore(): void {
+        setOpen(false);
+        setHasTypedQuery(false);
+        setQuery(selectedCategory?.name ?? '');
+    }
+
+    return (
+        <div ref={wrapRef} className="relative min-w-0">
+            <input
+                className={cn(className, 'pr-8')}
+                aria-label="Categoria"
+                role="combobox"
+                aria-expanded={open}
+                aria-autocomplete="list"
+                placeholder="Buscar categoria"
+                value={query}
+                onFocus={() => {
+                    if (closeTimerRef.current) {
+                        window.clearTimeout(closeTimerRef.current);
+                    }
+                    setOpen(true);
+                    syncDropdownPosition();
+                }}
+                onBlur={() => {
+                    closeTimerRef.current = window.setTimeout(closeAndRestore, 120);
+                }}
+                onChange={(event) => {
+                    setQuery(event.target.value);
+                    setHasTypedQuery(true);
+                    setOpen(true);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        setOpen(true);
+                        setActiveIndex((current) => Math.min(current + 1, matches.length));
+                        return;
+                    }
+
+                    if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        setActiveIndex((current) => Math.max(current - 1, 0));
+                        return;
+                    }
+
+                    if (event.key === 'Enter' && open) {
+                        event.preventDefault();
+                        if (activeIndex === 0) {
+                            const firstMatch = hasTypedQuery && normalizeSearchValue(query) !== '' ? matches[0] : null;
+
+                            if (firstMatch) {
+                                chooseCategory(String(firstMatch.id), firstMatch.name);
+                                return;
+                            }
+
+                            chooseCategory('', 'Sin categoria');
+                            return;
+                        }
+
+                        const match = matches[activeIndex - 1];
+                        if (match) {
+                            chooseCategory(String(match.id), match.name);
+                        }
+                        return;
+                    }
+
+                    if (event.key === 'Escape' && open) {
+                        event.preventDefault();
+                        closeAndRestore();
+                        return;
+                    }
+
+                    onSaveKeyDown(event);
+                }}
+            />
+            <button
+                type="button"
+                className="absolute right-1 top-1/2 flex h-[calc(100%-0.5rem)] min-h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-[0.7rem] font-black text-brand-700 transition hover:bg-brand-50"
+                aria-label="Desplegar categorias"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                    if (closeTimerRef.current) {
+                        window.clearTimeout(closeTimerRef.current);
+                    }
+                    setOpen((current) => !current);
+                    syncDropdownPosition();
+                }}
+            >
+                v
+            </button>
+            {open ? (
+                <div
+                    className="fixed z-[9999] max-h-72 overflow-y-auto rounded-xl border border-sky-200 bg-white p-1 text-xs shadow-[0_18px_42px_rgba(15,23,42,0.18)]"
+                    style={dropdownStyle}
+                    role="listbox"
+                >
+                    <button
+                        type="button"
+                        className={cn('flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-left font-bold text-ink-800 hover:bg-brand-50', activeIndex === 0 && 'bg-brand-50 text-brand-800')}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => chooseCategory('', 'Sin categoria')}
+                    >
+                        <span>Sin categoria</span>
+                    </button>
+                    {matches.length > 0 ? matches.map((category, index) => (
+                        <button
+                            key={category.id}
+                            type="button"
+                            className={cn('grid w-full gap-0.5 rounded-lg px-2 py-2 text-left hover:bg-brand-50', activeIndex === index + 1 && 'bg-brand-50')}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseEnter={() => setActiveIndex(index + 1)}
+                            onClick={() => chooseCategory(String(category.id), category.name)}
+                            role="option"
+                            aria-selected={String(category.id) === value}
+                        >
+                            <span className="truncate font-black text-ink-950">{category.name}</span>
+                            <span className="truncate text-[0.68rem] font-semibold text-ink-700/75">{category.group_key || 'sin grupo'} - {category.product_count} productos</span>
+                        </button>
+                    )) : (
+                        <div className="px-2 py-3 text-center font-semibold text-ink-700/75">Sin coincidencias</div>
+                    )}
+                </div>
+            ) : null}
+        </div>
     );
 }
 
@@ -402,23 +640,16 @@ function ProductInlineRow({
                 </div>
             </td>
             <td className={`${ui.tableCell} min-w-[190px] !px-2 !py-2`} data-label="Categoria">
-                <select
+                <CategoryCombobox
                     className={`${ui.input} min-h-9 rounded-lg px-2 py-1 text-xs`}
-                    aria-label="Categoria"
                     value={form.category_id}
-                    onChange={(event) => {
-                        setForm((current) => ({ ...current, category_id: event.target.value }));
+                    categories={categories}
+                    onChange={(category_id) => {
+                        setForm((current) => ({ ...current, category_id }));
                         markDirty();
                     }}
-                    onKeyDown={handleInlineKeyDown}
-                >
-                    <option value="">Sin categoria</option>
-                    {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                            {category.name}
-                        </option>
-                    ))}
-                </select>
+                    onSaveKeyDown={handleInlineKeyDown}
+                />
             </td>
             <td className={`${ui.tableCell} w-[88px] !px-1.5 !py-2`} data-label="Precio">
                 <input
@@ -715,22 +946,16 @@ function ProductMobileCard({
                             }}
                             onKeyDown={handleInlineKeyDown}
                         />
-                        <select
+                        <CategoryCombobox
                             className={`${ui.input} min-h-10 min-w-0 rounded-xl px-3 py-2 text-sm`}
                             value={form.category_id}
-                            onChange={(event) => {
-                                setForm((current) => ({ ...current, category_id: event.target.value }));
+                            categories={categories}
+                            onChange={(category_id) => {
+                                setForm((current) => ({ ...current, category_id }));
                                 markDirty();
                             }}
-                            onKeyDown={handleInlineKeyDown}
-                        >
-                            <option value="">Sin categoria</option>
-                            {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                    {category.name}
-                                </option>
-                            ))}
-                        </select>
+                            onSaveKeyDown={handleInlineKeyDown}
+                        />
                     </div>
                     {(product.validation ?? []).length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
@@ -755,6 +980,12 @@ function ProductMobileCard({
                 </div>
             </div>
 
+            <details className="rounded-xl border border-sky-100 bg-white/80">
+                <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-brand-800 [&::-webkit-details-marker]:hidden">
+                    Edición rápida
+                    <span className="text-base leading-none" aria-hidden="true">+</span>
+                </summary>
+                <div className="grid gap-2 border-t border-sky-100 p-2">
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label className="grid gap-1">
                     <span className="text-xs font-black uppercase tracking-[0.08em] text-brand-700/75">Precio</span>
@@ -826,8 +1057,15 @@ function ProductMobileCard({
                 </div>
                 {product.deleted_at ? <button type="button" className={stateChipClass('trash')} onClick={() => onFilter({ quick: 'trashed', includeDeleted: true })}>Papelera</button> : null}
             </div>
+                </div>
+            </details>
 
-            <div className="grid grid-cols-4 gap-2">
+            <details className="rounded-xl border border-sky-100 bg-white/80">
+                <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-brand-800 [&::-webkit-details-marker]:hidden">
+                    Acciones
+                    <span className="text-base leading-none" aria-hidden="true">+</span>
+                </summary>
+            <div className="grid grid-cols-2 gap-2 border-t border-sky-100 p-2">
                 <button type="button" className={cn(productGridIconButton, 'h-10 w-full', isDirty && 'border-amber-300 bg-amber-50 text-amber-800', !isDirty && 'cursor-not-allowed opacity-45')} title="Guardar" aria-label="Guardar" disabled={!isDirty || status === 'saving'} onClick={() => void saveInline()}>
                     <FaSave aria-hidden="true" />
                 </button>
@@ -859,6 +1097,7 @@ function ProductMobileCard({
                     <FaTrash aria-hidden="true" />
                 </Link>
             </div>
+            </details>
             {feedback !== '' ? <p className={inlineFeedbackClass(status)}>{feedback}</p> : null}
         </article>
     );
@@ -881,6 +1120,10 @@ export default function ProductsPage({
     },
 }: ProductsPageProps): JSX.Element {
     const safeFilters = Array.isArray(filters) ? {} : (filters ?? {});
+    const sortedCategories = useMemo(
+        () => [...categories].sort((left, right) => left.name.localeCompare(right.name, 'es', { sensitivity: 'base' })),
+        [categories],
+    );
     const savedFiltersRef = useRef<SavedProductFilters | null>(readSavedProductFilters());
     const hasIncomingFilters = Boolean(
         safeFilters.q ||
@@ -895,6 +1138,7 @@ export default function ProductsPage({
     const savedFilters = hasIncomingFilters ? null : savedFiltersRef.current;
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [pendingProductIds, setPendingProductIds] = useState<number[]>([]);
+    const [visibleMobileProductCount, setVisibleMobileProductCount] = useState(MOBILE_PRODUCT_BATCH_SIZE);
     const pendingSaveHandlersRef = useRef<Map<number, () => Promise<void>>>(new Map());
     const [search, setSearch] = useState(safeFilters.q ?? savedFilters?.search ?? '');
     const [categoryId, setCategoryId] = useState(safeFilters.category_id ? String(safeFilters.category_id) : savedFilters?.categoryId ?? '');
@@ -928,7 +1172,7 @@ export default function ProductsPage({
         offer_percent: '',
     });
     const quickCreateForm = useForm<QuickCreateFormData>({
-        category_id: String(categories[0]?.id ?? ''),
+        category_id: String(sortedCategories[0]?.id ?? ''),
         name: '',
         sku: '',
         short_description: '',
@@ -948,6 +1192,11 @@ export default function ProductsPage({
         () => products.length > 0 && selectedIds.length === products.length,
         [products.length, selectedIds.length],
     );
+    const visibleMobileProducts = useMemo(
+        () => products.slice(0, visibleMobileProductCount),
+        [products, visibleMobileProductCount],
+    );
+    const hasMoreMobileProducts = visibleMobileProducts.length < products.length;
 
     const hasSelection = selectedIds.length > 0;
     const hasPendingChanges = pendingProductIds.length > 0;
@@ -961,7 +1210,7 @@ export default function ProductsPage({
         }
 
         if (categoryId !== '') {
-            const categoryName = categories.find((category) => String(category.id) === categoryId)?.name ?? `Categoria ${categoryId}`;
+            const categoryName = sortedCategories.find((category) => String(category.id) === categoryId)?.name ?? `Categoria ${categoryId}`;
             parts.push(`Categoria: ${categoryName}`);
         }
 
@@ -990,8 +1239,12 @@ export default function ProductsPage({
         }
 
         return parts;
-    }, [categories, categoryId, estado, includeDeleted, issue, missing, order, quick, search, sort]);
+    }, [categoryId, estado, includeDeleted, issue, missing, order, quick, search, sort, sortedCategories]);
     const hasActiveFilters = activeFilterSummary.length > 0;
+
+    useEffect(() => {
+        setVisibleMobileProductCount(MOBILE_PRODUCT_BATCH_SIZE);
+    }, [categoryId, estado, includeDeleted, issue, missing, products.length, quick, search, sort]);
 
     const applyFilters = (event?: FormEvent<HTMLFormElement>): void => {
         event?.preventDefault();
@@ -1208,6 +1461,13 @@ export default function ProductsPage({
             await handler();
         }
     };
+    const discardPendingChanges = (): void => {
+        if (!hasPendingChanges || !window.confirm('Se descartarán los cambios sin guardar. Continuar?')) {
+            return;
+        }
+
+        window.location.reload();
+    };
 
     const submitBulk = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -1315,7 +1575,7 @@ export default function ProductsPage({
                     <div className={ui.formGrid}>
                         <input className={ui.input} placeholder="Nombre" value={quickCreateForm.data.name} onChange={(event) => quickCreateForm.setData('name', event.target.value)} />
                         <select className={ui.input} value={quickCreateForm.data.category_id} onChange={(event) => quickCreateForm.setData('category_id', event.target.value)}>
-                            {categories.map((category) => (
+                            {sortedCategories.map((category) => (
                                 <option key={category.id} value={category.id}>
                                     {category.name}
                                 </option>
@@ -1384,7 +1644,7 @@ export default function ProductsPage({
                         {bulkForm.data.action === 'set_category' ? (
                             <select className={`${ui.input} lg:min-w-[220px]`} value={bulkForm.data.category_id} onChange={(event) => bulkForm.setData('category_id', event.target.value)}>
                                 <option value="">Elegir categoria</option>
-                                {categories.map((category) => (
+                                {sortedCategories.map((category) => (
                                     <option key={category.id} value={category.id}>
                                         {category.name}
                                     </option>
@@ -1485,7 +1745,7 @@ export default function ProductsPage({
                             </div>
                             <select className={ui.input} value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
                                 <option value="">Todas las categorias</option>
-                                {categories.map((category) => (
+                                {sortedCategories.map((category) => (
                                     <option key={category.id} value={category.id}>
                                         {category.name} ({category.product_count})
                                     </option>
@@ -1549,11 +1809,11 @@ export default function ProductsPage({
                     </button>
                 </div>
                 <div className="grid gap-3 md:hidden">
-                    {products.map((product) => (
+                    {visibleMobileProducts.map((product) => (
                         <ProductMobileCard
                             key={product.id}
                             product={product}
-                            categories={categories}
+                            categories={sortedCategories}
                             isSelected={selectedIds.includes(product.id)}
                             onFilter={applyQuickFilter}
                             onPendingChange={updatePendingProduct}
@@ -1563,6 +1823,15 @@ export default function ProductsPage({
                             }
                         />
                     ))}
+                    {hasMoreMobileProducts ? (
+                        <button
+                            type="button"
+                            className={buttonClass('soft', 'sm', 'min-h-10')}
+                            onClick={() => setVisibleMobileProductCount((current) => Math.min(current + MOBILE_PRODUCT_BATCH_SIZE, products.length))}
+                        >
+                            Mostrar más productos ({visibleMobileProducts.length} de {products.length})
+                        </button>
+                    ) : null}
                     {products.length === 0 ? (
                         <article className={ui.emptyCard}>
                             <h3 className={ui.emptyTitle}>No se encontraron productos</h3>
@@ -1614,7 +1883,7 @@ export default function ProductsPage({
                                 <ProductInlineRow
                                     key={product.id}
                                     product={product}
-                                    categories={categories}
+                                    categories={sortedCategories}
                                     isSelected={selectedIds.includes(product.id)}
                                     density={density}
                                     onFilter={applyQuickFilter}
@@ -1630,6 +1899,20 @@ export default function ProductsPage({
                     </table>
                 </div>
             </section>
+            {hasPendingChanges ? (
+                <div className="fixed inset-x-2 bottom-2 z-50 mx-auto grid max-w-[42rem] gap-2 rounded-xl border border-amber-200 bg-white/95 p-2 shadow-[0_18px_40px_rgba(15,45,103,0.22)] backdrop-blur md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center print:hidden">
+                    <div className="min-w-0 px-1">
+                        <p className="text-[0.62rem] font-black uppercase tracking-[0.14em] text-amber-700">Cambios pendientes</p>
+                        <p className="text-sm font-bold text-ink-900">{pendingProductIds.length} producto(s) con edición sin guardar.</p>
+                    </div>
+                    <button type="button" className={buttonClass('primary', 'sm', 'min-h-10')} onClick={() => void saveAllPending()}>
+                        Guardar todo
+                    </button>
+                    <button type="button" className={buttonClass('soft', 'sm', 'min-h-10')} onClick={discardPendingChanges}>
+                        Descartar
+                    </button>
+                </div>
+            ) : null}
         </AdminLayout>
     );
 }

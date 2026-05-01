@@ -12,6 +12,7 @@ const categoryIconButtonSoft = `${categoryIconButton} border-sky-200 bg-white te
 const categoryIconButtonPrimary = `${categoryIconButton} border-brand-500 bg-brand-600 text-white hover:bg-brand-700`;
 const categoryIconButtonSuccess = `${categoryIconButton} border-emerald-500 bg-emerald-500 text-white hover:bg-emerald-600`;
 const categoryIconButtonDanger = `${categoryIconButton} border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100`;
+const customGroupValue = '__custom_group__';
 
 interface CategoryItem {
     id: number;
@@ -62,6 +63,72 @@ function normalizeGroup(value: string): string {
     return value.trim().toLowerCase().replace(/\s+/g, '-');
 }
 
+function GroupKeyField({
+    value,
+    groups,
+    onChange,
+    placeholder = 'Grupo',
+}: {
+    value: string;
+    groups: GroupOption[];
+    onChange: (value: string) => void;
+    placeholder?: string;
+}): JSX.Element {
+    const hasKnownGroup = groups.some((group) => group.key === value);
+    const [customMode, setCustomMode] = useState(value !== '' && !hasKnownGroup);
+
+    useEffect(() => {
+        if (value !== '' && !groups.some((group) => group.key === value)) {
+            setCustomMode(true);
+        }
+    }, [groups, value]);
+
+    if (customMode) {
+        return (
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <input
+                    className={`${ui.input} min-h-10 rounded-xl py-2`}
+                    placeholder={placeholder}
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                />
+                <button
+                    type="button"
+                    className={buttonClass('soft', 'sm', 'min-h-10 whitespace-nowrap rounded-xl')}
+                    onClick={() => {
+                        onChange(groups[0]?.key ?? '');
+                        setCustomMode(false);
+                    }}
+                >
+                    Lista
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <select
+            className={`${ui.input} min-h-10 rounded-xl py-2`}
+            value={hasKnownGroup ? value : ''}
+            onChange={(event) => {
+                if (event.target.value === customGroupValue) {
+                    onChange('');
+                    setCustomMode(true);
+                    return;
+                }
+
+                onChange(event.target.value);
+            }}
+        >
+            <option value="" disabled>{placeholder}</option>
+            {groups.map((group) => (
+                <option key={group.key} value={group.key}>{group.label}</option>
+            ))}
+            <option value={customGroupValue}>Nuevo grupo...</option>
+        </select>
+    );
+}
+
 function CategoryEditor({
     category,
     groups,
@@ -84,8 +151,6 @@ function CategoryEditor({
         sort_order: category.sort_order,
         is_hidden: category.is_hidden,
     });
-
-    const groupListId = `category-groups-${category.id}`;
 
     useEffect(() => {
         setForm({
@@ -128,12 +193,7 @@ function CategoryEditor({
                     </div>
                 </td>
                 <td className={`${ui.tableCell} w-[190px]`}>
-                    <input className={`${ui.input} min-h-10 rounded-xl py-2`} list={groupListId} value={form.group_key} onChange={(event) => setForm((current) => ({ ...current, group_key: event.target.value }))} />
-                    <datalist id={groupListId}>
-                        {groups.map((group) => (
-                            <option key={group.key} value={group.key}>{group.label}</option>
-                        ))}
-                    </datalist>
+                    <GroupKeyField value={form.group_key} groups={groups} onChange={(group_key) => setForm((current) => ({ ...current, group_key }))} />
                 </td>
                 <td className={`${ui.tableCell} w-[96px]`}>
                     <input className={`${ui.input} min-h-10 rounded-xl px-3 py-2`} type="number" min="1" value={form.sort_order} onChange={(event) => setForm((current) => ({ ...current, sort_order: Number(event.target.value) }))} />
@@ -182,7 +242,7 @@ function CategoryEditor({
                 </div>
                 <input className={`${ui.input} min-h-10 rounded-xl py-2`} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
                 <div className="grid gap-2 sm:grid-cols-2">
-                    <input className={`${ui.input} min-h-10 rounded-xl py-2`} list={groupListId} placeholder="Grupo" value={form.group_key} onChange={(event) => setForm((current) => ({ ...current, group_key: event.target.value }))} />
+                    <GroupKeyField value={form.group_key} groups={groups} onChange={(group_key) => setForm((current) => ({ ...current, group_key }))} />
                     <input className={`${ui.input} min-h-10 rounded-xl py-2`} type="number" min="1" value={form.sort_order} onChange={(event) => setForm((current) => ({ ...current, sort_order: Number(event.target.value) }))} />
                 </div>
                 <div className="grid grid-cols-5 gap-2">
@@ -291,11 +351,11 @@ export default function CategoriesPage({ categories, groupOptions, stats }: Cate
     }
 
     return (
-        <AdminLayout title="Categorias">
+        <AdminLayout title="Categorías">
             <section className={ui.heroCard}>
                 <div className={ui.heroTitleWrap}>
                     <p className={ui.eyebrow}>Taxonomia</p>
-                    <h2 className={ui.heroTitle}>Categorias, grupos y visibilidad</h2>
+                    <h2 className={ui.heroTitle}>Categorías, grupos y visibilidad</h2>
                     <p className={ui.heroText}>Alta, edicion rapida, fusion, orden y control del menu publico desde una vista compacta.</p>
                 </div>
             </section>
@@ -338,12 +398,7 @@ export default function CategoriesPage({ categories, groupOptions, stats }: Cate
                         </label>
                         <label className={ui.field}>
                             <span className={ui.fieldLabel}>Grupo</span>
-                            <input className={ui.input} list="new-category-groups" value={createForm.data.group_key} onChange={(event) => createForm.setData('group_key', event.target.value)} />
-                            <datalist id="new-category-groups">
-                                {groups.map((group) => (
-                                    <option key={group.key} value={group.key}>{group.label}</option>
-                                ))}
-                            </datalist>
+                            <GroupKeyField value={createForm.data.group_key} groups={groups} onChange={(group_key) => createForm.setData('group_key', group_key)} />
                         </label>
                         <label className={ui.field}>
                             <span className={ui.fieldLabel}>Orden</span>
