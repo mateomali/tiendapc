@@ -480,6 +480,20 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
                             <p className={ui.eyebrow}>Caja</p>
                             <h2 className="text-2xl font-black text-ink-950">Nueva venta</h2>
                         </div>
+                        <div className="grid gap-2 rounded-xl border border-sky-100 bg-white/92 p-2 shadow-[0_8px_18px_rgba(18,58,132,0.06)] xl:hidden">
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                                <label className="grid gap-1">
+                                    <span className="text-xs font-black uppercase tracking-[0.12em] text-brand-700">Cliente</span>
+                                    <input className={`${ui.input} min-h-9 rounded-xl px-3 py-2 text-xs`} value={customerLabel} onChange={(event) => setCustomerLabel(event.target.value)} />
+                                </label>
+                                <div className="grid gap-1">
+                                    <span className="text-xs font-black uppercase tracking-[0.12em] text-brand-700">Fecha</span>
+                                    <span className="grid min-h-9 items-center rounded-xl border border-sky-200/90 bg-sky-50 px-3 py-2 text-xs font-black text-ink-900">
+                                        {defaults.issuedAtLabel}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
                         <div className="grid gap-2">
                             <div className="relative">
                                 <input
@@ -646,7 +660,7 @@ const TicketAside = memo(function TicketAside({
                         {items.length} producto(s)
                     </span>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="hidden gap-2 xl:grid xl:grid-cols-2">
                     <label className="grid gap-1">
                         <span className={ui.fieldLabel}>Cliente</span>
                         <input className={ui.input} value={customerLabel} onChange={(event) => onCustomerLabelChange(event.target.value)} />
