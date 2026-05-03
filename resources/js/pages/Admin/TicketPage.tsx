@@ -110,7 +110,7 @@ export default function TicketPage({ sale }: TicketPageProps): JSX.Element {
                             <span>Productos totales: </span>
                             <strong>{sale.items.length}</strong>
                         </p>
-                        <p className="flex w-full items-baseline justify-between gap-2 border-t border-black pt-1 text-[15px] font-black">
+                        <p className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-2 border-t border-black pt-1 text-[15px] font-black">
                             <span className="uppercase">Total</span>
                             <strong className="whitespace-nowrap text-right text-[17px]">{formatCurrency(sale.total)}</strong>
                         </p>
