@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { AdminLayout } from '../../layouts/AdminLayout';
 import { buttonClass, ui } from '../../ui';
@@ -42,8 +42,15 @@ interface ProductMissingSkusPageProps {
 
 export default function ProductMissingSkusPage({ items, urls }: ProductMissingSkusPageProps): JSX.Element {
     const [values, setValues] = useState<Record<number, string>>(Object.fromEntries(items.map((item) => [item.id, item.payload.sku ?? ''])));
+    const [savedIds, setSavedIds] = useState<number[]>([]);
+    const [savingIds, setSavingIds] = useState<number[]>([]);
+    const [errorMessage, setErrorMessage] = useState('');
+    const visibleItems = items.filter((item) => !savedIds.includes(item.id));
 
     async function save(item: MissingSkuItem): Promise<void> {
+        setErrorMessage('');
+        setSavingIds((current) => [...current, item.id]);
+
         const payload = new FormData();
         payload.append('category_id', String(item.payload.category_id ?? 0));
         payload.append('name', item.payload.name);
@@ -63,17 +70,28 @@ export default function ProductMissingSkusPage({ items, urls }: ProductMissingSk
         payload.append('is_featured', item.payload.is_featured ? '1' : '0');
         payload.append('is_active', item.payload.is_active ? '1' : '0');
 
-        await window.fetch(item.updateAction, {
-            method: 'POST',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
-                Accept: 'application/json',
-            },
-            body: payload,
-        });
+        try {
+            const response = await window.fetch(item.updateAction, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '',
+                    Accept: 'application/json',
+                },
+                body: payload,
+            });
 
-        router.reload();
+            if (!response.ok) {
+                setErrorMessage(`No se pudo guardar el SKU de "${item.name}".`);
+                return;
+            }
+
+            setSavedIds((current) => [...current, item.id]);
+        } catch {
+            setErrorMessage(`No se pudo guardar el SKU de "${item.name}".`);
+        } finally {
+            setSavingIds((current) => current.filter((id) => id !== item.id));
+        }
     }
 
     return (
@@ -85,15 +103,20 @@ export default function ProductMissingSkusPage({ items, urls }: ProductMissingSk
                     <p className={ui.heroText}>Completa identificadores pendientes para sostener busqueda, ventas y control operativo del catalogo.</p>
                 </div>
                 <div className={ui.heroActions}>
-                    <a href={urls.products} className={buttonClass('soft')}>
+                    <Link href={urls.products} className={buttonClass('soft')}>
                         Volver a productos
-                    </a>
+                    </Link>
                 </div>
             </section>
 
             <section className={ui.sectionCard}>
+                {errorMessage !== '' ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-900">
+                        {errorMessage}
+                    </div>
+                ) : null}
                 <div className="grid gap-4">
-                    {items.map((item) => (
+                    {visibleItems.map((item) => (
                         <article key={item.id} className={ui.backupRow}>
                             <div className="grid flex-1 gap-2">
                                 <strong>{item.name}</strong>
@@ -109,16 +132,16 @@ export default function ProductMissingSkusPage({ items, urls }: ProductMissingSk
                                 </div>
                             </div>
                             <div className={ui.inlineActions}>
-                                <a href={item.editUrl} className={buttonClass('soft', 'sm')}>
+                                <Link href={item.editUrl} className={buttonClass('soft', 'sm')}>
                                     Editar completo
-                                </a>
-                                <button type="button" className={buttonClass('primary', 'sm')} onClick={() => void save(item)}>
-                                    Guardar SKU
+                                </Link>
+                                <button type="button" className={buttonClass('primary', 'sm')} onClick={() => void save(item)} disabled={savingIds.includes(item.id)}>
+                                    {savingIds.includes(item.id) ? 'Guardando...' : 'Guardar SKU'}
                                 </button>
                             </div>
                         </article>
                     ))}
-                    {items.length === 0 ? (
+                    {visibleItems.length === 0 ? (
                         <article className={ui.emptyCard}>
                             <h3 className={ui.emptyTitle}>No hay productos sin SKU</h3>
                             <p className={ui.emptyText}>Todos los productos visibles ya tienen identificador comercial.</p>

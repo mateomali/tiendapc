@@ -105,6 +105,7 @@ function isExternalAnnouncementUrl(url: string | undefined): boolean {
 export function SiteLayout({ children, title, headerSearch, announcements, announcementMode = 'default' }: SiteLayoutProps): JSX.Element {
     const { cart, layout } = usePage<SharedPageProps>().props;
     const [search, setSearch] = useState(headerSearch?.query ?? '');
+    const [searching, setSearching] = useState(false);
     const [announcementIndex, setAnnouncementIndex] = useState(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -194,7 +195,13 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
     };
 
     const submitSearch = (query = search): void => {
-        window.location.assign(buildSearchUrl(query));
+        setMobileMenuOpen(false);
+        router.visit(buildSearchUrl(query), {
+            preserveState: true,
+            preserveScroll: false,
+            onStart: () => setSearching(true),
+            onFinish: () => setSearching(false),
+        });
     };
 
     const showAnnouncementControls = (announcements?.items.length ?? 0) > 1;
@@ -316,12 +323,14 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                                 }}
                                                 placeholder="Buscar por producto, ejemplo: auricular o cargador..."
                                                 className={site.searchInput}
+                                                aria-busy={searching ? 'true' : 'false'}
                                             />
                                             <button
                                                 type="button"
-                                                className={`${site.searchButton} max-[860px]:before:hidden min-[861px]:inline-flex min-[861px]:min-h-[2.35rem] min-[861px]:min-w-[2.35rem] min-[861px]:items-center min-[861px]:justify-center min-[861px]:rounded-[0.72rem] min-[861px]:p-0`}
+                                                className={`${site.searchButton} max-[860px]:before:hidden min-[861px]:inline-flex min-[861px]:min-h-[2.35rem] min-[861px]:min-w-[2.35rem] min-[861px]:items-center min-[861px]:justify-center min-[861px]:rounded-[0.72rem] min-[861px]:p-0 ${searching ? 'opacity-75' : ''}`}
                                                 onClick={() => submitSearch()}
                                                 aria-label="Buscar productos"
+                                                disabled={searching}
                                             >
                                                 <span className={site.searchButtonIcon}>
                                                     <SearchNavIcon />
@@ -395,12 +404,14 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                             }}
                                             placeholder="Buscar ej: cargador"
                                             className={site.searchInput}
+                                            aria-busy={searching ? 'true' : 'false'}
                                         />
                                         <button
                                             type="button"
-                                            className={`${site.searchButton} max-[860px]:before:hidden min-[861px]:inline-flex min-[861px]:min-h-[2.35rem] min-[861px]:min-w-[2.35rem] min-[861px]:items-center min-[861px]:justify-center min-[861px]:rounded-[0.72rem] min-[861px]:p-0`}
+                                            className={`${site.searchButton} max-[860px]:before:hidden min-[861px]:inline-flex min-[861px]:min-h-[2.35rem] min-[861px]:min-w-[2.35rem] min-[861px]:items-center min-[861px]:justify-center min-[861px]:rounded-[0.72rem] min-[861px]:p-0 ${searching ? 'opacity-75' : ''}`}
                                             onClick={() => submitSearch()}
                                             aria-label="Buscar productos"
+                                            disabled={searching}
                                         >
                                             <span className={site.searchButtonIcon}>
                                                 <SearchNavIcon />
@@ -459,9 +470,10 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                         }}
                                         placeholder="Buscar por producto, ejemplo: auricular o cargador..."
                                         className={site.searchInput}
+                                        aria-busy={searching ? 'true' : 'false'}
                                     />
-                                    <button type="button" className={site.searchButton} onClick={() => submitSearch()}>
-                                        Buscar
+                                    <button type="button" className={`${site.searchButton} ${searching ? 'opacity-75' : ''}`} onClick={() => submitSearch()} disabled={searching}>
+                                        {searching ? 'Buscando' : 'Buscar'}
                                     </button>
                                     <Link href={layout.cartUrl} className={site.mobileCart} aria-label={`Ir al carrito, ${cart.count} productos`} prefetch={['hover', 'click']} cacheFor="15s">
                                         <span className={site.mobileCartIcon}>

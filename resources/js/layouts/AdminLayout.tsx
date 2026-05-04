@@ -64,7 +64,7 @@ const adminMobileMenuButtonClasses =
     'flex min-h-8 cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-white/25 bg-white/12 px-2.5 py-1.5 text-[0.72rem] font-black leading-none tracking-[0.02em] text-slate-50 backdrop-blur-sm [&::-webkit-details-marker]:hidden';
 
 const adminDensityClasses = [
-    'min-h-screen bg-[#e8f1ff] p-2 text-[#0f172a] [color-scheme:light] print:bg-white print:p-0 md:p-2.5',
+    'min-h-screen overflow-x-hidden bg-[#e8f1ff] p-2 text-[#0f172a] [color-scheme:light] print:bg-white print:p-0 max-[430px]:p-1.5 md:p-2.5',
     '[&_:where(main,form,section,article,aside,div,nav)]:min-w-0',
     '[&_:where(section,article,aside,form)]:!rounded-xl',
     '[&_:where(main>section,main>form,main>article,main>aside,main>div>section,main>div>form,main>div>article,main>div>aside)]:!border-[rgba(148,180,226,0.72)]',
@@ -83,8 +83,8 @@ const adminDensityClasses = [
     '[&_:where(td)]:!border-r [&_:where(td)]:!border-b [&_:where(td)]:!border-[rgba(192,211,238,0.9)] [&_:where(td)]:!px-2 [&_:where(td)]:!py-[0.45rem] [&_:where(td)]:!align-top',
     '[&_:where(th:last-child,td:last-child)]:!border-r-0 [&_:where(tbody_tr:nth-child(even))]:bg-[rgba(248,251,255,0.72)] [&_:where(tbody_tr:hover)]:bg-[rgba(229,241,255,0.82)]',
     '[&_:where(img)]:max-w-full',
-    '[&_:where(main_article_h3,main_button_h3)]:line-clamp-2 [&_:where(main_article_p,main_button_p)]:line-clamp-2 [&_:where(main_article_p,main_button_p)]:break-anywhere',
-    '[&_:where(main_article_.inline-flex,main_article_a,main_article_button)]:!min-h-[1.85rem] [&_:where(main_article_.inline-flex,main_article_a,main_article_button)]:!py-1',
+    '[&_:where(article_h3,button_h3)]:line-clamp-2 [&_:where(article_p,button_p)]:line-clamp-2 [&_:where(article_p,button_p)]:break-anywhere',
+    '[&_:where(article_.inline-flex,article_a,article_button)]:!min-h-[1.85rem] [&_:where(article_.inline-flex,article_a,article_button)]:!py-1',
     '[&_:where(.overflow-x-auto)]:!rounded-[0.6rem]',
     '[&_:where(.rounded-2xl,.rounded-\\[1\\.4rem\\],.rounded-\\[1\\.5rem\\],.rounded-\\[1\\.75rem\\],.rounded-\\[22px\\],.rounded-\\[24px\\])]:!rounded-[0.65rem]',
     '[&_:where(.p-6,.p-5,.p-4)]:!p-3 [&_:where(.px-6,.px-5,.px-4)]:!px-3 [&_:where(.py-8,.py-6,.py-5,.py-4)]:!py-3',

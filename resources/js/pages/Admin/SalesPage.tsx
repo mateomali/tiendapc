@@ -1,5 +1,5 @@
 import { Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminLayout } from '../../layouts/AdminLayout';
 import { buttonClass, ui } from '../../ui';
 import { formatCurrency } from '../../utils';
@@ -58,6 +58,33 @@ export default function SalesPage({ query, period, customRange, metrics, sales, 
     const [search, setSearch] = useState(query);
     const [from, setFrom] = useState(customRange.from);
     const [to, setTo] = useState(customRange.to);
+    const [searching, setSearching] = useState(false);
+
+    useEffect(() => {
+        setSearch(query);
+    }, [query]);
+
+    useEffect(() => {
+        if (search === query) {
+            return undefined;
+        }
+
+        const timeout = window.setTimeout(() => {
+            router.get(
+                route('admin.sales.index'),
+                { q: search || undefined, ...activePeriodParams() },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onStart: () => setSearching(true),
+                    onFinish: () => setSearching(false),
+                },
+            );
+        }, 450);
+
+        return () => window.clearTimeout(timeout);
+    }, [search, query, period, customRange.from, customRange.to]);
 
     function goToPeriod(nextPeriod: PeriodKey): void {
         router.get(
@@ -180,8 +207,10 @@ export default function SalesPage({ query, period, customRange, metrics, sales, 
                         );
                     }}
                 >
-                    <input className={`${ui.input} lg:max-w-sm`} placeholder="Buscar por ticket o cliente" value={search} onChange={(event) => setSearch(event.target.value)} />
-                    <button className={buttonClass('primary')}>Buscar</button>
+                    <input className={`${ui.input} lg:max-w-sm`} placeholder="Buscar por ticket o cliente" value={search} onChange={(event) => setSearch(event.target.value)} aria-busy={searching ? 'true' : 'false'} />
+                    <button className={buttonClass('primary')} disabled={searching}>
+                        {searching ? 'Buscando...' : 'Buscar'}
+                    </button>
                 </form>
             </section>
 

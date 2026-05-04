@@ -110,10 +110,14 @@ export default function TicketPage({ sale }: TicketPageProps): JSX.Element {
                             <span>Productos totales: </span>
                             <strong>{sale.items.length}</strong>
                         </p>
-                        <p className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-2 border-t border-black pt-1 text-[15px] font-black">
-                            <span className="uppercase">Total</span>
-                            <strong className="whitespace-nowrap text-right text-[17px]">{formatCurrency(sale.total)}</strong>
-                        </p>
+                        <table className="w-full border-t border-black pt-1 text-[15px] font-black" style={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+                            <tbody>
+                                <tr>
+                                    <td className="pt-1 uppercase" style={{ width: '40%' }}>Total</td>
+                                    <td className="whitespace-nowrap pt-1 text-[17px]" style={{ width: '60%', textAlign: 'right' }}>{formatCurrency(sale.total)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                         {sale.notes ? (
                             <div className="mt-1">
                                 <strong>Observaciones</strong>

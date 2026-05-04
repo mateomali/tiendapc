@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { FaArrowLeft, FaMapMarkerAlt, FaSearch, FaTimes, FaTools, FaWhatsapp } from 'react-icons/fa';
 import type {
@@ -117,6 +117,7 @@ export default function PublicTrackingPage({
         dni_buscado: filters.dni_buscado ? String(filters.dni_buscado) : '',
     });
     const [lightbox, setLightbox] = useState<LightboxState | null>(null);
+    const [submittingLookup, setSubmittingLookup] = useState(false);
 
     const submitLookup = (): void => {
         const params = new URLSearchParams();
@@ -131,8 +132,12 @@ export default function PublicTrackingPage({
             params.set('dni', dni);
         }
 
-        const query = params.toString();
-        window.location.assign(`${window.location.pathname}${query !== '' ? `?${query}` : ''}`);
+        router.get(window.location.pathname, Object.fromEntries(params.entries()), {
+            preserveState: true,
+            preserveScroll: false,
+            onStart: () => setSubmittingLookup(true),
+            onFinish: () => setSubmittingLookup(false),
+        });
     };
 
     useEffect(() => {
@@ -217,8 +222,8 @@ export default function PublicTrackingPage({
                             />
                         </label>
 
-                        <button className={actionButtonClass} type="submit" aria-label="Consultar estado de la reparación" title="Consultar estado">
-                            <span className="md:hidden">Encontrar mi equipo</span>
+                        <button className={`${actionButtonClass} ${submittingLookup ? 'opacity-75' : ''}`} type="submit" aria-label="Consultar estado de la reparación" title="Consultar estado" disabled={submittingLookup}>
+                            <span className="md:hidden">{submittingLookup ? 'Buscando...' : 'Encontrar mi equipo'}</span>
                             <FaSearch aria-hidden="true" className="text-base" />
                         </button>
                     </form>

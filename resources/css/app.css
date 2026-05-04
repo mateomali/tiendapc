@@ -1,5 +1,61 @@
 @import 'tailwindcss';
 
+@layer base {
+    *,
+    ::before,
+    ::after {
+        box-sizing: border-box;
+    }
+
+    html {
+        min-width: 320px;
+        overflow-x: hidden;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+
+    body {
+        min-width: 320px;
+        overflow-x: hidden;
+        overscroll-behavior-y: none;
+        background: #dce9ff;
+        text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+        font: inherit;
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    img,
+    svg,
+    video,
+    canvas {
+        max-width: 100%;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
 @media print {
     @page {
         size: 80mm auto;
