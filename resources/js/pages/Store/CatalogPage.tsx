@@ -256,7 +256,7 @@ function CatalogProductCard({ product, imageRotationMs, cartUrl, eagerImage }: C
             : 'regular';
 
     return (
-        <article className={catalogCardClass(cardTone, product.cartQty > 0 ? 'max-[860px]:h-[232px] max-[560px]:h-[214px] max-[860px]:[contain-intrinsic-size:232px] max-[560px]:[contain-intrinsic-size:214px]' : undefined)} data-testid="catalog-product-card">
+        <article className={catalogCardClass(cardTone, product.cartQty > 0 ? 'max-[860px]:h-[218px] max-[560px]:h-[198px] max-[860px]:[contain-intrinsic-size:218px] max-[560px]:[contain-intrinsic-size:198px]' : undefined)} data-testid="catalog-product-card">
             {product.hasOffer ? (
                 <div className={catalogOfferRibbonClass} aria-label={`Descuento del ${product.discountPercentage}%`}>
                     {'\u{1F525}'}Oferta -{product.discountPercentage}%

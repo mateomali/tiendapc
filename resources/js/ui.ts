@@ -1,12 +1,12 @@
 ﻿import { cn } from './utils';
 
 const cardSurface =
-    'rounded-[1.75rem] border border-[rgba(214,227,251,0.92)] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] shadow-[0_22px_40px_rgba(18,58,132,0.1)]';
+    'rounded-[1rem] border border-[rgba(203,219,244,0.82)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_12px_28px_rgba(18,58,132,0.075)]';
 const buttonBase =
-    'inline-flex cursor-pointer items-center justify-center gap-[0.55rem] rounded-2xl border border-transparent px-[1.1rem] py-[0.7rem] text-[0.92rem] font-black tracking-[0.02em] no-underline transition duration-150 hover:-translate-y-px hover:brightness-[1.02] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgba(53,117,236,0.16)] disabled:cursor-not-allowed disabled:opacity-65 disabled:transform-none disabled:brightness-100';
+    'inline-flex cursor-pointer items-center justify-center gap-2 rounded-[0.78rem] border border-transparent px-4 py-2 text-[0.86rem] font-black leading-none tracking-[0.01em] no-underline transition duration-150 active:translate-y-px hover:-translate-y-px hover:brightness-[1.02] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgba(53,117,236,0.16)] disabled:cursor-not-allowed disabled:opacity-60 disabled:transform-none disabled:brightness-100';
 const buttonSize = {
-    default: 'min-h-[2.8rem]',
-    sm: 'min-h-[2.2rem] rounded-[0.85rem] px-[0.85rem] py-[0.45rem] text-[0.8rem]',
+    default: 'min-h-10',
+    sm: 'min-h-8 rounded-[0.62rem] px-3 py-1.5 text-[0.74rem]',
 } as const;
 const buttonVariant = {
     primary:
@@ -20,45 +20,45 @@ const buttonVariant = {
 } as const;
 
 export const ui = {
-    pageStack: 'grid gap-6',
+    pageStack: 'grid gap-4',
     heroCard:
-        `${cardSurface} flex flex-col gap-5 p-6 text-ink-900 lg:flex-row lg:items-start lg:justify-between`,
-    heroTitleWrap: 'space-y-3',
-    eyebrow: 'text-xs font-black uppercase tracking-[0.28em] text-brand-700/70',
-    heroTitle: 'text-3xl font-black tracking-tight text-ink-950 md:text-[2.1rem]',
-    heroText: 'max-w-3xl text-sm leading-6 text-ink-800 md:text-base',
-    heroActions: 'flex flex-wrap items-center gap-3',
-    statsGrid: 'grid gap-4 md:grid-cols-2 xl:grid-cols-4',
-    statCard: `${cardSurface} space-y-2 p-5`,
-    statLabel: 'text-xs font-black uppercase tracking-[0.22em] text-brand-700/70',
-    statValue: 'text-3xl font-black tracking-tight text-ink-950 md:text-4xl',
-    statValueCompact: 'text-xl font-black tracking-tight text-ink-950 md:text-2xl',
-    sectionCard: `${cardSurface} space-y-5 p-6`,
-    sectionCardTight: `${cardSurface} space-y-4 p-5`,
-    cardHeading: 'flex flex-col gap-4 md:flex-row md:items-center md:justify-between',
-    cardTitleWrap: 'space-y-1.5',
-    cardTitle: 'text-2xl font-black tracking-tight text-ink-950',
-    dashboardGrid: 'grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]',
-    twoColumnGrid: 'grid gap-6 xl:grid-cols-2',
-    settingsGrid: 'grid gap-4 md:grid-cols-2',
-    formGrid: 'grid gap-4 md:grid-cols-2',
-    stackList: 'grid gap-3',
-    filtersRow: 'flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center',
-    inlineActions: 'flex flex-wrap items-center gap-3',
-    mediaActions: 'flex flex-wrap items-center gap-3',
+        `${cardSurface} flex flex-col gap-4 p-4 text-ink-900 sm:p-5 lg:flex-row lg:items-start lg:justify-between`,
+    heroTitleWrap: 'space-y-2',
+    eyebrow: 'text-[0.68rem] font-black uppercase tracking-[0.16em] text-brand-700/70',
+    heroTitle: 'text-[1.55rem] font-black leading-tight tracking-tight text-ink-950 md:text-[1.9rem]',
+    heroText: 'max-w-3xl text-[0.88rem] leading-6 text-ink-800 md:text-[0.96rem]',
+    heroActions: 'flex flex-wrap items-center gap-2',
+    statsGrid: 'grid gap-3 md:grid-cols-2 xl:grid-cols-4',
+    statCard: `${cardSurface} space-y-1.5 p-4`,
+    statLabel: 'text-[0.68rem] font-black uppercase tracking-[0.15em] text-brand-700/70',
+    statValue: 'text-2xl font-black tracking-tight text-ink-950 md:text-3xl',
+    statValueCompact: 'text-lg font-black tracking-tight text-ink-950 md:text-xl',
+    sectionCard: `${cardSurface} space-y-4 p-4 sm:p-5`,
+    sectionCardTight: `${cardSurface} space-y-3 p-4`,
+    cardHeading: 'flex flex-col gap-3 md:flex-row md:items-center md:justify-between',
+    cardTitleWrap: 'space-y-1',
+    cardTitle: 'text-xl font-black tracking-tight text-ink-950',
+    dashboardGrid: 'grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]',
+    twoColumnGrid: 'grid gap-4 xl:grid-cols-2',
+    settingsGrid: 'grid gap-3 md:grid-cols-2',
+    formGrid: 'grid gap-3 md:grid-cols-2',
+    stackList: 'grid gap-2.5',
+    filtersRow: 'flex flex-col gap-2.5 lg:flex-row lg:flex-wrap lg:items-center',
+    inlineActions: 'flex flex-wrap items-center gap-2',
+    mediaActions: 'flex flex-wrap items-center gap-2',
     inlineCaption: 'text-sm leading-5 text-ink-700/85',
-    field: 'grid gap-2',
-    fieldWide: 'grid gap-2 md:col-span-2',
-    fieldFull: 'grid gap-2 md:col-span-full',
-    fieldLabel: 'text-sm font-bold text-ink-900',
+    field: 'grid gap-1.5',
+    fieldWide: 'grid gap-1.5 md:col-span-2',
+    fieldFull: 'grid gap-1.5 md:col-span-full',
+    fieldLabel: 'text-[0.82rem] font-bold text-ink-900',
     fieldHint: 'text-xs leading-5 text-ink-700/80',
     input:
-        'min-h-11 w-full rounded-2xl border border-sky-200/90 bg-white/95 px-4 py-3 text-sm font-medium text-ink-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-100/70 disabled:text-slate-500',
+        'min-h-10 w-full rounded-[0.72rem] border border-sky-200/90 bg-white/95 px-3 py-2 text-[0.88rem] font-medium text-ink-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-100/70 disabled:text-slate-500',
     textarea:
-        'min-h-32 w-full rounded-2xl border border-sky-200/90 bg-white/95 px-4 py-3 text-sm font-medium text-ink-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-100/70 disabled:text-slate-500',
-    checkboxLine: 'inline-flex items-center gap-3 rounded-2xl border border-sky-100 bg-white/75 px-4 py-3 text-sm font-semibold text-ink-900',
+        'min-h-28 w-full rounded-[0.72rem] border border-sky-200/90 bg-white/95 px-3 py-2 text-[0.88rem] font-medium text-ink-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 disabled:cursor-not-allowed disabled:bg-slate-100/70 disabled:text-slate-500',
+    checkboxLine: 'inline-flex items-center gap-2.5 rounded-[0.78rem] border border-sky-100 bg-white/75 px-3 py-2 text-[0.86rem] font-semibold text-ink-900',
     checkboxLineSpaced:
-        'inline-flex items-center gap-3 rounded-2xl border border-sky-100 bg-white/75 px-4 py-3 text-sm font-semibold text-ink-900 md:min-h-11',
+        'inline-flex items-center gap-2.5 rounded-[0.78rem] border border-sky-100 bg-white/75 px-3 py-2 text-[0.86rem] font-semibold text-ink-900 md:min-h-10',
     previewPill:
         'rounded-2xl border border-sky-100 bg-white/80 px-4 py-3 text-sm text-ink-900 shadow-[0_10px_24px_rgba(18,58,132,0.08)]',
     previewPanel: `${cardSurface} flex min-h-48 items-center justify-center p-4`,
@@ -85,8 +85,8 @@ export const ui = {
         `${cardSurface} grid gap-2 p-2 text-left transition hover:border-brand-500/40 hover:shadow-[0_10px_18px_rgba(18,58,132,0.08)]`,
     mediaPickerThumb: 'h-20 w-full rounded-[0.45rem] object-cover sm:h-24',
     emptyCard:
-        `${cardSurface} flex min-h-40 flex-col items-center justify-center gap-3 px-6 py-8 text-center`,
-    emptyTitle: 'text-xl font-black tracking-tight text-ink-950',
+        `${cardSurface} flex min-h-32 flex-col items-center justify-center gap-2.5 px-4 py-6 text-center`,
+    emptyTitle: 'text-lg font-black tracking-tight text-ink-950',
     emptyText: 'max-w-xl text-sm leading-6 text-ink-700/85',
     shortcutsGrid: 'grid gap-3 sm:grid-cols-2 xl:grid-cols-3',
     shortcut:
@@ -108,11 +108,11 @@ export const ui = {
     backupMeta: 'grid gap-1 text-sm text-ink-700/85',
     pagination: 'flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border border-sky-100 bg-white/85 px-4 py-4 text-sm font-semibold text-ink-800',
     tableWrap:
-        'overflow-x-auto rounded-[1.5rem] border border-sky-100 bg-white/90 shadow-[0_16px_30px_rgba(18,58,132,0.08)]',
-    table: 'min-w-full border-separate border-spacing-0 text-left text-sm text-ink-900',
+        'overflow-x-auto rounded-[0.9rem] border border-sky-100 bg-white/90 shadow-[0_10px_22px_rgba(18,58,132,0.065)]',
+    table: 'min-w-full border-separate border-spacing-0 text-left text-[0.84rem] text-ink-900',
     tableHeadCell:
-        'border-b border-sky-100 bg-sky-50/70 px-4 py-3 text-xs font-black uppercase tracking-[0.16em] text-brand-700/80',
-    tableCell: 'border-b border-sky-100/80 px-4 py-4 align-top',
+        'border-b border-sky-100 bg-sky-50/70 px-3 py-2.5 text-[0.68rem] font-black uppercase tracking-[0.12em] text-brand-700/80',
+    tableCell: 'border-b border-sky-100/80 px-3 py-3 align-top',
     tableRowSelected: 'bg-brand-50/60',
     tableRowDirty: '!bg-amber-50/90',
     tableEmptyCell: 'px-4 py-8 text-center text-sm font-semibold text-ink-700/85',
@@ -229,15 +229,15 @@ export const site = {
     brandRow:
         'grid grid-cols-[minmax(220px,280px)_minmax(380px,620px)_auto] grid-rows-1 items-center justify-center gap-x-[0.95rem] gap-y-0 max-[1320px]:grid-cols-[minmax(190px,238px)_minmax(360px,1fr)_auto] max-[1080px]:grid-cols-[minmax(180px,218px)_minmax(280px,1fr)_auto] max-[860px]:grid-cols-[minmax(0,1fr)_auto] max-[860px]:grid-rows-none max-[860px]:gap-x-[0.22rem] max-[860px]:gap-y-[0.18rem]',
     mobileBrandTop:
-        'contents max-[860px]:col-span-full max-[860px]:grid max-[860px]:grid-cols-[2.2rem_minmax(0,1fr)_2.2rem] max-[860px]:items-center max-[860px]:gap-[0.3rem]',
+        'contents max-[860px]:col-span-full max-[860px]:grid max-[860px]:grid-cols-[2.05rem_minmax(0,1fr)_2.05rem] max-[860px]:items-center max-[860px]:gap-[0.24rem]',
     logoLink: 'col-start-1 row-start-1 grid h-full items-center justify-items-center gap-[0.35rem] self-center max-[860px]:row-span-1 max-[860px]:col-start-2 max-[860px]:h-auto max-[860px]:w-full max-[860px]:translate-y-0 max-[860px]:justify-items-center',
-    logo: 'w-full max-w-[268px] translate-x-[-8px] object-contain drop-shadow-[0_10px_18px_rgba(4,17,43,0.30)] max-[1320px]:max-w-[238px] max-[1080px]:max-w-[218px] max-[860px]:max-w-[200px] max-[860px]:translate-x-0 max-[560px]:max-w-[190px]',
+    logo: 'w-full max-w-[268px] translate-x-[-8px] object-contain drop-shadow-[0_10px_18px_rgba(4,17,43,0.30)] max-[1320px]:max-w-[238px] max-[1080px]:max-w-[218px] max-[860px]:max-w-[178px] max-[860px]:translate-x-0 max-[560px]:max-w-[164px]',
     headerCenter:
         'col-start-2 row-start-1 grid min-w-0 justify-items-start gap-0 max-[860px]:hidden',
     mobileSearchDock:
         'hidden max-[860px]:sticky max-[860px]:top-0 max-[860px]:z-50 max-[860px]:mt-0 max-[860px]:block max-[860px]:w-full max-[860px]:[position:-webkit-sticky]',
     mobileSearchDockInner:
-        'grid grid-cols-[minmax(0,1fr)_2.72rem] items-center gap-[0.26rem] rounded-none border border-[rgba(162,203,255,0.64)] bg-[linear-gradient(180deg,#2f5ead_0%,#22458f_100%)] p-[0.28rem] shadow-[0_10px_20px_rgba(16,48,108,0.18),inset_0_1px_0_rgba(255,255,255,0.12)]',
+        'grid grid-cols-[minmax(0,1fr)_2.46rem] items-center gap-[0.22rem] rounded-none border border-[rgba(162,203,255,0.64)] bg-[linear-gradient(180deg,#2f5ead_0%,#22458f_100%)] p-[0.22rem] shadow-[0_8px_18px_rgba(16,48,108,0.16),inset_0_1px_0_rgba(255,255,255,0.12)]',
     searchPanel: 'grid min-w-0 gap-[0.42rem] max-[860px]:w-full max-[860px]:justify-items-center',
     searchPanelHeader: 'w-full max-w-[620px] justify-self-stretch max-[860px]:min-w-0 max-[860px]:max-w-none',
     desktopStoreInfo:
@@ -255,9 +255,9 @@ export const site = {
     searchRow:
         'grid grid-cols-[minmax(0,1fr)_2.12rem] gap-[0.24rem] rounded-[0.72rem] border border-[rgba(129,175,241,0.58)] bg-[#254160] p-[0.14rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_7px_14px_rgba(5,28,74,0.14)] max-[860px]:w-full max-[860px]:grid-cols-[minmax(0,1fr)_2.58rem] max-[860px]:items-center max-[860px]:gap-[0.28rem] max-[860px]:rounded-[0.74rem] max-[860px]:border max-[860px]:border-[rgba(129,175,241,0.58)] max-[860px]:p-[0.2rem] max-[860px]:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_8px_18px_rgba(5,28,74,0.18)]',
     searchInput:
-        'min-h-[2.05rem] rounded-[0.58rem] border border-[rgba(149,180,230,0.65)] bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] p-[0.42rem_0.72rem] text-[0.84rem] text-[#1d417d] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] placeholder:text-[#6f87af] focus:outline focus:outline-2 focus:outline-offset-1 focus:outline-[rgba(107,185,255,0.34)] max-[860px]:min-h-[2.5rem] max-[860px]:rounded-[0.68rem] max-[860px]:p-[0.54rem_0.72rem] max-[860px]:text-[0.94rem]',
+        'min-h-[2.05rem] rounded-[0.58rem] border border-[rgba(149,180,230,0.65)] bg-[linear-gradient(180deg,#ffffff_0%,#f5f9ff_100%)] p-[0.42rem_0.72rem] text-[0.84rem] text-[#1d417d] shadow-[inset_0_1px_0_rgba(255,255,255,0.92)] placeholder:text-[#6f87af] focus:outline focus:outline-2 focus:outline-offset-1 focus:outline-[rgba(107,185,255,0.34)] max-[860px]:min-h-[2.28rem] max-[860px]:rounded-[0.64rem] max-[860px]:p-[0.46rem_0.66rem] max-[860px]:text-[0.88rem]',
     searchButton:
-        `${interactiveLift} rounded-[0.62rem] border border-[rgba(159,210,255,0.88)] bg-[linear-gradient(180deg,#4d90f2_0%,#2e63c8_100%)] font-black uppercase tracking-[0.03em] text-white shadow-[0_7px_14px_rgba(13,56,128,0.18),inset_0_1px_0_rgba(255,255,255,0.26)] max-[860px]:relative max-[860px]:min-h-[2.5rem] max-[860px]:min-w-[2.58rem] max-[860px]:rounded-[0.68rem] max-[860px]:border-[rgba(188,226,255,0.95)] max-[860px]:p-0 max-[860px]:text-[0px] max-[860px]:before:hidden`,
+        `${interactiveLift} rounded-[0.62rem] border border-[rgba(159,210,255,0.88)] bg-[linear-gradient(180deg,#4d90f2_0%,#2e63c8_100%)] font-black uppercase tracking-[0.03em] text-white shadow-[0_7px_14px_rgba(13,56,128,0.18),inset_0_1px_0_rgba(255,255,255,0.26)] max-[860px]:relative max-[860px]:min-h-[2.28rem] max-[860px]:min-w-[2.36rem] max-[860px]:rounded-[0.64rem] max-[860px]:border-[rgba(188,226,255,0.95)] max-[860px]:p-0 max-[860px]:text-[0px] max-[860px]:before:hidden`,
     searchButtonIcon:
         'inline-flex h-4 w-4 flex-none items-center justify-center [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-2 [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     mobileCart:
@@ -268,7 +268,7 @@ export const site = {
     mobileMenuIcon:
         'inline-flex h-[1.15rem] w-[1.15rem] items-center justify-center [&_img]:block [&_img]:h-full [&_img]:w-full [&_img]:object-contain [&_img]:brightness-0 [&_img]:invert [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-[2.4] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     mobileHeaderCart:
-        `${interactiveLift} relative hidden h-[2.72rem] min-h-[2.72rem] w-[2.72rem] min-w-[2.72rem] items-center justify-center rounded-[0.72rem] border border-[rgba(157,234,255,0.8)] bg-[linear-gradient(180deg,#35bcd7_0%,#1388bb_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] max-[860px]:inline-flex`,
+        `${interactiveLift} relative hidden h-[2.46rem] min-h-[2.46rem] w-[2.46rem] min-w-[2.46rem] items-center justify-center rounded-[0.64rem] border border-[rgba(157,234,255,0.8)] bg-[linear-gradient(180deg,#35bcd7_0%,#1388bb_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] max-[860px]:inline-flex`,
     mobileMenuOverlay:
         'fixed inset-0 z-50 hidden items-end bg-[rgba(5,18,48,0.42)] p-[0.55rem] max-[860px]:flex max-[380px]:p-[0.34rem]',
     mobileMenuSheet:
@@ -385,13 +385,13 @@ export const catalog = {
     layoutMain: 'grid grid-cols-1 gap-0',
     mobileControls: 'grid gap-0 min-[861px]:hidden',
     mobileControlsBar:
-        'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-[0.42rem] rounded-none border border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.36rem] text-[#f3f8ff] shadow-[0_8px_16px_rgba(33,74,154,0.09),inset_0_1px_0_rgba(255,255,255,0.08)] max-[860px]:gap-[0.28rem] max-[860px]:rounded-none max-[860px]:p-[0.24rem]',
+        'grid grid-cols-[minmax(0,1fr)_auto] items-end gap-[0.32rem] rounded-none border border-[rgba(178,214,255,0.46)] bg-[linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.3rem] text-[#f3f8ff] shadow-[0_8px_16px_rgba(33,74,154,0.08),inset_0_1px_0_rgba(255,255,255,0.08)] max-[860px]:gap-[0.22rem] max-[860px]:rounded-none max-[860px]:p-[0.2rem]',
     mobileControlsFilters: 'min-w-0 [&_.catalog-mobile-unused]:hidden',
     mobileControlsCount:
         'inline-flex min-h-[34px] items-center rounded-[0.68rem] bg-[rgba(8,27,67,0.26)] px-3 text-[0.76rem] font-black uppercase tracking-[0.06em] text-[#eaf4ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
     mobileControlsActions: 'flex items-end justify-end gap-[0.34rem]',
     mobileControlsButton:
-        'inline-flex h-[34px] min-h-[34px] w-[34px] min-w-[34px] items-center justify-center rounded-[0.68rem] border border-[rgba(205,227,255,0.76)] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(237,245,255,0.95)_100%)] p-0 text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_12px_rgba(7,32,88,0.10)]',
+        'inline-flex h-8 min-h-8 w-8 min-w-8 items-center justify-center rounded-[0.58rem] border border-[rgba(205,227,255,0.76)] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(237,245,255,0.95)_100%)] p-0 text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_12px_rgba(7,32,88,0.10)]',
     mobileControlsIcon:
         'inline-flex h-4 w-4 flex-none items-center justify-center [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-2 [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     mobileSheetOverlay:
@@ -427,7 +427,7 @@ export const catalog = {
     toolbarSubcategoryHidden: 'pointer-events-none h-0 overflow-hidden opacity-0',
     sectionTitle: 'px-1 text-[0.62rem] font-black uppercase tracking-[0.09em] text-[#dcecff] [text-shadow:0_1px_8px_rgba(5,18,48,0.24)] max-[860px]:text-[0.58rem] max-[860px]:leading-none max-[860px]:tracking-[0.05em]',
     select:
-        'min-h-10 min-w-0 rounded-[0.72rem] border border-[rgba(204,226,255,0.72)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(235,244,255,0.94)_100%)] px-3 py-0 text-[0.8rem] font-semibold text-[#173b76] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_6px_12px_rgba(7,32,88,0.10)] outline-none transition focus:border-[rgba(184,229,255,0.92)] focus:ring-2 focus:ring-sky-200/35 max-[860px]:w-full max-[860px]:overflow-hidden max-[860px]:truncate max-[860px]:rounded-[0.68rem] max-[860px]:px-2 max-[860px]:pr-6 max-[860px]:text-[0.72rem]',
+        'min-h-9 min-w-0 rounded-[0.62rem] border border-[rgba(204,226,255,0.72)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(235,244,255,0.94)_100%)] px-2.5 py-0 text-[0.78rem] font-semibold text-[#173b76] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_10px_rgba(7,32,88,0.08)] outline-none transition focus:border-[rgba(184,229,255,0.92)] focus:ring-2 focus:ring-sky-200/35 max-[860px]:min-h-8 max-[860px]:w-full max-[860px]:overflow-hidden max-[860px]:truncate max-[860px]:rounded-[0.56rem] max-[860px]:px-2 max-[860px]:pr-6 max-[860px]:text-[0.68rem]',
     orderForm: 'm-0 flex min-w-0 flex-none items-center gap-0 max-[860px]:flex-none',
     orderLabel: 'hidden',
     orderToggle: 'flex w-auto items-center gap-1 max-[860px]:gap-[0.34rem]',
@@ -437,14 +437,14 @@ export const catalog = {
     densitySelect:
         'h-10 min-h-10 w-full cursor-pointer rounded-[0.72rem] border border-[rgba(205,227,255,0.74)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(237,245,255,0.94)_100%)] py-0 pr-1.5 pl-7 text-[0.76rem] font-black text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_12px_rgba(7,32,88,0.10)] outline-none transition hover:brightness-[1.03] focus:border-[rgba(184,229,255,0.92)] focus:ring-2 focus:ring-sky-200/40',
     clearButton:
-        'inline-flex h-10 min-h-10 min-w-10 items-center justify-center gap-1.5 rounded-[0.72rem] border border-[#fecdd3]/90 bg-[linear-gradient(180deg,#fff3f5_0%,#ffdce3_100%)] px-2.5 text-[0.72rem] font-black uppercase tracking-[0.025em] text-[#b42342] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_5px_12px_rgba(7,32,88,0.10)] transition-[transform,box-shadow,filter] duration-150 hover:-translate-y-px hover:brightness-[1.02] focus-visible:-translate-y-px focus-visible:brightness-[1.03] max-[860px]:h-[34px] max-[860px]:min-h-[34px] max-[860px]:w-[34px] max-[860px]:min-w-[34px] max-[860px]:rounded-[0.62rem] max-[860px]:px-0 max-[860px]:text-[0px] max-[560px]:text-[0px]',
+        'inline-flex h-9 min-h-9 min-w-9 items-center justify-center gap-1.5 rounded-[0.62rem] border border-[#fecdd3]/90 bg-[linear-gradient(180deg,#fff3f5_0%,#ffdce3_100%)] px-2 text-[0.68rem] font-black uppercase tracking-[0.02em] text-[#b42342] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_5px_12px_rgba(7,32,88,0.08)] transition-[transform,box-shadow,filter] duration-150 hover:-translate-y-px hover:brightness-[1.02] focus-visible:-translate-y-px focus-visible:brightness-[1.03] max-[860px]:h-8 max-[860px]:min-h-8 max-[860px]:w-8 max-[860px]:min-w-8 max-[860px]:rounded-[0.56rem] max-[860px]:px-0 max-[860px]:text-[0px] max-[560px]:text-[0px]',
     clearIcon: 'inline-flex h-4 w-4 flex-none items-center justify-center text-current [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-2 [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     results: 'rounded-none border border-[rgba(91,192,255,0.30)] bg-[radial-gradient(circle_at_16%_12%,rgba(56,189,248,0.10)_0%,rgba(56,189,248,0)_28%),radial-gradient(circle_at_88%_18%,rgba(59,130,246,0.09)_0%,rgba(59,130,246,0)_30%),linear-gradient(180deg,#071a3f_0%,#0a2558_54%,#061634_100%)] pt-0 shadow-[inset_0_1px_0_rgba(186,230,253,0.10),0_16px_30px_rgba(4,18,48,0.18)] max-[860px]:rounded-none max-[860px]:pt-0',
     productToolbar:
         'mb-0 hidden min-h-[3.25rem] w-full max-w-none grid-cols-[minmax(360px,1fr)_auto] items-center gap-2 rounded-none border-y border-x-0 border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.28rem_0.7rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md min-[861px]:grid max-[1120px]:grid-cols-1 max-[1120px]:items-stretch',
     productToolbarFilters: 'min-w-0 min-[861px]:max-w-[1500px]',
     productToolbarActions: 'min-w-0 justify-self-end max-[1120px]:justify-self-stretch',
-    grid: 'grid grid-cols-1 gap-3',
+    grid: 'grid grid-cols-1 gap-2.5',
     empty: 'grid justify-items-center gap-[0.7rem] rounded-[1.3rem] border border-[rgba(155,194,242,0.92)] bg-[linear-gradient(180deg,#ffffff_0%,#eff6ff_100%)] px-4 py-8 text-center shadow-[0_14px_28px_rgba(33,74,154,0.12)] max-[860px]:rounded-[1.05rem]',
     marquee: 'relative mx-0 mb-0 overflow-hidden rounded-none border-y border-x-0 border-[rgba(146,189,255,0.28)] bg-[linear-gradient(90deg,rgba(5,31,79,0.72),rgba(16,61,137,0.82),rgba(5,31,79,0.72))] p-[0.2rem_0.75rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] max-[860px]:mx-0 max-[860px]:mb-0 max-[860px]:p-[0.16rem_0.62rem] max-[860px]:pr-10',
     marqueeTrack: 'flex w-full items-center justify-center whitespace-nowrap',
@@ -454,7 +454,7 @@ export const catalog = {
 };
 
 const orderButtonBase =
-    'inline-flex h-10 min-h-10 min-w-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.72rem] border border-[rgba(205,227,255,0.74)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(237,245,255,0.94)_100%)] px-2.5 py-0 text-[0.72rem] font-black uppercase tracking-[0.025em] text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_12px_rgba(7,32,88,0.10)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:brightness-[1.03] focus-visible:-translate-y-px focus-visible:brightness-[1.03] max-[860px]:h-[34px] max-[860px]:min-h-[34px] max-[860px]:w-[34px] max-[860px]:min-w-[34px] max-[860px]:rounded-[0.62rem] max-[860px]:px-0 max-[860px]:text-[0px]';
+    'inline-flex h-9 min-h-9 min-w-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.62rem] border border-[rgba(205,227,255,0.74)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(237,245,255,0.94)_100%)] px-2 py-0 text-[0.68rem] font-black uppercase tracking-[0.02em] text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_10px_rgba(7,32,88,0.08)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:brightness-[1.03] focus-visible:-translate-y-px focus-visible:brightness-[1.03] max-[860px]:h-8 max-[860px]:min-h-8 max-[860px]:w-8 max-[860px]:min-w-8 max-[860px]:rounded-[0.56rem] max-[860px]:px-0 max-[860px]:text-[0px]';
 
 export function catalogOrderButtonClass(active: boolean): string {
     return cn(
@@ -482,7 +482,7 @@ export const catalogOrderFireIconClass =
 export const catalogOrderCurrencyClass = 'text-[0.68rem] font-black leading-none';
 
 const catalogCardBase =
-    'relative grid h-[208px] min-h-[178px] grid-cols-[44%_minmax(0,1fr)] items-stretch overflow-hidden rounded-xl border bg-white shadow-[0_10px_22px_rgba(15,23,42,0.08)] transition-[transform,box-shadow,filter,border-color] duration-200 min-[861px]:h-auto min-[861px]:min-h-full min-[861px]:grid-cols-1 min-[861px]:content-start min-[861px]:rounded-[1.05rem] min-[861px]:hover:-translate-y-1 min-[861px]:hover:brightness-[1.01] min-[861px]:hover:shadow-[0_16px_30px_rgba(15,23,42,0.11),0_0_0_3px_rgba(184,215,255,0.28)] max-[860px]:[contain:layout_paint_style] max-[860px]:[content-visibility:auto] max-[860px]:[contain-intrinsic-size:208px] max-[860px]:shadow-[0_6px_14px_rgba(15,23,42,0.07)] max-[560px]:h-[190px] max-[560px]:[contain-intrinsic-size:190px] max-[560px]:grid-cols-[43%_minmax(0,1fr)]';
+    'relative grid h-[196px] min-h-[170px] grid-cols-[42%_minmax(0,1fr)] items-stretch overflow-hidden rounded-[0.82rem] border bg-white shadow-[0_8px_18px_rgba(15,23,42,0.075)] transition-[transform,box-shadow,filter,border-color] duration-200 min-[861px]:h-auto min-[861px]:min-h-full min-[861px]:grid-cols-1 min-[861px]:content-start min-[861px]:rounded-[0.95rem] min-[861px]:hover:-translate-y-1 min-[861px]:hover:brightness-[1.01] min-[861px]:hover:shadow-[0_14px_28px_rgba(15,23,42,0.105),0_0_0_3px_rgba(184,215,255,0.24)] max-[860px]:[contain:layout_paint_style] max-[860px]:[content-visibility:auto] max-[860px]:[contain-intrinsic-size:196px] max-[860px]:shadow-[0_6px_14px_rgba(15,23,42,0.065)] max-[560px]:h-[178px] max-[560px]:[contain-intrinsic-size:178px] max-[560px]:grid-cols-[41%_minmax(0,1fr)]';
 const catalogToneClasses = {
     offer: 'border-[#ff8aa0]/70 ring-1 ring-[#ff2d55]/35 shadow-[0_0_0_1px_rgba(255,255,255,0.62),0_0_20px_rgba(255,45,85,0.28),0_0_42px_rgba(255,122,0,0.18),0_10px_24px_rgba(15,23,42,0.08)] min-[861px]:hover:shadow-[0_0_0_1px_rgba(255,255,255,0.70),0_0_24px_rgba(255,45,85,0.34),0_0_52px_rgba(255,122,0,0.22),0_16px_30px_rgba(15,23,42,0.11)]',
     featured: 'border-slate-200 ring-1 ring-slate-100/80',
@@ -523,14 +523,14 @@ export const catalogFeaturedChipClass =
     'inline-flex items-center gap-1 rounded-full bg-[linear-gradient(180deg,#ffe9a8_0%,#f2c95c_58%,#d7a92f_100%)] px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[#17376f] shadow-[0_6px_14px_rgba(13,53,126,0.14),inset_0_1px_0_rgba(255,255,255,0.44)] ring-1 ring-[#f8d978]/90 backdrop-blur-[2px] max-[560px]:px-2 max-[560px]:py-0.5 max-[560px]:text-[0.54rem]';
 export const catalogNewChipClass =
     'rounded-full bg-[#eefbff]/95 px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.1em] text-[#0b6f95] shadow-[0_6px_14px_rgba(8,91,117,0.14)] ring-1 ring-[#b7ecff]/90 backdrop-blur-[2px] max-[560px]:px-2 max-[560px]:py-0.5 max-[560px]:text-[0.54rem]';
-export const catalogImageLinkClass = 'group relative m-1.5 flex min-h-[172px] items-center justify-center overflow-hidden rounded-lg bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-1.5 shadow-inner ring-1 min-[861px]:m-2 min-[861px]:aspect-[6/7] min-[861px]:min-h-0 min-[861px]:rounded-[0.85rem] min-[861px]:p-2.5 max-[560px]:m-1 max-[560px]:min-h-[150px] max-[560px]:p-1';
+export const catalogImageLinkClass = 'group relative m-1 flex min-h-[158px] items-center justify-center overflow-hidden rounded-[0.62rem] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-1.5 shadow-inner ring-1 min-[861px]:m-2 min-[861px]:aspect-[6/7] min-[861px]:min-h-0 min-[861px]:rounded-[0.78rem] min-[861px]:p-2 max-[560px]:m-1 max-[560px]:min-h-[136px] max-[560px]:p-1';
 export const catalogImageDetailsPillClass =
     'pointer-events-none absolute left-1/2 top-1/2 z-[3] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#071a3f]/88 px-3 py-1.5 text-[0.72rem] font-bold text-white opacity-0 shadow-[0_10px_20px_rgba(7,26,63,0.24)] backdrop-blur-sm transition duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 max-[860px]:hidden';
 export const catalogImageClass = 'h-full max-h-full w-full max-w-full bg-transparent object-contain opacity-95 saturate-[0.96]';
-export const catalogBodyClass = 'grid min-w-0 content-start gap-1 overflow-hidden px-2.5 py-2 font-sans min-[861px]:content-start min-[861px]:gap-[0.72rem] min-[861px]:overflow-visible min-[861px]:px-3.5 min-[861px]:pb-3.5 min-[861px]:pt-1';
+export const catalogBodyClass = 'grid min-w-0 content-start gap-[0.22rem] overflow-hidden px-2 py-1.5 font-sans min-[861px]:content-start min-[861px]:gap-[0.62rem] min-[861px]:overflow-visible min-[861px]:px-3 min-[861px]:pb-3 min-[861px]:pt-1';
 export const catalogCategoryClass = 'block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700 max-[560px]:text-[0.64rem] max-[560px]:tracking-[0.035em]';
-export const catalogTitleClass = 'line-clamp-2 min-h-0 text-[1.06rem] font-bold leading-[1.22] text-[#1f365d] min-[861px]:line-clamp-3 min-[861px]:min-h-[3.55rem] max-[560px]:text-[0.92rem] max-[560px]:leading-[1.2]';
-export const catalogPriceBoxClass = 'mt-1 grid gap-0.5 rounded-lg px-2.5 py-1.5 text-center ring-1 min-[861px]:mt-0 min-[861px]:py-2.5 max-[560px]:mt-[0.28rem]';
+export const catalogTitleClass = 'line-clamp-2 min-h-0 text-[0.98rem] font-bold leading-[1.18] text-[#1f365d] min-[861px]:line-clamp-3 min-[861px]:min-h-[3.2rem] max-[560px]:text-[0.86rem] max-[560px]:leading-[1.16]';
+export const catalogPriceBoxClass = 'mt-1 grid gap-0.5 rounded-[0.58rem] px-2 py-1.5 text-center ring-1 min-[861px]:mt-0 min-[861px]:py-2 max-[560px]:mt-[0.2rem]';
 const catalogPriceBoxToneClasses = {
     offer: '!bg-[#f2f8ff] ring-[#b8d7ff]/85',
     featured: '!bg-slate-50 ring-slate-200/80',
@@ -545,15 +545,15 @@ const catalogImageToneClasses = {
 } as const;
 export const catalogPriceBeforeClass = 'text-[0.7rem] font-semibold uppercase tracking-[0.045em] text-[#7d8794] opacity-100 no-underline max-[560px]:text-[0.64rem] max-[560px]:text-[#6f7a88]';
 export const catalogPriceBeforeValueClass = 'line-through';
-export const catalogPriceClass = 'text-[1.75rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.45rem]';
+export const catalogPriceClass = 'text-[1.58rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.28rem]';
 export const productPriceClass = 'text-[1.75rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.45rem]';
 export const productPriceBoxClass =
     'mx-auto grid w-[min(100%,420px)] justify-items-center gap-[0.28rem] rounded-[1.2rem] border border-[var(--product-tone-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-[0.9rem_1rem_0.95rem] text-center shadow-[0_0_14px_color-mix(in_srgb,var(--product-tone-glow)_46%,transparent)]';
-export const catalogActionsClass = 'mt-[0.62rem] grid grid-cols-2 gap-1 min-[861px]:mt-0 max-[560px]:mt-[0.72rem]';
+export const catalogActionsClass = 'mt-[0.45rem] grid grid-cols-2 gap-1 min-[861px]:mt-0 max-[560px]:mt-[0.42rem]';
 export const productActionsClass = 'flex w-full flex-wrap justify-center gap-[0.55rem]';
 
 const catalogActionBase =
-    'inline-flex min-h-9 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[0.72rem] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:brightness-[1.03] max-[560px]:text-[0.66rem]';
+    'inline-flex min-h-8 items-center justify-center gap-1 rounded-[0.58rem] px-2 py-1 text-[0.68rem] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 active:translate-y-px hover:-translate-y-px hover:brightness-[1.03] max-[560px]:text-[0.62rem]';
 const catalogActionVariant = {
     primary: 'bg-[linear-gradient(180deg,#2f61bf_0%,#224592_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_16px_rgba(13,53,126,0.20),0_0_0_3px_rgba(184,215,255,0.24)]',
     success: 'border border-[#128C7E] bg-[#128C7E] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_rgba(18,140,126,0.20)] hover:bg-[#075E54]',
