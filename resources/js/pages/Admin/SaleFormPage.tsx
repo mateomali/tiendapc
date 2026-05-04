@@ -1,4 +1,4 @@
-import { router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaMinus, FaPlus, FaSearch, FaTimes, FaTrashAlt, FaVideo } from 'react-icons/fa';
 import { AdminLayout } from '../../layouts/AdminLayout';
@@ -478,9 +478,14 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
             <section className="grid gap-3 xl:grid-cols-[minmax(0,0.92fr)_minmax(520px,1.08fr)]">
                 <div className="grid content-start gap-3">
                     <section className={`${ui.sectionCardTight} grid gap-2`}>
-                        <div className="grid gap-1">
-                            <p className={ui.eyebrow}>Caja</p>
-                            <h2 className="text-2xl font-black text-ink-950">Nueva venta</h2>
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="grid gap-1">
+                                <p className={ui.eyebrow}>Caja</p>
+                                <h2 className="text-2xl font-black text-ink-950">Nueva venta</h2>
+                            </div>
+                            <Link href={urls.index} className={buttonClass('soft', 'sm')}>
+                                Volver a ventas
+                            </Link>
                         </div>
                         <div className="grid gap-2 rounded-xl border border-sky-100 bg-white/92 p-2 shadow-[0_8px_18px_rgba(18,58,132,0.06)] xl:hidden">
                             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">

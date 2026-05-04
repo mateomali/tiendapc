@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
 import type { ChangeEvent } from 'react';
 import { useRef, useState } from 'react';
 import { AdminLayout } from '../../layouts/AdminLayout';
@@ -173,6 +173,9 @@ export default function ProductFormPage({ product, categories }: ProductFormPage
                             <h2 className={ui.heroTitle}>{product ? 'Editar producto' : 'Nuevo producto'}</h2>
                         </div>
                         <div className={ui.heroActions}>
+                            <Link href={route('admin.products.index')} className={buttonClass('soft', 'sm')}>
+                                Volver a productos
+                            </Link>
                             <label className={ui.checkboxLine}>
                                 <input type="checkbox" checked={form.data.is_active} onChange={(event) => form.setData('is_active', event.target.checked)} />
                                 <span>Activo</span>

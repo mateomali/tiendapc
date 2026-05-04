@@ -49,6 +49,9 @@ export default function TicketPage({ sale }: TicketPageProps): JSX.Element {
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border border-sky-100 bg-white/90 p-4 shadow-sm print:hidden">
                     <h1 className="text-xl font-black text-ink-950">Ticket de venta #{sale.ticket_number_display}</h1>
                     <div className="flex flex-wrap gap-2">
+                        <Link href={route('admin.sales.index')} className={buttonClass('soft', 'sm')}>
+                            Volver a ventas
+                        </Link>
                         <Link href={route('admin.sales.create')} className={buttonClass('soft', 'sm')}>
                             Nueva venta
                         </Link>
