@@ -310,6 +310,22 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                         <div className={productDetailBadgesClass}>
                             {product.isFeatured ? <span className={productFeaturedFlagClass}>★MAS VENDIDO!</span> : null}
                         </div>
+                        <div className={productThumbRowClass}>
+                            {product.images.map((image) => (
+                                <button key={image} type="button" className={productThumbClass(activeImage === image)} onClick={() => setActiveImage(image)}>
+                                    <img
+                                        src={image}
+                                        alt={product.name}
+                                        className={productThumbImageClass}
+                                        loading="lazy"
+                                        decoding="async"
+                                        onError={(event) => {
+                                            event.currentTarget.src = product.imageFallbackUrl;
+                                        }}
+                                    />
+                                </button>
+                            ))}
+                        </div>
                         <div className={productMainImageShellClass}>
                             {product.isNew && !product.hasOffer ? <span className={productDetailImageNewChipClass}>NOVEDAD!</span> : null}
                             <button type="button" className="grid h-full w-full cursor-zoom-in place-items-center" onClick={() => setZoomOpen(true)} aria-label="Ampliar imagen">
@@ -345,22 +361,6 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                                     </button>
                                 </>
                             ) : null}
-                        </div>
-                        <div className={productThumbRowClass}>
-                            {product.images.map((image) => (
-                                <button key={image} type="button" className={productThumbClass(activeImage === image)} onClick={() => setActiveImage(image)}>
-                                    <img
-                                        src={image}
-                                        alt={product.name}
-                                        className={productThumbImageClass}
-                                        loading="lazy"
-                                        decoding="async"
-                                        onError={(event) => {
-                                            event.currentTarget.src = product.imageFallbackUrl;
-                                        }}
-                                    />
-                                </button>
-                            ))}
                         </div>
                     </div>
 

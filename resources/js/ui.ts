@@ -171,9 +171,9 @@ export const storeBackLinkClass =
 export const productMainImageClass =
     'h-[290px] w-full max-w-[620px] rounded-[1.4rem] border-[3px] border-[var(--product-tone-border)] bg-white object-contain shadow-[0_0_16px_color-mix(in_srgb,var(--product-tone-glow)_60%,transparent)] max-[860px]:h-[260px] max-[860px]:max-w-full max-[560px]:h-[220px]';
 export const productMainImageShellClass =
-    'relative flex min-h-[310px] w-full items-center justify-center max-[860px]:min-h-[276px] max-[560px]:min-h-[236px]';
+    'relative flex min-h-[310px] w-full items-center justify-center px-8 max-[860px]:min-h-[276px] max-[560px]:min-h-[236px] max-[560px]:px-6';
 const productMainImageNavBase =
-    'absolute top-1/2 z-[2] inline-flex h-[4.2rem] w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[rgba(175,203,240,0.9)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(233,243,255,0.96)_100%)] text-[#214b98] shadow-[0_12px_20px_rgba(17,45,101,0.14),inset_0_1px_0_rgba(255,255,255,0.94)] transition-[transform,filter,box-shadow] duration-150 hover:scale-[1.02] hover:brightness-[1.03]';
+    'absolute top-1/2 z-[2] inline-flex h-14 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[rgba(175,203,240,0.9)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(233,243,255,0.96)_100%)] text-[#214b98] shadow-[0_12px_20px_rgba(17,45,101,0.14),inset_0_1px_0_rgba(255,255,255,0.94)] transition-[transform,filter,box-shadow] duration-150 hover:scale-[1.02] hover:brightness-[1.03]';
 export const productMainImageNavIconClass =
     'h-4 w-4 fill-none stroke-current stroke-[2.4] [stroke-linecap:round] [stroke-linejoin:round]';
 export const productThumbRowClass =
@@ -208,7 +208,7 @@ export const productMoreButtonClass =
     'w-fit rounded-full border-0 bg-[linear-gradient(180deg,#e9f8ff_0%,#c7ecff_100%)] px-[0.8rem] py-[0.45rem] font-extrabold text-[#184f7e] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:brightness-[1.03]';
 
 export function productMainImageNavClass(direction: 'left' | 'right'): string {
-    return cn(productMainImageNavBase, direction === 'left' ? 'left-2' : 'right-2');
+    return cn(productMainImageNavBase, direction === 'left' ? 'left-0' : 'right-0');
 }
 
 export function productThumbClass(active: boolean): string {
@@ -553,7 +553,7 @@ export const catalogActionsClass = 'mt-[0.45rem] grid grid-cols-2 gap-1 min-[861
 export const productActionsClass = 'flex w-full flex-wrap justify-center gap-[0.55rem]';
 
 const catalogActionBase =
-    'inline-flex min-h-8 items-center justify-center gap-1 rounded-[0.58rem] px-2 py-1 text-[0.68rem] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 active:translate-y-px hover:-translate-y-px hover:brightness-[1.03] max-[560px]:text-[0.62rem]';
+    'inline-flex min-h-9 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[0.72rem] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 active:translate-y-px hover:-translate-y-px hover:brightness-[1.03] max-[560px]:text-[0.66rem]';
 const catalogActionVariant = {
     primary: 'bg-[linear-gradient(180deg,#2f61bf_0%,#224592_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_16px_rgba(13,53,126,0.20),0_0_0_3px_rgba(184,215,255,0.24)]',
     success: 'border border-[#128C7E] bg-[#128C7E] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_rgba(18,140,126,0.20)] hover:bg-[#075E54]',
@@ -586,7 +586,7 @@ export const productGalleryCardClass =
     'relative grid justify-items-center gap-[0.7rem] border-0 bg-transparent p-4 shadow-none max-[860px]:rounded-[1.05rem]';
 
 export const related = {
-    shell: 'mx-auto grid w-[min(980px,100%)] gap-[0.8rem]',
+    shell: 'mx-auto mt-2 grid w-[min(980px,100%)] gap-[0.8rem] pt-2 max-[560px]:mt-1',
     header: 'flex items-center justify-between gap-[0.8rem] max-[860px]:flex-col max-[860px]:items-start',
     title: 'text-[1.1rem] font-black uppercase tracking-[0.04em] text-[#1d3f7c]',
     nav: 'inline-flex items-center gap-[0.45rem] max-[860px]:self-end max-[560px]:w-full max-[560px]:justify-end',
