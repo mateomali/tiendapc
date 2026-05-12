@@ -113,6 +113,14 @@ function repairStatusSelectClass(status: string): string {
     return 'border-[#6c757d] bg-slate-100 text-slate-800';
 }
 
+function nextQuickStatus(status: string): string {
+    if (status === 'PENDIENTE') return 'EN REPARACION';
+    if (status === 'EN REPARACION' || status === 'EN REPARACION / ESPERA REPUESTO') return 'LISTA';
+    if (status === 'LISTA') return 'PENDIENTE';
+
+    return status;
+}
+
 function formatLegacyDate(value?: string | null): string {
     if (!value) return '-';
     const [year, month, day] = value.split('-');
@@ -140,6 +148,28 @@ function isOverdue(repair: RepairOrderView): boolean {
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     return repair.fecha_estimada < today;
+}
+
+function overdueDays(repair: RepairOrderView): number | null {
+    if (!isOverdue(repair) || !repair.fecha_estimada) return null;
+
+    const [year, month, day] = repair.fecha_estimada.split('-').map(Number);
+    if (!year || !month || !day) return null;
+
+    const estimatedDate = new Date(year, month - 1, day);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.floor((today.getTime() - estimatedDate.getTime()) / 86400000);
+
+    return days > 0 ? days : null;
+}
+
+function overdueLabel(repair: RepairOrderView): string | null {
+    const days = overdueDays(repair);
+
+    if (days === null) return null;
+
+    return `Vencida hace ${days} ${days === 1 ? 'dia' : 'dias'}`;
 }
 
 function ModalShell({
@@ -491,11 +521,14 @@ function RepairEditCard({
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'].includes(repair.estado);
     const canDeliver = repair.estado === 'LISTA' && repair.entregado !== 'si';
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
+    const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'LISTA'].includes(repair.estado);
+    const nextStatus = nextQuickStatus(repair.estado);
     const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni);
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
     const isLastGroupedDesktopRow = isGroupedDesktopRow && rowIndex === rowTotal - 1;
     const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
+    const overdueText = overdueLabel(repair);
 
     const submitEdit = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -512,6 +545,24 @@ function RepairEditCard({
                 setInlineOpen(false);
             },
         });
+    };
+
+    const cycleDesktopStatus = (): void => {
+        if (readOnly || !canCycleStatus || !repair.actions?.update || form.processing) return;
+
+        router.post(
+            repair.actions.update,
+            {
+                ...form.data,
+                estado: nextStatus,
+                images: null,
+                final_images: null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => form.setData('estado', nextStatus),
+            },
+        );
     };
 
     const selectImages = (key: 'images' | 'final_images', event: ChangeEvent<HTMLInputElement>): void => {
@@ -888,13 +939,19 @@ function RepairEditCard({
                     <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
                         <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>
                         {isToday(repair.fecha_estimada) ? <span className="w-fit rounded bg-[#ffc107] px-1 text-[0.65rem] font-black leading-tight text-[#111827]">Hoy</span> : null}
-                        {isOverdue(repair) ? <span className="w-fit rounded bg-[#dc3545] px-1 text-[0.65rem] font-black leading-tight text-white">Vencida</span> : null}
+                        {overdueText ? <span className="w-fit rounded bg-[#dc3545] px-1 text-[0.65rem] font-black leading-tight text-white">{overdueText}</span> : null}
                     </button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-black text-[#0f172a]" onClick={openInlineEditor}>
                         <PaymentStatus monto={monto} senia={senia} />
                     </button>
                     <div className="flex items-center justify-center">
-                        <button type="button" className={cn('rounded-full px-2.5 py-1 text-[0.68rem] font-black uppercase shadow-sm', repairStatusBadgeClass(repair.estado))} onClick={openInlineEditor}>
+                        <button
+                            type="button"
+                            className={cn('rounded-full px-2.5 py-1 text-[0.68rem] font-black uppercase shadow-sm transition', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:-translate-y-0.5 hover:shadow-md', (readOnly || !canCycleStatus) && 'cursor-default')}
+                            onClick={cycleDesktopStatus}
+                            disabled={readOnly || !canCycleStatus || form.processing}
+                            title={!readOnly && canCycleStatus ? `Cambiar a ${compactStatus(nextStatus)}` : compactStatus(repair.estado)}
+                        >
                             {compactStatus(repair.estado)}
                         </button>
                     </div>
@@ -926,7 +983,7 @@ function RepairEditCard({
                             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="rounded-full bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
                                 {isToday(repair.fecha_estimada) ? <span className="rounded-full bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
-                                {isOverdue(repair) ? <span className="rounded-full bg-[#dc3545] px-1.5 py-0.5 text-white">Vencida</span> : null}
+                                {overdueText ? <span className="rounded-full bg-[#dc3545] px-1.5 py-0.5 text-white">{overdueText}</span> : null}
                                 <PaymentStatus monto={monto} senia={senia} />
                             </div>
                         </div>
@@ -959,7 +1016,7 @@ function RepairEditCard({
                         {repair.contacto ? <FieldSummary label="Contacto" value={repair.contacto} onClick={openInlineEditor} /> : null}
                         {repair.modelo ? <FieldSummary label="Modelo" value={repair.modelo} strong onClick={openInlineEditor} /> : null}
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
-                        <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{isOverdue(repair) ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">Vencida</span> : null}</>} onClick={openInlineEditor} />
+                        <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
                         <FieldSummary label="Estado" value={compactStatus(repair.estado)} onClick={openInlineEditor} />
                         {senia > 0 ? <FieldSummary label="Senia" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                     </div>
