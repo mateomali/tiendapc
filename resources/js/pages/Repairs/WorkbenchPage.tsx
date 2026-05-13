@@ -19,6 +19,13 @@ interface ServiceTemplateOption {
     repuesto: string;
 }
 
+interface RepairPartInventoryOption {
+    id: number;
+    quantity: number;
+    model: string;
+    box: string;
+}
+
 interface WorkbenchPageProps {
     filters: {
         q?: string;
@@ -46,6 +53,7 @@ interface WorkbenchPageProps {
     states: string[];
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates: ServiceTemplateOption[];
+    partInventory: RepairPartInventoryOption[];
     nextOrderId: number;
     pageMode?: 'consultas' | 'ingreso';
 }
@@ -61,6 +69,7 @@ interface RepairJobFormData {
     estado: string;
     repuesto: string;
     pedir_repuesto: boolean;
+    inventory_part_id: string;
     categorias_reparacion: string;
     images: File[] | null;
 }
@@ -87,6 +96,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         estado: defaultState,
         repuesto: '',
         pedir_repuesto: false,
+        inventory_part_id: '',
         categorias_reparacion: '4',
         images: null,
     };
@@ -213,6 +223,7 @@ export default function WorkbenchPage({
     states,
     serviceCategories,
     serviceTemplates,
+    partInventory,
     nextOrderId,
     pageMode = 'consultas',
 }: WorkbenchPageProps): JSX.Element {
@@ -241,6 +252,7 @@ export default function WorkbenchPage({
     const [imagePreviews, setImagePreviews] = useState<Record<number, string[]>>({});
     const [duplicateNotice, setDuplicateNotice] = useState('');
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+    const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const summaryRange = filters.summary_range ?? 'month';
     const categoryFilter = String(filters.categoria_filter ?? '');
@@ -320,6 +332,51 @@ export default function WorkbenchPage({
         addJob(createForm.data.jobs[index]);
         setDuplicateNotice('Reparacion duplicada');
         window.setTimeout(() => setDuplicateNotice(''), 1800);
+    };
+
+    const matchingInventoryParts = (index: number): RepairPartInventoryOption[] => {
+        const query = (partSearches[index] ?? createForm.data.jobs[index]?.repuesto ?? '').trim().toLowerCase();
+
+        if (query.length < 2) {
+            return [];
+        }
+
+        return partInventory
+            .filter((part) => part.quantity > 0 && part.model.toLowerCase().includes(query))
+            .slice(0, 8);
+    };
+
+    const appendJobObservation = (current: string, addition: string): string => {
+        const trimmed = current.trim();
+
+        if (trimmed === '' || ['sin observaciones', 'sin observacion'].includes(trimmed.toLowerCase())) {
+            return addition;
+        }
+
+        if (trimmed.toLowerCase().includes(addition.toLowerCase())) {
+            return current;
+        }
+
+        return `${trimmed}\n${addition}`;
+    };
+
+    const selectInventoryPart = (index: number, part: RepairPartInventoryOption): void => {
+        updateJob(index, (job) => ({
+            ...job,
+            repuesto: part.model,
+            pedir_repuesto: false,
+            inventory_part_id: String(part.id),
+            estado: job.estado === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : job.estado,
+            observaciones: appendJobObservation(job.observaciones, `Repuesto en caja ${part.box.toUpperCase()}`),
+        }));
+        setPartSearches((current) => ({ ...current, [index]: part.model }));
+    };
+
+    const clearInventoryPart = (index: number): void => {
+        updateJob(index, (job) => ({
+            ...job,
+            inventory_part_id: '',
+        }));
     };
 
     const clearZeroAmount = (index: number, field: 'monto' | 'senia'): void => {
@@ -420,6 +477,7 @@ export default function WorkbenchPage({
         updateJob(index, (job) => ({
             ...job,
             pedir_repuesto: checked,
+            inventory_part_id: checked ? '' : job.inventory_part_id,
             estado: checked && job.estado === 'PENDIENTE'
                 ? 'EN REPARACION / ESPERA REPUESTO'
                 : (!checked && job.estado === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : job.estado),
@@ -832,6 +890,7 @@ export default function WorkbenchPage({
                                     createForm.setData('jobs', [createEmptyJob(states[0] ?? 'PENDIENTE')]);
                                     setImagePreviews({});
                                     setLookupFeedback('');
+                                    setPartSearches({});
                                 },
                             });
                         }}
@@ -935,8 +994,62 @@ export default function WorkbenchPage({
                                                     Mandar a pedidos
                                                 </label>
                                             </div>
-                                            <textarea className={compactTextareaClass} rows={2} placeholder="Detalle del repuesto. Ej: modulo Samsung A54 negro" value={job.repuesto} onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value }))} />
-                                            <span className="mt-1 block text-xs font-semibold text-[#92400e]">Solo se guarda si marcas Mandar a pedidos.</span>
+                                            <label className={repairLabelClass}>
+                                                Buscar en cajas
+                                                <div className="relative">
+                                                    <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#92400e]" aria-hidden="true" />
+                                                    <input
+                                                        className={cn(compactInputClass, 'pl-9')}
+                                                        value={partSearches[index] ?? job.repuesto}
+                                                        onChange={(event) => {
+                                                            const value = event.target.value;
+                                                            setPartSearches((current) => ({ ...current, [index]: value }));
+                                                            updateJob(index, (current) => ({ ...current, repuesto: value, inventory_part_id: '' }));
+                                                        }}
+                                                        placeholder="Buscar modulo, bateria, modelo..."
+                                                    />
+                                                </div>
+                                            </label>
+                                            {matchingInventoryParts(index).length > 0 ? (
+                                                <div className="mt-2 grid gap-1">
+                                                    {matchingInventoryParts(index).map((part) => (
+                                                        <button
+                                                            key={part.id}
+                                                            type="button"
+                                                            className={cn(
+                                                                'grid gap-1 rounded-xl border px-3 py-2 text-left text-sm transition hover:-translate-y-px',
+                                                                job.inventory_part_id === String(part.id)
+                                                                    ? 'border-[#16a34a] bg-[#dcfce7] text-[#14532d]'
+                                                                    : 'border-[#fed7aa] bg-white text-[#334155] hover:bg-[#fff7ed]',
+                                                            )}
+                                                            onClick={() => selectInventoryPart(index, part)}
+                                                        >
+                                                            <span className="font-black">{part.model}</span>
+                                                            <span className="text-xs font-bold text-slate-500">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : (partSearches[index] ?? job.repuesto).trim().length >= 2 ? (
+                                                <div className="mt-2 rounded-xl border border-dashed border-[#fed7aa] bg-white px-3 py-2 text-sm font-bold text-[#92400e]">
+                                                    No hay coincidencias en cajas. Si hace falta pedirlo, marca Mandar a pedidos.
+                                                </div>
+                                            ) : null}
+                                            {job.inventory_part_id !== '' ? (
+                                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
+                                                    <span>Asignado desde caja. Al guardar se descuenta del inventario.</span>
+                                                    <button type="button" className="text-xs font-black uppercase tracking-[0.05em] text-[#15803d] underline-offset-2 hover:underline" onClick={() => clearInventoryPart(index)}>
+                                                        Quitar seleccion
+                                                    </button>
+                                                </div>
+                                            ) : null}
+                                            <textarea
+                                                className={compactTextareaClass}
+                                                rows={2}
+                                                placeholder="Detalle del repuesto. Ej: modulo Samsung A54 negro"
+                                                value={job.repuesto}
+                                                onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))}
+                                            />
+                                            <span className="mt-1 block text-xs font-semibold text-[#92400e]">Si elegis un repuesto disponible no hace falta mandarlo a pedidos. Si no hay stock, marca Mandar a pedidos.</span>
                                         </div>
                                     </div>
                                 </article>
@@ -1191,6 +1304,7 @@ export default function WorkbenchPage({
                                             ticket={ticket}
                                             repair={repair}
                                             serviceCategories={serviceCategories}
+                                            partInventory={partInventory}
                                             rowIndex={repairIndex}
                                             rowTotal={ticket.repairs.length}
                                         />
@@ -1210,6 +1324,7 @@ export default function WorkbenchPage({
                             ticket={ticket}
                             states={states}
                             serviceCategories={serviceCategories}
+                            partInventory={partInventory}
                             allowAddRepair
                         />
                     ))}

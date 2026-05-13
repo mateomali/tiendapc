@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RepairEvent;
 use App\Models\RepairOrder;
+use App\Models\RepairPart;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -129,56 +130,63 @@ class RepairService
 
     public function create(array $payload, array $files = []): RepairOrder
     {
-        $orderId = (int) ($payload['id_orden'] ?? $this->nextOrderId());
+        return DB::transaction(function () use ($payload, $files): RepairOrder {
+            $orderId = (int) ($payload['id_orden'] ?? $this->nextOrderId());
 
-        if ($orderId <= 0) {
-            throw new \RuntimeException('ID de orden invalido.');
-        }
+            if ($orderId <= 0) {
+                throw new \RuntimeException('ID de orden invalido.');
+            }
 
-        if (RepairOrder::query()->where('id', $orderId)->exists()) {
-            throw new \RuntimeException("El ID de orden #{$orderId} ya fue utilizado. Elegi otro.");
-        }
+            if (RepairOrder::query()->where('id', $orderId)->exists()) {
+                throw new \RuntimeException("El ID de orden #{$orderId} ya fue utilizado. Elegi otro.");
+            }
 
-        $jobs = $this->normalizeJobs($payload);
-        $jobFiles = is_array($files['jobs'] ?? null) ? $files['jobs'] : [];
-        $sharedImages = is_array($files['images'] ?? null) ? $files['images'] : [];
-        $firstOrder = null;
+            $jobs = $this->normalizeJobs($payload);
+            $jobFiles = is_array($files['jobs'] ?? null) ? $files['jobs'] : [];
+            $sharedImages = is_array($files['images'] ?? null) ? $files['images'] : [];
+            $firstOrder = null;
 
-        foreach ($jobs as $index => $job) {
-            $repairNumber = $index + 1;
-            $images = is_array($jobFiles[$index]['images'] ?? null)
-                ? $jobFiles[$index]['images']
-                : ($repairNumber === 1 ? $sharedImages : []);
-            $storedImages = $this->storeImages($images, $orderId, $repairNumber, 'orig');
+            foreach ($jobs as $index => $job) {
+                $repairNumber = $index + 1;
+                $images = is_array($jobFiles[$index]['images'] ?? null)
+                    ? $jobFiles[$index]['images']
+                    : ($repairNumber === 1 ? $sharedImages : []);
+                $storedImages = $this->storeImages($images, $orderId, $repairNumber, 'orig');
 
-            $order = RepairOrder::query()->create([
-                'id' => $orderId,
-                'reparacion' => $repairNumber,
-                'fecha' => now()->toDateString(),
-                'nombre_cliente' => $payload['nombre_cliente'],
-                'dni' => $payload['dni'] ?? config('tienda.repair_default_dni'),
-                'contacto' => $payload['contacto'] ?? null,
-                'modelo' => $job['modelo'],
-                'descripcion' => $job['descripcion'],
-                'observaciones' => $job['observaciones'],
-                'monto' => $job['monto'],
-                'senia' => min((float) $job['senia'], (float) $job['monto']),
-                'fecha_estimada' => $job['fecha_estimada'],
-                'estado' => $job['estado'],
-                'entregado' => 'no',
-                'repuesto' => $job['repuesto'],
-                'repuesto_pedido' => $job['pedir_repuesto'],
-                'repuesto_pedido_at' => $job['pedir_repuesto'] ? now() : null,
-                'repuesto_pedido_oculto_at' => null,
-                'categorias_reparacion' => $job['categorias_reparacion'],
-                'imagen' => implode('|', $storedImages),
-            ]);
+                $allocation = $this->allocateInventoryPart((int) ($job['inventory_part_id'] ?? 0));
 
-            $this->recordEvent($order, 'CREADA', null, $order->estado);
-            $firstOrder ??= $order;
-        }
+                $order = RepairOrder::query()->create([
+                    'id' => $orderId,
+                    'reparacion' => $repairNumber,
+                    'fecha' => now()->toDateString(),
+                    'nombre_cliente' => $payload['nombre_cliente'],
+                    'dni' => $payload['dni'] ?? config('tienda.repair_default_dni'),
+                    'contacto' => $payload['contacto'] ?? null,
+                    'modelo' => $job['modelo'],
+                    'descripcion' => $job['descripcion'],
+                    'observaciones' => $job['observaciones'],
+                    'monto' => $job['monto'],
+                    'senia' => min((float) $job['senia'], (float) $job['monto']),
+                    'fecha_estimada' => $job['fecha_estimada'],
+                    'estado' => $job['estado'],
+                    'entregado' => 'no',
+                    'repuesto' => $job['repuesto'],
+                    'repuesto_pedido' => $job['pedir_repuesto'],
+                    'repuesto_pedido_at' => $job['pedir_repuesto'] ? now() : null,
+                    'repuesto_pedido_oculto_at' => null,
+                    'inventory_part_id' => $allocation['id'] ?? null,
+                    'inventory_part_model' => $allocation['model'] ?? null,
+                    'inventory_part_box' => $allocation['box'] ?? null,
+                    'categorias_reparacion' => $job['categorias_reparacion'],
+                    'imagen' => implode('|', $storedImages),
+                ]);
 
-        return $firstOrder ?? throw new \RuntimeException('No se pudo crear la orden de reparacion.');
+                $this->recordEvent($order, 'CREADA', null, $order->estado);
+                $firstOrder ??= $order;
+            }
+
+            return $firstOrder ?? throw new \RuntimeException('No se pudo crear la orden de reparacion.');
+        });
     }
 
     public function addRepair(RepairOrder $order, array $payload, array $images = []): RepairOrder
@@ -217,6 +225,66 @@ class RepairService
         return $repair;
     }
 
+    private function allocateInventoryPart(int $partId): ?array
+    {
+        if ($partId <= 0) {
+            return null;
+        }
+
+        /** @var RepairPart|null $part */
+        $part = RepairPart::query()->lockForUpdate()->find($partId);
+
+        if ($part === null || $part->quantity <= 0) {
+            return null;
+        }
+
+        $allocation = [
+            'id' => $part->id,
+            'model' => $part->model,
+            'box' => $part->box,
+        ];
+
+        if ($part->quantity <= 1) {
+            $part->delete();
+
+            return $allocation;
+        }
+
+        $part->decrement('quantity');
+
+        return $allocation;
+    }
+
+    private function returnInventoryPart(?string $model, ?string $box): void
+    {
+        $model = trim((string) $model);
+        $box = strtolower(trim((string) $box));
+
+        if ($model === '' || $box === '') {
+            return;
+        }
+
+        /** @var RepairPart|null $part */
+        $part = RepairPart::query()
+            ->where('model', $model)
+            ->where('box', $box)
+            ->lockForUpdate()
+            ->first();
+
+        if ($part !== null) {
+            $part->increment('quantity');
+
+            return;
+        }
+
+        RepairPart::query()->create([
+            'quantity' => 1,
+            'model' => $model,
+            'box' => $box,
+            'sort_order' => ((int) RepairPart::query()->max('sort_order')) + 1,
+        ]);
+    }
+
     public function update(RepairOrder $order, array $payload, array $images = [], array $finalImages = []): RepairOrder
     {
         return DB::transaction(function () use ($order, $payload, $images, $finalImages): RepairOrder {
@@ -252,6 +320,28 @@ class RepairService
             $partRequested = filter_var($payload['repuesto_pedido'] ?? false, FILTER_VALIDATE_BOOL);
             $part = trim((string) ($payload['repuesto'] ?? ''));
             $activePartRequest = $partRequested && $part !== '';
+            $previousInventoryPartId = (int) ($order->inventory_part_id ?? 0);
+            $nextInventoryPartId = (int) ($payload['inventory_part_id'] ?? 0);
+            $inventoryChanged = $previousInventoryPartId !== $nextInventoryPartId;
+            $allocation = null;
+
+            if ($inventoryChanged && $previousInventoryPartId > 0) {
+                $this->returnInventoryPart($order->inventory_part_model, $order->inventory_part_box);
+                $this->recordEvent($order, 'REPUESTO_DEVUELTO_A_CAJA', $previousState, $order->estado);
+            }
+
+            if ($inventoryChanged && $nextInventoryPartId > 0) {
+                $allocation = $this->allocateInventoryPart($nextInventoryPartId);
+                if ($allocation !== null) {
+                    $this->recordEvent($order, 'REPUESTO_ASIGNADO_DESDE_CAJA', $previousState, $order->estado);
+                }
+            } elseif (! $inventoryChanged && $previousInventoryPartId > 0) {
+                $allocation = [
+                    'id' => $order->inventory_part_id,
+                    'model' => $order->inventory_part_model,
+                    'box' => $order->inventory_part_box,
+                ];
+            }
 
             $order->fill([
                 'id' => $newOrderId,
@@ -267,10 +357,13 @@ class RepairService
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => $payload['estado'] ?? $order->estado,
                 'fecha_entregado' => $payload['fecha_entregado'] ?? $order->fecha_entregado,
-                'repuesto' => $activePartRequest ? $part : null,
+                'repuesto' => ($activePartRequest || $allocation !== null) && $part !== '' ? $part : null,
                 'repuesto_pedido' => $activePartRequest,
                 'repuesto_pedido_at' => $activePartRequest ? ($order->repuesto_pedido_at ?? now()) : null,
                 'repuesto_pedido_oculto_at' => $activePartRequest ? null : $order->repuesto_pedido_oculto_at,
+                'inventory_part_id' => $allocation['id'] ?? null,
+                'inventory_part_model' => $allocation['model'] ?? null,
+                'inventory_part_box' => $allocation['box'] ?? null,
                 'categorias_reparacion' => $payload['categorias_reparacion'] ?? 4,
                 'imagen' => implode('|', $originalImages),
                 'imagen3' => $finalStored[0] ?? null,
@@ -709,6 +802,7 @@ class RepairService
      *     estado:string,
      *     repuesto:?string,
      *     pedir_repuesto:bool,
+     *     inventory_part_id:int,
      *     categorias_reparacion:int
      * }>
      */
@@ -724,6 +818,7 @@ class RepairService
             'fecha_estimada',
             'estado',
             'repuesto',
+            'inventory_part_id',
             'categorias_reparacion',
         ])])
             ->filter(fn ($job): bool => is_array($job))
@@ -735,6 +830,7 @@ class RepairService
                 $fallbackDescription = trim((string) ($template['description'] ?? ''));
                 $shouldRequestPart = filter_var($job['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
                 $part = trim((string) ($job['repuesto'] ?? ''));
+                $inventoryPartId = max(0, (int) ($job['inventory_part_id'] ?? 0));
 
                 if ($description === '' && $fallbackDescription !== '') {
                     $description = $model !== '' ? trim($fallbackDescription . ' ' . $model) : $fallbackDescription;
@@ -753,8 +849,9 @@ class RepairService
                     'senia' => $job['senia'] ?? 0,
                     'fecha_estimada' => $job['fecha_estimada'] ?? null,
                     'estado' => $state,
-                    'repuesto' => $shouldRequestPart && $part !== '' ? $part : null,
+                    'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                     'pedir_repuesto' => $shouldRequestPart,
+                    'inventory_part_id' => $inventoryPartId,
                     'categorias_reparacion' => max(1, (int) ($job['categorias_reparacion'] ?? 4)),
                 ];
             })
@@ -771,6 +868,7 @@ class RepairService
 
             $shouldRequestPart = filter_var($payload['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
             $part = trim((string) ($payload['repuesto'] ?? ''));
+            $inventoryPartId = max(0, (int) ($payload['inventory_part_id'] ?? 0));
 
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
@@ -780,8 +878,9 @@ class RepairService
                 'senia' => $payload['senia'] ?? 0,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => ! $shouldRequestPart && ($payload['estado'] ?? null) === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : ($payload['estado'] ?? 'PENDIENTE'),
-                'repuesto' => $shouldRequestPart && $part !== '' ? $part : null,
+                'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                 'pedir_repuesto' => $shouldRequestPart,
+                'inventory_part_id' => $inventoryPartId,
                 'categorias_reparacion' => max(1, (int) ($payload['categorias_reparacion'] ?? 4)),
             ]];
         }

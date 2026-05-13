@@ -25,6 +25,13 @@ interface ServiceCategoryOption {
     label: string;
 }
 
+interface RepairPartInventoryOption {
+    id: number;
+    quantity: number;
+    model: string;
+    box: string;
+}
+
 export const repairDesktopTableGridClass =
     'grid-cols-[3.4rem_minmax(8rem,0.65fr)_4.8rem_5.8rem_5.4rem_3.7rem_4.4rem_minmax(12rem,0.7fr)_minmax(12rem,0.7fr)_5.8rem_5rem_7.4rem_17.5rem]';
 
@@ -32,6 +39,7 @@ interface RepairTicketPanelProps {
     ticket: RepairTicketView;
     states: string[];
     serviceCategories: ServiceCategoryOption[];
+    partInventory?: RepairPartInventoryOption[];
     allowAddRepair?: boolean;
     readOnly?: boolean;
 }
@@ -52,6 +60,7 @@ interface RepairUpdateFormData {
     fecha_entregado: string;
     repuesto: string;
     repuesto_pedido: boolean;
+    inventory_part_id: string;
     categorias_reparacion: string;
     images: File[] | null;
     final_images: File[] | null;
@@ -476,11 +485,13 @@ function RepairEditCard({
     rowIndex = 0,
     rowTotal = 1,
     onAddRepair,
+    partInventory,
 }: {
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
     readOnly?: boolean;
     ticket: RepairTicketView;
+    partInventory: RepairPartInventoryOption[];
     variant?: 'mobile' | 'desktop';
     rowIndex?: number;
     rowTotal?: number;
@@ -502,6 +513,7 @@ function RepairEditCard({
         fecha_entregado: repair.fecha_entregado ?? '',
         repuesto: repair.repuesto ?? '',
         repuesto_pedido: Boolean(repair.repuesto_pedido),
+        inventory_part_id: repair.inventory_part_id ? String(repair.inventory_part_id) : '',
         categorias_reparacion: String(repair.categorias_reparacion ?? 4),
         images: null,
         final_images: null,
@@ -514,6 +526,7 @@ function RepairEditCard({
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [finalImagePreviews, setFinalImagePreviews] = useState<string[]>([]);
+    const [partSearch, setPartSearch] = useState(repair.repuesto ?? '');
     const monto = Number(repair.monto ?? 0);
     const senia = Number(repair.senia ?? 0);
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
@@ -529,6 +542,48 @@ function RepairEditCard({
     const isLastGroupedDesktopRow = isGroupedDesktopRow && rowIndex === rowTotal - 1;
     const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
     const overdueText = overdueLabel(repair);
+    const currentInventoryLabel = repair.inventory_part_box && repair.inventory_part_model
+        ? `${repair.inventory_part_model} - caja ${repair.inventory_part_box.toUpperCase()}`
+        : '';
+    const partMatches = partSearch.trim().length >= 2
+        ? partInventory
+            .filter((part) => part.quantity > 0 && part.model.toLowerCase().includes(partSearch.trim().toLowerCase()))
+            .slice(0, 8)
+        : [];
+
+    const appendObservation = (current: string, addition: string): string => {
+        const trimmed = current.trim();
+
+        if (trimmed === '' || ['sin observaciones', 'sin observacion'].includes(trimmed.toLowerCase())) {
+            return addition;
+        }
+
+        if (trimmed.toLowerCase().includes(addition.toLowerCase())) {
+            return current;
+        }
+
+        return `${trimmed}\n${addition}`;
+    };
+
+    const selectInventoryPart = (part: RepairPartInventoryOption): void => {
+        form.setData((current) => ({
+            ...current,
+            repuesto: part.model,
+            repuesto_pedido: false,
+            inventory_part_id: String(part.id),
+            observaciones: appendObservation(current.observaciones, `Repuesto en caja ${part.box.toUpperCase()}`),
+        }));
+        setPartSearch(part.model);
+    };
+
+    const returnCurrentInventoryPart = (): void => {
+        form.setData((current) => ({
+            ...current,
+            inventory_part_id: '',
+            repuesto: '',
+        }));
+        setPartSearch('');
+    };
 
     const submitEdit = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
@@ -823,11 +878,63 @@ function RepairEditCard({
                                 <EditField label="Observaciones del Técnico">
                                     <textarea className={ui.repairDenseTextarea} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} rows={3} disabled={readOnly} />
                                 </EditField>
-                                <EditField label="Repuesto a pedir">
-                                    <textarea className={ui.repairDenseTextarea} value={form.data.repuesto} onChange={(event) => form.setData('repuesto', event.target.value)} rows={2} disabled={readOnly} />
+                                <EditField label="Repuesto a usar / pedir">
+                                    <div className="grid gap-2">
+                                        {currentInventoryLabel !== '' ? (
+                                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
+                                                <span>Asignado: {currentInventoryLabel}</span>
+                                                {!readOnly ? (
+                                                    <button type="button" className="text-xs font-black uppercase tracking-[0.05em] underline-offset-2 hover:underline" onClick={returnCurrentInventoryPart}>
+                                                        Devolver a caja
+                                                    </button>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        <input
+                                            className={ui.repairDenseInput}
+                                            value={partSearch}
+                                            onChange={(event) => {
+                                                setPartSearch(event.target.value);
+                                                form.setData((current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }));
+                                            }}
+                                            placeholder="Buscar en cajas o escribir repuesto a pedir"
+                                            disabled={readOnly}
+                                        />
+                                        {partMatches.length > 0 ? (
+                                            <div className="grid gap-1">
+                                                {partMatches.map((part) => (
+                                                    <button
+                                                        key={part.id}
+                                                        type="button"
+                                                        className={cn(
+                                                            'grid gap-1 rounded-xl border px-3 py-2 text-left text-sm transition hover:-translate-y-px',
+                                                            form.data.inventory_part_id === String(part.id)
+                                                                ? 'border-[#16a34a] bg-[#dcfce7] text-[#14532d]'
+                                                                : 'border-[#fed7aa] bg-white text-[#334155] hover:bg-[#fff7ed]',
+                                                        )}
+                                                        onClick={() => selectInventoryPart(part)}
+                                                        disabled={readOnly}
+                                                    >
+                                                        <span className="font-black">{part.model}</span>
+                                                        <span className="text-xs font-bold text-slate-500">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                        <textarea className={ui.repairDenseTextarea} value={form.data.repuesto} onChange={(event) => form.setData((current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))} rows={2} disabled={readOnly} />
+                                    </div>
                                 </EditField>
                                 <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#f59e0b33] bg-[#fff8ed] px-3 py-2 text-sm font-black text-[#92400e]">
-                                    <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} disabled={readOnly} />
+                                    <input
+                                        type="checkbox"
+                                        checked={form.data.repuesto_pedido}
+                                        onChange={(event) => form.setData((current) => ({
+                                            ...current,
+                                            repuesto_pedido: event.target.checked,
+                                            inventory_part_id: event.target.checked ? '' : current.inventory_part_id,
+                                        }))}
+                                        disabled={readOnly}
+                                    />
                                     Mandar a pedidos
                                 </label>
                                 <h4 className="mt-2 border-b border-[#bfdbfe] pb-2 text-sm font-black text-[#0d6efd]">Imágenes Actuales</h4>
@@ -1044,6 +1151,7 @@ export function RepairDesktopRow({
     ticket,
     repair,
     serviceCategories,
+    partInventory = [],
     readOnly = false,
     rowIndex = 0,
     rowTotal = ticket.repairs.length,
@@ -1051,6 +1159,7 @@ export function RepairDesktopRow({
     ticket: RepairTicketView;
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
+    partInventory?: RepairPartInventoryOption[];
     readOnly?: boolean;
     rowIndex?: number;
     rowTotal?: number;
@@ -1059,7 +1168,7 @@ export function RepairDesktopRow({
 
     return (
         <>
-            <RepairEditCard repair={repair} serviceCategories={serviceCategories} readOnly={readOnly} ticket={ticket} variant="desktop" rowIndex={rowIndex} rowTotal={rowTotal} onAddRepair={() => setAddOpen(true)} />
+            <RepairEditCard repair={repair} serviceCategories={serviceCategories} partInventory={partInventory} readOnly={readOnly} ticket={ticket} variant="desktop" rowIndex={rowIndex} rowTotal={rowTotal} onAddRepair={() => setAddOpen(true)} />
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} onClose={() => setAddOpen(false)} /> : null}
         </>
     );
@@ -1069,6 +1178,7 @@ export function RepairTicketPanel({
     ticket,
     states,
     serviceCategories,
+    partInventory = [],
     allowAddRepair = false,
     readOnly = false,
 }: RepairTicketPanelProps): JSX.Element {
@@ -1127,6 +1237,7 @@ export function RepairTicketPanel({
                                 key={`desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                                 repair={repair}
                                 serviceCategories={serviceCategories}
+                                partInventory={partInventory}
                                 readOnly={readOnly}
                                 ticket={ticket}
                                 variant="desktop"
@@ -1143,6 +1254,7 @@ export function RepairTicketPanel({
                         key={`mobile-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                         repair={repair}
                         serviceCategories={serviceCategories}
+                        partInventory={partInventory}
                         readOnly={readOnly}
                         ticket={ticket}
                         variant="mobile"

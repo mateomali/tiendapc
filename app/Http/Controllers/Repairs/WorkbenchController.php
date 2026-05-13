@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Repairs\RepairOrderRequest;
 use App\Models\RepairEvent;
 use App\Models\RepairOrder;
+use App\Models\RepairPart;
+use App\Models\RepairPartBox;
 use App\Services\RepairService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -58,6 +60,7 @@ class WorkbenchController extends Controller
             'states' => $repairService->availableStates(false),
             'serviceCategories' => $this->serviceCategories(),
             'serviceTemplates' => $repairService->serviceTemplates(),
+            'partInventory' => $this->partInventoryOptions(),
             'nextOrderId' => $repairService->nextOrderId(),
             'pageMode' => $pageMode,
         ]);
@@ -137,7 +140,72 @@ class WorkbenchController extends Controller
                 'month' => route('repairs.parts', ['periodo' => 'month']),
                 'all' => route('repairs.parts', ['periodo' => 'all']),
             ],
+            'inventory' => RepairPart::query()
+                ->get()
+                ->sortBy(fn (RepairPart $part): string => sprintf(
+                    '%06d-%06d-%06d',
+                    $this->boxSortOrder((string) $part->box),
+                    (int) $part->sort_order,
+                    (int) $part->id,
+                ))
+                ->map(fn (RepairPart $part): array => $this->serializeRepairPart($part))
+                ->values()
+                ->all(),
+            'boxes' => RepairPartBox::query()
+                ->orderBy('sort_order')
+                ->orderBy('code')
+                ->pluck('code')
+                ->all(),
+            'inventoryActions' => [
+                'store' => route('repairs.parts.inventory.store'),
+                'storeBox' => route('repairs.parts.boxes.store'),
+            ],
         ]);
+    }
+
+    public function storePartInventory(Request $request): RedirectResponse
+    {
+        $validated = $this->validatePartInventory($request);
+
+        $this->ensurePartBox($validated['box']);
+
+        $nextSortOrder = ((int) RepairPart::query()->max('sort_order')) + 1;
+
+        RepairPart::query()->create([
+            ...$validated,
+            'sort_order' => $nextSortOrder,
+        ]);
+
+        return back()->with('success', 'Repuesto agregado al inventario.');
+    }
+
+    public function updatePartInventory(Request $request, RepairPart $repairPart): RedirectResponse
+    {
+        $validated = $this->validatePartInventory($request);
+
+        $this->ensurePartBox($validated['box']);
+        $repairPart->update($validated);
+
+        return back()->with('success', 'Repuesto actualizado.');
+    }
+
+    public function destroyPartInventory(RepairPart $repairPart): RedirectResponse
+    {
+        $repairPart->delete();
+
+        return back()->with('success', 'Repuesto eliminado del inventario.');
+    }
+
+    public function storePartBox(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'box' => ['required', 'string', 'max:16', 'regex:/^[a-zA-Z]+$/'],
+        ]);
+
+        $box = strtolower(trim((string) $validated['box']));
+        $this->ensurePartBox($box);
+
+        return back()->with('success', sprintf('Caja %s agregada.', strtoupper($box)));
     }
 
     public function removePartRequest(RepairOrder $repairOrder): RedirectResponse
@@ -148,6 +216,83 @@ class WorkbenchController extends Controller
         ]);
 
         return back()->with('success', 'Repuesto quitado de la lista de pedidos.');
+    }
+
+    private function validatePartInventory(Request $request): array
+    {
+        $validated = $request->validate([
+            'quantity' => ['required', 'integer', 'min:0', 'max:9999'],
+            'model' => ['required', 'string', 'max:255'],
+            'box' => ['required', 'string', 'max:16', 'regex:/^[a-zA-Z]+$/'],
+        ]);
+
+        $validated['model'] = trim((string) $validated['model']);
+        $validated['box'] = strtolower(trim((string) $validated['box']));
+
+        return $validated;
+    }
+
+    private function ensurePartBox(string $box): void
+    {
+        $code = strtolower(trim($box));
+
+        if ($code === '') {
+            return;
+        }
+
+        RepairPartBox::query()->firstOrCreate(
+            ['code' => $code],
+            ['sort_order' => $this->boxSortOrder($code)],
+        );
+    }
+
+    private function boxSortOrder(string $box): int
+    {
+        $code = strtolower(trim($box));
+        $value = 0;
+
+        foreach (str_split($code) as $char) {
+            if ($char < 'a' || $char > 'z') {
+                continue;
+            }
+
+            $value = ($value * 26) + (ord($char) - 96);
+        }
+
+        return $value > 0 ? $value : 999999;
+    }
+
+    private function serializeRepairPart(RepairPart $part): array
+    {
+        return [
+            'id' => $part->id,
+            'quantity' => $part->quantity,
+            'model' => $part->model,
+            'box' => $part->box,
+            'update_url' => route('repairs.parts.inventory.update', $part),
+            'delete_url' => route('repairs.parts.inventory.delete', $part),
+        ];
+    }
+
+    private function partInventoryOptions(): array
+    {
+        return RepairPart::query()
+            ->where('quantity', '>', 0)
+            ->get()
+            ->sortBy(fn (RepairPart $part): string => sprintf(
+                '%06d-%06d-%06d',
+                $this->boxSortOrder((string) $part->box),
+                (int) $part->sort_order,
+                (int) $part->id,
+            ))
+            ->map(fn (RepairPart $part): array => [
+                'id' => $part->id,
+                'quantity' => $part->quantity,
+                'model' => $part->model,
+                'box' => $part->box,
+            ])
+            ->values()
+            ->all();
     }
 
     public function lookupByDni(Request $request, RepairService $repairService): JsonResponse
@@ -378,6 +523,9 @@ class WorkbenchController extends Controller
             'repuesto' => $order->repuesto,
             'repuesto_pedido' => (bool) $order->repuesto_pedido,
             'repuesto_pedido_at' => optional($order->repuesto_pedido_at)->format('Y-m-d H:i'),
+            'inventory_part_id' => $order->inventory_part_id,
+            'inventory_part_model' => $order->inventory_part_model,
+            'inventory_part_box' => $order->inventory_part_box,
             'categorias_reparacion' => $order->categorias_reparacion,
             'imagenes' => $this->serializeImages($order->originalImages(), $order, false),
             'imagenes_finales' => $this->serializeImages($order->finalImages(), $order, true),

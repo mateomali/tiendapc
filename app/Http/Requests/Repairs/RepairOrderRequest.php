@@ -30,6 +30,7 @@ class RepairOrderRequest extends FormRequest
             'fecha_entregado' => ['nullable', 'date'],
             'repuesto' => ['nullable', 'string', 'max:255'],
             'repuesto_pedido' => ['nullable', 'boolean'],
+            'inventory_part_id' => ['nullable', 'integer', 'min:1'],
             'categorias_reparacion' => ['nullable', 'integer', 'min:1'],
             'images.*' => ['nullable', 'file', 'image', 'max:8192'],
             'final_images.*' => ['nullable', 'file', 'image', 'max:8192'],
@@ -44,6 +45,7 @@ class RepairOrderRequest extends FormRequest
             'jobs.*.estado' => ['nullable', 'string', 'max:80'],
             'jobs.*.repuesto' => ['nullable', 'string', 'max:255'],
             'jobs.*.pedir_repuesto' => ['nullable', 'boolean'],
+            'jobs.*.inventory_part_id' => ['nullable', 'integer', 'min:1'],
             'jobs.*.categorias_reparacion' => ['nullable', 'integer', 'min:1'],
             'jobs.*.images.*' => ['nullable', 'file', 'image', 'max:8192'],
         ];

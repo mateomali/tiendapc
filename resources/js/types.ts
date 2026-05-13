@@ -196,6 +196,9 @@ export interface RepairOrderView {
     repuesto?: string | null;
     repuesto_pedido?: boolean;
     repuesto_pedido_at?: string | null;
+    inventory_part_id?: number | null;
+    inventory_part_model?: string | null;
+    inventory_part_box?: string | null;
     categorias_reparacion: number;
     imagenes: RepairImageView[];
     imagenes_finales: RepairImageView[];

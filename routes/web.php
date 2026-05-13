@@ -57,6 +57,10 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/entregados.php', [WorkbenchController::class, 'delivered']);
     Route::get('/repuestos', [WorkbenchController::class, 'parts'])->name('repairs.parts');
     Route::get('/repuestos.php', [WorkbenchController::class, 'parts']);
+    Route::post('/repairs/parts/inventory', [WorkbenchController::class, 'storePartInventory'])->name('repairs.parts.inventory.store');
+    Route::post('/repairs/parts/boxes', [WorkbenchController::class, 'storePartBox'])->name('repairs.parts.boxes.store');
+    Route::post('/repairs/parts/inventory/{repairPart}', [WorkbenchController::class, 'updatePartInventory'])->name('repairs.parts.inventory.update');
+    Route::post('/repairs/parts/inventory/{repairPart}/delete', [WorkbenchController::class, 'destroyPartInventory'])->name('repairs.parts.inventory.delete');
     Route::post('/repairs/orders/{repairOrder}/parts/remove', [WorkbenchController::class, 'removePartRequest'])->name('repairs.parts.remove');
     Route::get('/repairs/api/client/by-dni', [WorkbenchController::class, 'lookupByDni'])->name('repairs.lookup');
     Route::post('/repairs/orders/{repairOrder}', [WorkbenchController::class, 'update'])->name('repairs.orders.update');
