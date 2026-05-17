@@ -409,7 +409,7 @@ class RepairService
 
         $deliveryNote = $this->deliveryObservation($via, $detail);
         if ($deliveryNote !== null) {
-            $updates['observaciones'] = $this->appendObservation($order->observaciones, $deliveryNote);
+            $updates['observaciones'] = $this->replaceDeliveryObservation($order->observaciones, $deliveryNote);
         }
 
         $order->update($updates);
@@ -428,7 +428,12 @@ class RepairService
         $via = trim((string) $via);
 
         if ($via !== 'otra') {
-            return null;
+            return match ($via) {
+                'dni' => 'Validacion de entrega: ENTREGADO CON DNI',
+                'ticket' => 'Validacion de entrega: ENTREGADO CON TICKET',
+                'persona' => 'Validacion de entrega: ENTREGADO AL TITULAR EN PERSONA',
+                default => null,
+            };
         }
 
         $detail = trim((string) $detail);
@@ -438,6 +443,21 @@ class RepairService
         }
 
         return 'Validacion de entrega: ' . $detail;
+    }
+
+    private function replaceDeliveryObservation(?string $current, string $addition): string
+    {
+        $current = trim((string) $current);
+
+        if ($current === '' || in_array(mb_strtolower($current, 'UTF-8'), ['sin observaciones', 'sin observacion'], true)) {
+            return $addition;
+        }
+
+        $lines = preg_split('/\R+/', $current) ?: [];
+        $kept = array_filter($lines, static fn (string $line): bool => ! str_starts_with(trim($line), 'Validacion de entrega:'));
+        $base = trim(implode("\n", $kept));
+
+        return $base === '' ? $addition : $base . "\n\n" . $addition;
     }
 
     private function appendObservation(?string $current, string $addition): string
@@ -621,7 +641,7 @@ class RepairService
             ->when($delivered, fn ($builder) => $builder->where('entregado', 'si'))
             ->when(! $delivered, fn ($builder) => $builder->where('entregado', 'no'))
             ->when(! $delivered, fn ($builder) => $this->applyOrderFilters($builder, $filters))
-            ->when($delivered, fn ($builder) => $builder->orderBy('id', 'desc')->orderBy('reparacion'));
+            ->when($delivered, fn ($builder) => $this->applyDeliveredOrderFilters($builder, $filters));
 
         $categoryFilter = (int) ($filters['categoria_filter'] ?? 0);
 
@@ -664,6 +684,17 @@ class RepairService
         }
 
         return $query;
+    }
+
+    private function applyDeliveredOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
+    {
+        $direction = strtolower((string) ($filters['orden'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $query
+            ->orderByRaw('fecha_entregado IS NULL')
+            ->orderBy('fecha_entregado', $direction)
+            ->orderBy('id', $direction)
+            ->orderBy('reparacion');
     }
 
     private function applyOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void

@@ -18,7 +18,7 @@ import {
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
-import { cn, formatCurrency } from '../utils';
+import { cn, formatAmountInput, formatCurrency } from '../utils';
 
 interface ServiceCategoryOption {
     value: number;
@@ -79,7 +79,7 @@ interface AddRepairFormData {
     images: File[] | null;
 }
 
-type DeliveryVia = 'dni' | 'ticket' | 'otra';
+type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
 
 function normalizeStatus(status: string): string {
     return status.toUpperCase();
@@ -134,6 +134,30 @@ function formatLegacyDate(value?: string | null): string {
     if (!value) return '-';
     const [year, month, day] = value.split('-');
     return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function daysSinceDate(value?: string | null): number | null {
+    if (!value) return null;
+
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+
+    const delivered = new Date(year, month - 1, day);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const difference = today.getTime() - delivered.getTime();
+
+    return Math.max(0, Math.floor(difference / 86_400_000));
+}
+
+function deliveredDetailLabel(value?: string | null): string {
+    const days = daysSinceDate(value);
+
+    if (days === null) return 'Sin fecha';
+    if (days === 0) return 'Entregada hoy';
+    if (days === 1) return 'Entregada hace 1 dia';
+
+    return `Entregada hace ${days} dias`;
 }
 
 function isToday(value?: string | null): boolean {
@@ -439,6 +463,14 @@ function AddRepairModal({
         });
     };
 
+    const clearAmountForTyping = (field: 'monto' | 'senia'): void => {
+        const value = form.data[field] ?? '';
+
+        if (value.trim() === '' || Number(value) === 0) {
+            form.setData(field, '');
+        }
+    };
+
     return (
         <ModalShell title={`Agregar reparacion al ticket #${ticket.id}`} onClose={onClose}>
             <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
@@ -446,8 +478,8 @@ function AddRepairModal({
                 <input className={ui.input} placeholder="Fecha estimada" type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                 <textarea className={`${ui.textarea} sm:col-span-2`} placeholder="Descripcion" value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} />
                 <textarea className={`${ui.textarea} sm:col-span-2`} placeholder="Observaciones" value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} />
-                <input className={ui.input} placeholder="Monto" value={form.data.monto} onChange={(event) => form.setData('monto', event.target.value)} />
-                <input className={ui.input} placeholder="Senia" value={form.data.senia} onChange={(event) => form.setData('senia', event.target.value)} />
+                <input className={ui.input} placeholder="Monto" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                <input className={ui.input} placeholder="Senia" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
                 <input className={ui.input} placeholder="Repuesto" value={form.data.repuesto} onChange={(event) => form.setData('repuesto', event.target.value)} />
                 <label className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#f59e0b33] bg-[#fff8ed] px-3 py-2 text-sm font-black text-[#92400e]">
                     <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} />
@@ -506,8 +538,8 @@ function RepairEditCard({
         modelo: repair.modelo ?? '',
         descripcion: repair.descripcion ?? '',
         observaciones: repair.observaciones ?? '',
-        monto: String(repair.monto ?? ''),
-        senia: String(repair.senia ?? ''),
+        monto: formatAmountInput(repair.monto),
+        senia: formatAmountInput(repair.senia),
         fecha_estimada: repair.fecha_estimada ?? '',
         estado: repair.estado,
         fecha_entregado: repair.fecha_entregado ?? '',
@@ -663,6 +695,14 @@ function RepairEditCard({
         setInlineOpen(false);
     };
 
+    const clearAmountForTyping = (field: 'monto' | 'senia'): void => {
+        const value = form.data[field] ?? '';
+
+        if (!readOnly && (value.trim() === '' || Number(value) === 0)) {
+            form.setData(field, '');
+        }
+    };
+
     const removeImage = (image: RepairImageView, finalImage: boolean): void => {
         const action = finalImage ? repair.actions?.removeFinalImage : repair.actions?.removeOriginalImage;
         if (!action) return;
@@ -727,7 +767,7 @@ function RepairEditCard({
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} />
             <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} placeholder="Modelo" />
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
-            <input className={ui.repairDenseInput} value={form.data.monto} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
+            <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
             <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
                 {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
             </select>
@@ -773,6 +813,11 @@ function RepairEditCard({
 
         return (
             <div className={cn(mobile ? 'flex flex-wrap justify-end gap-1.5' : 'flex items-center justify-end gap-1')}>
+                {canMarkReady ? (
+                    <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
+                        <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
+                    </button>
+                ) : null}
                 <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                     <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                 </button>
@@ -785,11 +830,6 @@ function RepairEditCard({
                             <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
                         </Link>
                     </>
-                ) : null}
-                {canMarkReady ? (
-                    <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
-                        <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
-                    </button>
                 ) : null}
                 {canDeliver ? (
                     <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
@@ -850,10 +890,10 @@ function RepairEditCard({
                                 </EditField>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Monto ($)">
-                                        <input className={ui.repairDenseInput} value={form.data.monto} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
+                                        <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                     <EditField label="Senia ($)">
-                                        <input className={ui.repairDenseInput} value={form.data.senia} onChange={(event) => form.setData('senia', event.target.value)} disabled={readOnly} />
+                                        <input className={ui.repairDenseInput} value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-2">
@@ -989,6 +1029,7 @@ function RepairEditCard({
                         <select className={ui.input} value={deliveryVia} onChange={(event) => setDeliveryVia(event.target.value as DeliveryVia)}>
                             <option value="dni">ENTREGADO CON DNI</option>
                             <option value="ticket">ENTREGADO CON TICKET</option>
+                            <option value="persona">ENTREGADO AL TITULAR EN PERSONA</option>
                             <option value="otra">ENTREGADO DE OTRA MANERA</option>
                         </select>
                         {deliveryVia === 'otra' ? (
@@ -1062,7 +1103,21 @@ function RepairEditCard({
                             {compactStatus(repair.estado)}
                         </button>
                     </div>
-                    <div className="flex items-center justify-end">{!readOnly && !inlineOpen ? <ActionButtons showGeneralTicketActions={rowIndex === 0} /> : null}{!readOnly && inlineOpen ? <span className="text-center text-xs font-bold uppercase text-[#1d4ed8]">Editando</span> : null}</div>
+                    <div className="flex items-center justify-end">
+                        {readOnly ? (
+                            <div className="grid justify-items-end gap-1 text-right">
+                                <span className="text-[0.7rem] font-black text-[#0f172a]">{deliveredDetailLabel(repair.fecha_entregado)}</span>
+                                <span className="text-[0.66rem] font-bold text-[#64748b]">{formatLegacyDate(repair.fecha_entregado)}</span>
+                                {repair.actions?.deliver ? (
+                                    <button type="button" className="rounded-md border border-[#bfdbfe] bg-white px-2 py-1 text-[0.66rem] font-black uppercase text-[#1d4ed8] transition hover:bg-[#eff6ff]" onClick={openDeliveryModal}>
+                                        Cambiar
+                                    </button>
+                                ) : null}
+                            </div>
+                        ) : null}
+                        {!readOnly && !inlineOpen ? <ActionButtons showGeneralTicketActions={rowIndex === 0} /> : null}
+                        {!readOnly && inlineOpen ? <span className="text-center text-xs font-bold uppercase text-[#1d4ed8]">Editando</span> : null}
+                    </div>
                 </div>
                 {!readOnly && inlineOpen ? (
                     <div id={`inline-wrap-${repair.registro_id}`} className="border-b border-slate-200 bg-[#f8fbff] p-3">
@@ -1125,8 +1180,14 @@ function RepairEditCard({
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
                         <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
                         <FieldSummary label="Estado" value={compactStatus(repair.estado)} onClick={openInlineEditor} />
+                        {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {senia > 0 ? <FieldSummary label="Senia" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                     </div>
+                    {readOnly && repair.actions?.deliver ? (
+                        <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={openDeliveryModal}>
+                            Cambiar forma de entrega
+                        </button>
+                    ) : null}
                     {showMore ? (
                         <details className="rounded-xl border border-slate-200 bg-slate-50">
                             <summary className="cursor-pointer px-3 py-2 text-sm font-black text-[#1d4ed8]"><FaImages className="mr-1 inline" aria-hidden="true" />Ver mas</summary>

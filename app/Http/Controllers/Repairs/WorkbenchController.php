@@ -419,7 +419,7 @@ class WorkbenchController extends Controller
     {
         $validated = $request->validate([
             'fecha_entregado' => ['nullable', 'date'],
-            'entrega_via' => ['nullable', 'string', 'in:dni,ticket,otra'],
+            'entrega_via' => ['nullable', 'string', 'in:dni,ticket,persona,otra'],
             'entrega_detalle' => ['nullable', 'required_if:entrega_via,otra', 'string', 'max:500'],
         ]);
 
@@ -578,8 +578,8 @@ class WorkbenchController extends Controller
     {
         return [
             ['value' => 1, 'label' => 'Celulares'],
-            ['value' => 2, 'label' => 'Consolas'],
-            ['value' => 3, 'label' => 'Accesorios'],
+            ['value' => 2, 'label' => 'Computadoras'],
+            ['value' => 3, 'label' => 'Consolas'],
             ['value' => 4, 'label' => 'Varios'],
         ];
     }

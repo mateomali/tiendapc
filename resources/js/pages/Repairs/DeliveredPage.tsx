@@ -89,7 +89,7 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                 >
                     <div className={ui.repairCardHeading}>
                         <div className={ui.cardTitleWrap}>
-                            <p className={ui.eyebrow}>Archivo</p>
+                            <p className={ui.eyebrow}>Detalle</p>
                             <h2 className={ui.cardTitle}>Filtrar entregadas</h2>
                         </div>
                     </div>
@@ -104,8 +104,8 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                             ))}
                         </select>
                         <select className={ui.repairDenseInput} value={form.data.orden} onChange={(event) => form.setData('orden', event.target.value)}>
-                            <option value="desc">Mas recientes primero</option>
-                            <option value="asc">Mas antiguas primero</option>
+                            <option value="desc">Detalle: entrega mas reciente</option>
+                            <option value="asc">Detalle: entrega mas antigua</option>
                         </select>
                         <button className={buttonClass('primary', 'default', 'lg:min-w-[132px]')} type="submit">
                             Buscar
@@ -142,7 +142,7 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                             <span>Estimada</span>
                             <span>Saldo</span>
                             <span className="text-center">Estado</span>
-                            <span className="text-center">Archivo</span>
+                            <span className="text-center">Detalle</span>
                         </div>
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (

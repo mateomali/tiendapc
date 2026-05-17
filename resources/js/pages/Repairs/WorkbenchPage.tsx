@@ -1,4 +1,4 @@
-import { Link, useForm } from '@inertiajs/react';
+import { Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
@@ -90,8 +90,8 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         tipo_servicio: '',
         descripcion: '',
         observaciones: 'sin observaciones',
-        monto: '0.00',
-        senia: '0.00',
+        monto: '0',
+        senia: '0',
         fecha_estimada: today,
         estado: defaultState,
         repuesto: '',
@@ -294,6 +294,16 @@ export default function WorkbenchPage({
             ...overrides,
         });
 
+    const submitCleanSearch = (preserveScroll = false): void => {
+        const query = filtersForm.data.q.trim();
+
+        router.get(
+            route('repairs.workbench'),
+            query !== '' ? { q: query } : {},
+            { preserveScroll },
+        );
+    };
+
     const updateJob = (index: number, updater: (job: RepairJobFormData) => RepairJobFormData): void => {
         createForm.setData(
             'jobs',
@@ -379,10 +389,10 @@ export default function WorkbenchPage({
         }));
     };
 
-    const clearZeroAmount = (index: number, field: 'monto' | 'senia'): void => {
+    const clearAmountForTyping = (index: number, field: 'monto' | 'senia'): void => {
         const value = createForm.data.jobs[index]?.[field] ?? '';
 
-        if (Number(value || 0) === 0) {
+        if (value.trim() === '' || Number(value) === 0) {
             updateJob(index, (current) => ({ ...current, [field]: '' }));
         }
     };
@@ -562,7 +572,7 @@ export default function WorkbenchPage({
                     className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        filtersForm.get(route('repairs.workbench'), { preserveScroll: true });
+                        submitCleanSearch(true);
                     }}
                 >
                     <input
@@ -687,16 +697,25 @@ export default function WorkbenchPage({
                 className="hidden rounded-[22px] border border-white/60 bg-white/90 px-4 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.08)] backdrop-blur-md xl:block"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    filtersForm.get(route('repairs.workbench'));
+                    submitCleanSearch();
                 }}
             >
                 <div className="grid gap-2 md:grid-cols-[minmax(16rem,0.85fr)_200px_180px_160px_auto] md:items-center">
+                    <div className="relative min-w-0">
                     <input
-                        className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="min-h-11 w-full rounded-full border border-[rgba(37,99,235,0.22)] bg-white py-2 pl-4 pr-11 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         placeholder="Buscar por cliente, ticket, modelo, descripción, contacto o DNI"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
+                        <button
+                            type="submit"
+                            className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#2563eb] transition hover:bg-[#eff6ff]"
+                            aria-label="Buscar"
+                        >
+                            <FaSearch aria-hidden="true" />
+                        </button>
+                    </div>
                     <select
                         className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         value={filtersForm.data.estado}
@@ -929,11 +948,11 @@ export default function WorkbenchPage({
                                     </div>
 
                                     <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
-                                        <div className={cn(fieldPanelBlue, 'md:col-span-2')}>
-                                            <label className={repairLabelClass}>Modelo / equipo<input className={compactInputClass} value={job.modelo} onChange={(event) => updateJob(index, (current) => ({ ...current, modelo: event.target.value }))} /></label>
-                                        </div>
                                         <div className={fieldPanelPurple}>
                                             <label className={repairLabelClass}>Categoria<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => updateJob(index, (current) => ({ ...current, categorias_reparacion: event.target.value }))}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
+                                        </div>
+                                        <div className={fieldPanelBlue}>
+                                            <label className={repairLabelClass}>Modelo / equipo<input className={compactInputClass} value={job.modelo} onChange={(event) => updateJob(index, (current) => ({ ...current, modelo: event.target.value }))} /></label>
                                         </div>
                                         <div className={cn(fieldPanelBlue, 'md:col-span-2')}>
                                             <label className={repairLabelClass}>Tipo de servicio / descripcion de la falla *</label>
@@ -949,10 +968,10 @@ export default function WorkbenchPage({
                                             <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.monto} onFocus={() => clearZeroAmount(index, 'monto')} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Sena ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.senia} onFocus={() => clearZeroAmount(index, 'senia')} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
+                                            <label className={repairLabelClass}>Sena ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
                                         </div>
                                         <div className={fieldPanelAmber}>
                                             <label className={repairLabelClass}>Fecha estimada<input className={compactInputClass} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
@@ -1163,6 +1182,17 @@ export default function WorkbenchPage({
                                     </div>
 
                                     <div className={ui.repairFormGrid}>
+                                        <select
+                                            className={ui.input}
+                                            value={job.categorias_reparacion}
+                                            onChange={(event) => updateJob(index, (current) => ({ ...current, categorias_reparacion: event.target.value }))}
+                                        >
+                                            {serviceCategories.map((category) => (
+                                                <option key={category.value} value={category.value}>
+                                                    {category.label}
+                                                </option>
+                                            ))}
+                                        </select>
                                         <input
                                             className={ui.input}
                                             placeholder="Modelo"
@@ -1185,14 +1215,14 @@ export default function WorkbenchPage({
                                             className={ui.input}
                                             placeholder="Monto"
                                             value={job.monto}
-                                            onFocus={() => clearZeroAmount(index, 'monto')}
+                                            onFocus={() => clearAmountForTyping(index, 'monto')}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))}
                                         />
                                         <input
                                             className={ui.input}
                                             placeholder="Senia"
                                             value={job.senia}
-                                            onFocus={() => clearZeroAmount(index, 'senia')}
+                                            onFocus={() => clearAmountForTyping(index, 'senia')}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))}
                                         />
                                         <input
@@ -1218,17 +1248,6 @@ export default function WorkbenchPage({
                                             value={job.repuesto}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value }))}
                                         />
-                                        <select
-                                            className={ui.input}
-                                            value={job.categorias_reparacion}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, categorias_reparacion: event.target.value }))}
-                                        >
-                                            {serviceCategories.map((category) => (
-                                                <option key={category.value} value={category.value}>
-                                                    {category.label}
-                                                </option>
-                                            ))}
-                                        </select>
                                         <label className={`${ui.repairUploadField} ${ui.repairFull}`}>
                                             <span>Fotos iniciales</span>
                                             <input

@@ -35,6 +35,8 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     const navLinkClasses =
         'inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-[0.68rem] font-black uppercase tracking-[0.02em] text-[#dbeafe] no-underline transition duration-150 hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-white/35 xl:min-h-10 xl:rounded-xl xl:px-3.5 xl:py-2 xl:text-[0.86rem] xl:tracking-[0.03em]';
     const navLinkActiveClasses = 'bg-white text-[#17408b] shadow-[0_10px_22px_rgba(6,24,64,0.18)]';
+    const newOrderLinkClasses = 'border border-[#fde68a] bg-[#facc15] text-[#111827] shadow-[0_10px_24px_rgba(250,204,21,0.34)] hover:bg-[#fde047] hover:text-[#111827]';
+    const newOrderActiveClasses = 'bg-[#fef3c7] text-[#92400e] shadow-[0_10px_24px_rgba(146,64,14,0.24)]';
 
     return (
         <>
@@ -70,9 +72,16 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                         <div className="-mx-0.5 flex gap-1 overflow-x-auto pb-0.5 xl:mx-0 xl:contents xl:overflow-visible xl:pb-0">
                             {navItems.map((item) => {
                                 const isActive = currentUrl === item.match || currentUrl.startsWith(`${item.match}/`);
+                                const isNewOrder = item.match === '/ingreso';
 
                                 return (
-                                    <Link key={item.href} href={item.href} className={cn(navLinkClasses, isActive && navLinkActiveClasses)} aria-label={item.label} title={item.label}>
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className={cn(navLinkClasses, isNewOrder && newOrderLinkClasses, isActive && (isNewOrder ? newOrderActiveClasses : navLinkActiveClasses))}
+                                        aria-label={item.label}
+                                        title={item.label}
+                                    >
                                         {item.icon}
                                         <span className="xl:hidden">{item.shortLabel}</span>
                                         <span className="hidden xl:inline">{item.label}</span>

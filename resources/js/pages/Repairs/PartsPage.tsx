@@ -89,7 +89,7 @@ function boxSortValue(box: string): number {
 }
 
 function sortBoxes(values: string[]): string[] {
-    return Array.from(new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))).sort((a, b) => boxSortValue(a) - boxSortValue(b) || a.localeCompare(b));
+    return Array.from(new Set(values.map((value) => value.trim().toLowerCase()).filter((value) => value !== '' && value !== '|'))).sort((a, b) => boxSortValue(a) - boxSortValue(b) || a.localeCompare(b));
 }
 
 export default function PartsPage({ period, rows, filters, inventory, boxes, inventoryActions }: PartsPageProps): JSX.Element {
