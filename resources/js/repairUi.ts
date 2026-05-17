@@ -1,7 +1,7 @@
 import { cn } from './utils';
 
 const repairSurfaceClass =
-    'rounded-lg border border-[#cbd5e1] bg-white shadow-sm';
+    'rounded-lg border border-[#b8d3f7] bg-white shadow-sm';
 
 const repairButtonBase =
     'inline-flex cursor-pointer items-center justify-center gap-2 rounded-md border border-transparent px-3.5 py-2 text-[0.86rem] font-bold leading-none no-underline transition duration-150 focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb33] disabled:cursor-not-allowed disabled:opacity-60';
@@ -20,11 +20,11 @@ const repairButtonVariant = {
 
 export const repairUi = {
     statsGrid: 'grid gap-3 md:grid-cols-2 xl:grid-cols-4',
-    statCard: `${repairSurfaceClass} space-y-2 p-4`,
-    statLabel: 'text-[0.78rem] font-bold text-[#475569]',
+    statCard: `${repairSurfaceClass} space-y-2 bg-[#f8fbff] p-4`,
+    statLabel: 'text-[0.78rem] font-bold text-[#1d4ed8]',
     statValue: 'text-2xl font-black tracking-tight text-[#0f172a] md:text-3xl',
     cardTitleWrap: 'space-y-1',
-    eyebrow: 'text-[0.78rem] font-bold text-[#475569]',
+    eyebrow: 'text-[0.78rem] font-bold text-[#1d4ed8]',
     cardTitle: 'text-lg font-black tracking-tight text-[#0f172a] md:text-xl',
     inlineCaption: 'text-sm leading-5 text-[#475569]',
     inlineActions: 'flex flex-wrap items-center gap-2',
@@ -42,9 +42,9 @@ export const repairUi = {
     repairUploadField:
         'flex min-h-28 flex-col justify-center gap-2 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] px-3 py-3 text-sm font-bold text-[#334155]',
     repairShell:
-        'rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-sm md:p-4',
-    repairTicketPanel: 'rounded-lg border border-[#cbd5e1] bg-white p-2.5 shadow-sm md:p-4',
-    repairRepairCard: 'rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-sm md:p-4',
+        'rounded-lg border border-[#b8d3f7] bg-[#f8fbff] p-3 shadow-sm md:p-4',
+    repairTicketPanel: 'rounded-lg border border-[#b8d3f7] bg-white p-2.5 shadow-sm md:p-4',
+    repairRepairCard: 'rounded-lg border border-[#b8d3f7] bg-white p-3 shadow-sm md:p-4',
     repairRepairHead: 'flex flex-col gap-3 md:flex-row md:items-start md:justify-between',
     repairMiniChip:
         'inline-flex items-center rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-2.5 py-1 text-[0.7rem] font-bold text-[#475569]',

@@ -498,6 +498,7 @@ class WorkbenchController extends Controller
                     ]),
                     'ticketUrl' => route('repairs.tickets.show', ['orderId' => $base->id]),
                     'whatsappUrl' => $this->customerWhatsappUrl($base),
+                    'addRepairAction' => route('repairs.orders.add_repair', $base),
                     'repairs' => $ticketOrders
                         ->sortBy('reparacion')
                         ->map(fn (RepairOrder $order): array => $this->serializeRepair($order, $delivered))

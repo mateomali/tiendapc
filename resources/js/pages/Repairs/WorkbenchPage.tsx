@@ -127,8 +127,8 @@ function SummaryCard({
     }[tone];
 
     return (
-        <article className="flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2.5 text-left shadow-sm">
-            <div className="text-[0.78rem] font-semibold text-[#475569]">{label}</div>
+        <article className="flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border border-[#b8d3f7] bg-[#f8fbff] px-3 py-2.5 text-left shadow-sm">
+            <div className="text-[0.78rem] font-semibold text-[#1d4ed8]">{label}</div>
             <div className="flex items-center justify-between gap-2.5">
                 <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
                 <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md text-[0.72rem] text-transparent', iconTone)}>
@@ -183,14 +183,14 @@ function SummaryFilterCard({
             href={href}
             preserveScroll
             className={cn(
-                'flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border bg-white px-3 py-2.5 text-left no-underline shadow-sm transition hover:border-[#94a3b8]',
-                active ? 'border-[#2563eb] bg-[#eff6ff]' : 'border-[#cbd5e1]',
+                'flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border bg-[#f8fbff] px-3 py-2.5 text-left no-underline shadow-sm transition hover:border-[#2563eb]',
+                active ? 'border-[#2563eb] bg-[#dbeafe]' : 'border-[#b8d3f7]',
             )}
         >
-            <div className="text-[0.78rem] font-semibold text-[#475569]">{label}</div>
+            <div className="text-[0.78rem] font-semibold text-[#1d4ed8]">{label}</div>
             <div className="flex items-center justify-between gap-2.5">
                 <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
-                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border border-[#cbd5e1] bg-[#f8fafc] text-[0.86rem]', trendTone)}>
+                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border border-[#bfdbfe] bg-white text-[0.86rem]', trendTone)}>
                     {icon}
                 </div>
             </div>
@@ -208,7 +208,7 @@ function FilterPill({ label, href, active }: { label: string; href: string; acti
                 'min-h-8 rounded-md border px-3 py-1.5 text-center text-[0.76rem] font-bold no-underline transition',
                 active
                     ? 'border-[#2563eb] bg-[#2563eb] text-white'
-                    : 'border-[#cbd5e1] bg-white text-[#334155] hover:border-[#94a3b8] hover:bg-[#f8fafc]',
+                    : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
             )}
         >
             {label}
@@ -623,7 +623,7 @@ export default function WorkbenchPage({
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
-            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 shadow-sm xl:hidden">
+            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#1d4ed8] bg-[#174ea6] p-2 text-white shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:hidden">
                 <form
                     className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
                     onSubmit={(event) => {
@@ -656,10 +656,10 @@ export default function WorkbenchPage({
             ) : null}
 
             {isConsultas ? (
-            <section className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 shadow-sm xl:block">
+            <section className="hidden rounded-lg border border-[#1d4ed8] bg-[#174ea6] px-3 py-2 text-white shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:block">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-semibold text-[#475569]">Periodo</span>
+                        <span className="mr-1 text-[0.78rem] font-semibold text-[#dbeafe]">Periodo</span>
                         {periodOptions.map((option) => (
                             <FilterPill
                                 key={option.value}
@@ -677,7 +677,7 @@ export default function WorkbenchPage({
                         ))}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-semibold text-[#475569]">Categorias</span>
+                        <span className="mr-1 text-[0.78rem] font-semibold text-[#dbeafe]">Categorias</span>
                         {categoryOptions.map((option) => (
                             <FilterPill
                                 key={option.value || 'all'}
@@ -693,7 +693,7 @@ export default function WorkbenchPage({
 
             {isConsultas && summaryRange === 'custom' ? (
                 <form
-                    className="hidden gap-2 rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-sm md:grid-cols-[180px_180px_auto] md:items-end xl:grid"
+                    className="hidden gap-2 rounded-lg border border-[#b8d3f7] bg-[#f8fbff] p-3 shadow-sm md:grid-cols-[180px_180px_auto] md:items-end xl:grid"
                     onSubmit={(event) => {
                         event.preventDefault();
                         filtersForm.get(route('repairs.workbench'), { preserveScroll: true });
@@ -750,7 +750,7 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <form
-                className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-3 shadow-sm xl:block"
+                className="hidden rounded-lg border border-[#1d4ed8] bg-[#174ea6] px-3 py-3 shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:block"
                 onSubmit={(event) => {
                     event.preventDefault();
                     submitCleanSearch();

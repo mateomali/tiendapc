@@ -430,7 +430,8 @@ function AddRepairModal({
         images: null,
     });
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-    const action = ticket.repairs[0] ? route('repairs.orders.add_repair', ticket.repairs[0].registro_id) : '';
+    const baseUpdateAction = ticket.repairs[0]?.actions?.update ?? '';
+    const action = ticket.addRepairAction ?? (baseUpdateAction !== '' ? `${baseUpdateAction.replace(/\/$/, '')}/add-repair` : '');
 
     const selectImages = (event: ChangeEvent<HTMLInputElement>): void => {
         const currentFiles = form.data.images ?? [];
@@ -472,34 +473,73 @@ function AddRepairModal({
     };
 
     return (
-        <ModalShell title={`Agregar reparacion al ticket #${ticket.id}`} onClose={onClose}>
-            <form className="grid gap-3 sm:grid-cols-2" onSubmit={submit}>
-                <input className={ui.input} placeholder="Modelo" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
-                <input className={ui.input} placeholder="Fecha estimada" type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
-                <textarea className={`${ui.textarea} sm:col-span-2`} placeholder="Descripcion" value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} />
-                <textarea className={`${ui.textarea} sm:col-span-2`} placeholder="Observaciones" value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} />
-                <input className={ui.input} placeholder="Monto" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
-                <input className={ui.input} placeholder="Senia" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
-                <input className={ui.input} placeholder="Repuesto" value={form.data.repuesto} onChange={(event) => form.setData('repuesto', event.target.value)} />
-                <label className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#f59e0b33] bg-[#fff8ed] px-3 py-2 text-sm font-black text-[#92400e]">
-                    <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} />
-                    Mandar a pedidos
-                </label>
-                <select className={ui.input} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)}>
-                    {serviceCategories.map((category) => (
-                        <option key={category.value} value={category.value}>{category.label}</option>
-                    ))}
-                </select>
-                <div className="sm:col-span-2">
+        <ModalShell title={`Agregar reparacion al ticket #${ticket.id}`} onClose={onClose} tone="primary">
+            <form className="grid gap-4" onSubmit={submit}>
+                <div className="rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                            <div className="text-sm font-black text-[#0f172a]">{ticket.nombre_cliente}</div>
+                            <div className="text-xs font-semibold text-[#475569]">Ticket #{ticket.id} - trabajo #{ticket.repairsCount + 1}</div>
+                        </div>
+                        <span className="rounded-md border border-[#93c5fd] bg-white px-2.5 py-1 text-xs font-black text-[#1d4ed8]">Nueva reparacion</span>
+                    </div>
+                </div>
+                <EditSection title="Trabajo">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <EditField label="Categoria">
+                            <select className={ui.input} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)}>
+                                {serviceCategories.map((category) => (
+                                    <option key={category.value} value={category.value}>{category.label}</option>
+                                ))}
+                            </select>
+                        </EditField>
+                        <EditField label="Modelo">
+                            <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
+                        </EditField>
+                        <EditField label="Trabajo a realizar">
+                            <textarea className={ui.textarea} placeholder="Descripcion de la reparacion" value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} />
+                        </EditField>
+                        <EditField label="Observaciones">
+                            <textarea className={ui.textarea} placeholder="Estado, accesorios, claves o detalles internos" value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} />
+                        </EditField>
+                    </div>
+                </EditSection>
+
+                <EditSection title="Agenda e importes">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                        <EditField label="Fecha estimada">
+                            <input className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
+                        </EditField>
+                        <EditField label="Monto">
+                            <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                        </EditField>
+                        <EditField label="Senia">
+                            <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
+                        </EditField>
+                    </div>
+                </EditSection>
+
+                <EditSection title="Repuesto">
+                    <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+                        <EditField label="Repuesto asociado">
+                            <input className={ui.input} placeholder="Buscar o escribir repuesto" value={form.data.repuesto} onChange={(event) => form.setData('repuesto', event.target.value)} />
+                        </EditField>
+                        <label className="inline-flex min-h-11 items-center gap-2 self-end rounded-lg border border-[#f59e0b55] bg-[#fff7ed] px-3 py-2 text-sm font-black text-[#92400e]">
+                            <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} />
+                            Mandar a pedidos
+                        </label>
+                    </div>
+                </EditSection>
+                <EditSection title="Fotos de ingreso">
                     <ImageUploadPicker
                         title="Fotos de ingreso"
-                        help="Podés sacar foto o elegir de galería. Se guardan hasta 2 imágenes iniciales."
+                        help="Podes sacar foto o elegir de galeria. Se guardan hasta 2 imagenes iniciales."
                         previews={imagePreviews}
                         onSelect={selectImages}
                         onRemove={removeImage}
                     />
-                </div>
-                <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
+                </EditSection>
+                <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-[#bfdbfe] bg-white px-4 py-3">
                     <button type="button" className={buttonClass('soft', 'sm')} onClick={onClose}>Cancelar</button>
                     <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>Agregar reparacion</button>
                 </div>
@@ -1072,7 +1112,7 @@ function RepairEditCard({
             <>
                 <div className={cn('grid min-h-[58px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-x-2 border-x-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && !isFirstGroupedDesktopRow && 'bg-[#f8fafc]', isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
                     <div className="grid content-center gap-1 text-center">
-                        {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">—</span>}
+                        {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">-</span>}
                     </div>
                     <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{showDesktopTicketData ? repair.nombre_cliente : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
@@ -1272,6 +1312,11 @@ export function RepairTicketPanel({
                     ) : (
                         <span className="inline-flex min-h-[34px] items-center justify-center rounded-[10px] border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold text-slate-600">Sin WhatsApp</span>
                     )}
+                    {allowAddRepair && !readOnly ? (
+                        <button type="button" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[9px] border border-[#7c3aed] bg-[#7c3aed] px-2.5 py-1 text-[0.78rem] font-bold text-white transition hover:bg-[#6d28d9] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm xl:hidden" onClick={() => setAddOpen(true)}>
+                            <FaPlus aria-hidden="true" />Agregar reparacion
+                        </button>
+                    ) : null}
                 </div>
             </header>
 
@@ -1322,12 +1367,6 @@ export function RepairTicketPanel({
                     />
                 ))}
             </div>
-
-            {allowAddRepair && !readOnly ? (
-                <button type="button" className="rounded-lg border border-[#cbd5e1] bg-white px-4 py-3 text-left text-sm font-bold text-[#334155] shadow-sm" onClick={() => setAddOpen(true)}>
-                    <FaPlus className="mr-1 inline" aria-hidden="true" />Agregar reparacion al ticket #{ticket.id}
-                </button>
-            ) : null}
 
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} onClose={() => setAddOpen(false)} /> : null}
             <span className="hidden">{states.length}</span>

@@ -246,6 +246,7 @@ export interface RepairTicketView {
     trackingUrl: string;
     ticketUrl: string;
     whatsappUrl?: string | null;
+    addRepairAction?: string | null;
     repairs: RepairOrderView[];
 }
 
