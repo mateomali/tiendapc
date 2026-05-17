@@ -153,7 +153,12 @@ class RepairService
                     : ($repairNumber === 1 ? $sharedImages : []);
                 $storedImages = $this->storeImages($images, $orderId, $repairNumber, 'orig');
 
-                $allocation = $this->allocateInventoryPart((int) ($job['inventory_part_id'] ?? 0));
+                $requestedInventoryPartId = (int) ($job['inventory_part_id'] ?? 0);
+                $allocation = $this->reserveInventoryPart($requestedInventoryPartId, $orderId, $repairNumber);
+
+                if ($requestedInventoryPartId > 0 && $allocation === null) {
+                    throw new \RuntimeException('El repuesto seleccionado ya no esta disponible.');
+                }
 
                 $order = RepairOrder::query()->create([
                     'id' => $orderId,
@@ -180,6 +185,10 @@ class RepairService
                     'categorias_reparacion' => $job['categorias_reparacion'],
                     'imagen' => implode('|', $storedImages),
                 ]);
+
+                if (Str::upper((string) $order->estado) === 'LISTA') {
+                    $this->consumeInventoryReservation($order);
+                }
 
                 $this->recordEvent($order, 'CREADA', null, $order->estado);
                 $firstOrder ??= $order;
@@ -225,7 +234,7 @@ class RepairService
         return $repair;
     }
 
-    private function allocateInventoryPart(int $partId): ?array
+    private function reserveInventoryPart(int $partId, int $orderId, int $repairNumber): ?array
     {
         if ($partId <= 0) {
             return null;
@@ -234,8 +243,28 @@ class RepairService
         /** @var RepairPart|null $part */
         $part = RepairPart::query()->lockForUpdate()->find($partId);
 
-        if ($part === null || $part->quantity <= 0) {
+        if ($part === null || $part->quantity <= 0 || $part->reserved_order_id !== null) {
             return null;
+        }
+
+        if ($part->quantity > 1) {
+            $part->decrement('quantity');
+
+            $part = RepairPart::query()->create([
+                'quantity' => 1,
+                'model' => $part->model,
+                'box' => $part->box,
+                'sort_order' => $part->sort_order,
+                'reserved_order_id' => $orderId,
+                'reserved_repair_number' => $repairNumber,
+                'reserved_at' => now(),
+            ]);
+        } else {
+            $part->update([
+                'reserved_order_id' => $orderId,
+                'reserved_repair_number' => $repairNumber,
+                'reserved_at' => now(),
+            ]);
         }
 
         $allocation = [
@@ -244,15 +273,54 @@ class RepairService
             'box' => $part->box,
         ];
 
-        if ($part->quantity <= 1) {
-            $part->delete();
+        return $allocation;
+    }
 
-            return $allocation;
+    private function returnInventoryReservation(?int $partId, ?string $model, ?string $box, bool $returnToStock = true): void
+    {
+        if ($partId !== null && $partId > 0) {
+            /** @var RepairPart|null $part */
+            $part = RepairPart::query()->lockForUpdate()->find($partId);
+
+            if ($part !== null && $part->reserved_order_id !== null) {
+                $part->delete();
+
+                if ($returnToStock) {
+                    $this->returnInventoryPart($part->model, $part->box);
+                }
+
+                return;
+            }
+
+            return;
         }
 
-        $part->decrement('quantity');
+        if ($returnToStock) {
+            $this->returnInventoryPart($model, $box);
+        }
+    }
 
-        return $allocation;
+    private function consumeInventoryReservation(RepairOrder $order): void
+    {
+        $partId = (int) ($order->inventory_part_id ?? 0);
+
+        if ($partId <= 0) {
+            return;
+        }
+
+        /** @var RepairPart|null $part */
+        $part = RepairPart::query()->lockForUpdate()->find($partId);
+
+        if (
+            $part === null
+            || $part->reserved_order_id !== (int) $order->id
+            || $part->reserved_repair_number !== (int) $order->reparacion
+        ) {
+            return;
+        }
+
+        $part->delete();
+        $this->recordEvent($order, 'REPUESTO_CONSUMIDO_EN_LISTA', $order->estado, $order->estado);
     }
 
     private function returnInventoryPart(?string $model, ?string $box): void
@@ -323,15 +391,21 @@ class RepairService
             $previousInventoryPartId = (int) ($order->inventory_part_id ?? 0);
             $nextInventoryPartId = (int) ($payload['inventory_part_id'] ?? 0);
             $inventoryChanged = $previousInventoryPartId !== $nextInventoryPartId;
+            $previousWasReady = Str::upper((string) $previousState) === 'LISTA';
             $allocation = null;
 
             if ($inventoryChanged && $previousInventoryPartId > 0) {
-                $this->returnInventoryPart($order->inventory_part_model, $order->inventory_part_box);
-                $this->recordEvent($order, 'REPUESTO_DEVUELTO_A_CAJA', $previousState, $order->estado);
+                $this->returnInventoryReservation($previousInventoryPartId, $order->inventory_part_model, $order->inventory_part_box, ! $previousWasReady);
+                if (! $previousWasReady) {
+                    $this->recordEvent($order, 'REPUESTO_DEVUELTO_A_CAJA', $previousState, $order->estado);
+                }
             }
 
             if ($inventoryChanged && $nextInventoryPartId > 0) {
-                $allocation = $this->allocateInventoryPart($nextInventoryPartId);
+                $allocation = $this->reserveInventoryPart($nextInventoryPartId, $newOrderId, (int) $order->reparacion);
+                if ($allocation === null) {
+                    throw new \RuntimeException('El repuesto seleccionado ya no esta disponible.');
+                }
                 if ($allocation !== null) {
                     $this->recordEvent($order, 'REPUESTO_ASIGNADO_DESDE_CAJA', $previousState, $order->estado);
                 }
@@ -369,6 +443,10 @@ class RepairService
                 'imagen3' => $finalStored[0] ?? null,
                 'imagen4' => $finalStored[1] ?? null,
             ])->save();
+
+            if (Str::upper((string) $order->estado) === 'LISTA') {
+                $this->consumeInventoryReservation($order);
+            }
 
             $this->recordEvent($order, $order->entregado === 'si' ? 'ACTUALIZADA_ENTREGADA' : 'ACTUALIZADA', $previousState, $order->estado);
 
@@ -501,6 +579,10 @@ class RepairService
         $order->update([
             'estado' => $state,
         ]);
+
+        if (Str::upper($state) === 'LISTA') {
+            $this->consumeInventoryReservation($order->refresh());
+        }
 
         $this->recordEvent($order, $event, $previousState, $state);
 

@@ -181,6 +181,10 @@ class WorkbenchController extends Controller
 
     public function updatePartInventory(Request $request, RepairPart $repairPart): RedirectResponse
     {
+        if ($repairPart->reserved_order_id !== null) {
+            return back()->with('error', 'No se puede editar un repuesto reservado.');
+        }
+
         $validated = $this->validatePartInventory($request);
 
         $this->ensurePartBox($validated['box']);
@@ -191,6 +195,10 @@ class WorkbenchController extends Controller
 
     public function destroyPartInventory(RepairPart $repairPart): RedirectResponse
     {
+        if ($repairPart->reserved_order_id !== null) {
+            return back()->with('error', 'No se puede eliminar un repuesto reservado.');
+        }
+
         $repairPart->delete();
 
         return back()->with('success', 'Repuesto eliminado del inventario.');
@@ -269,6 +277,8 @@ class WorkbenchController extends Controller
             'quantity' => $part->quantity,
             'model' => $part->model,
             'box' => $part->box,
+            'reserved_order_id' => $part->reserved_order_id,
+            'reserved_repair_number' => $part->reserved_repair_number,
             'update_url' => route('repairs.parts.inventory.update', $part),
             'delete_url' => route('repairs.parts.inventory.delete', $part),
         ];
@@ -278,6 +288,7 @@ class WorkbenchController extends Controller
     {
         return RepairPart::query()
             ->where('quantity', '>', 0)
+            ->whereNull('reserved_order_id')
             ->get()
             ->sortBy(fn (RepairPart $part): string => sprintf(
                 '%06d-%06d-%06d',

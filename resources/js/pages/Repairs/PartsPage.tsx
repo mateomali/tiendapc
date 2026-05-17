@@ -22,6 +22,8 @@ interface InventoryPart {
     quantity: number;
     model: string;
     box: string;
+    reserved_order_id?: number | null;
+    reserved_repair_number?: number | null;
     update_url: string;
     delete_url: string;
 }
@@ -59,9 +61,9 @@ const periodLabels = {
 } as const;
 
 const inputClass =
-    'min-h-10 w-full rounded-lg border border-[#bfdbfe] bg-white px-3 py-2 text-sm font-bold text-[#0f172a] shadow-inner outline-none transition focus:border-[#2563eb] focus:ring-3 focus:ring-[#93c5fd66]';
+    'min-h-10 w-full rounded-lg border border-[#c7d7ed] bg-white px-3 py-2 text-sm font-bold text-[#0f172a] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-[#2563eb] focus:ring-3 focus:ring-[#93c5fd66]';
 const tableInputClass =
-    'h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm font-bold text-[#0f172a] outline-none transition hover:border-[#bfdbfe] hover:bg-white focus:border-[#2563eb] focus:bg-white focus:ring-3 focus:ring-[#93c5fd66]';
+    'h-9 w-full rounded-md border border-transparent bg-transparent px-2 text-sm font-bold text-[#0f172a] outline-none transition hover:border-[#c7d7ed] hover:bg-white focus:border-[#2563eb] focus:bg-white focus:ring-3 focus:ring-[#93c5fd66]';
 
 function normalizePart(part: InventoryPart): InventoryPart {
     return {
@@ -217,8 +219,8 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
 
     return (
         <RepairLayout title="Repuestos">
-            <section className="overflow-hidden rounded-[18px] border border-[#bfdbfe] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.09)]">
-                <div className="grid gap-4 border-b border-[#dbeafe] bg-[linear-gradient(135deg,#173b7d,#2563eb)] px-4 py-4 text-white xl:grid-cols-[1fr_2fr] xl:items-end">
+            <section className="overflow-hidden rounded-[18px] border border-[#dbe7f6] bg-white/96 shadow-[0_16px_38px_rgba(15,23,42,0.10)] ring-1 ring-white/70">
+                <div className="grid gap-4 border-b border-[#dbe7f6] bg-[linear-gradient(135deg,#12366f,#2563eb)] px-4 py-4 text-white xl:grid-cols-[1fr_2fr] xl:items-end">
                     <div className="min-w-0">
                         <p className="text-[0.7rem] font-black uppercase tracking-[0.18em] text-blue-100">Inventario por cajas</p>
                         <h1 className="flex items-center gap-2 text-xl font-black md:text-2xl">
@@ -268,13 +270,13 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                     </div>
                 </div>
 
-                <div className="grid gap-2 border-b border-[#dbeafe] bg-white px-3 py-2 xl:grid-cols-[1fr_auto] xl:items-center">
+                <div className="grid gap-2 border-b border-[#dbe7f6] bg-white px-3 py-2 xl:grid-cols-[1fr_auto] xl:items-center">
                     <div className="flex gap-1 overflow-x-auto">
                         <button
                             type="button"
                             className={cn(
                                 'min-h-9 shrink-0 rounded-lg border px-3 text-xs font-black uppercase tracking-[0.05em] transition',
-                                boxFilter === '' ? 'border-[#2563eb] bg-[#2563eb] text-white' : 'border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe]',
+                                boxFilter === '' ? 'border-[#2563eb] bg-[#2563eb] text-white shadow-[0_8px_18px_rgba(37,99,235,0.18)]' : 'border-[#c7d7ed] bg-[#f8fbff] text-[#17427f] hover:bg-[#eef6ff]',
                             )}
                             onClick={() => selectBox('')}
                         >
@@ -286,7 +288,7 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                                 type="button"
                                 className={cn(
                                     'min-h-9 shrink-0 rounded-lg border px-3 text-xs font-black uppercase tracking-[0.05em] transition',
-                                    boxFilter === box ? 'border-[#2563eb] bg-[#2563eb] text-white' : 'border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#dbeafe]',
+                                    boxFilter === box ? 'border-[#2563eb] bg-[#2563eb] text-white shadow-[0_8px_18px_rgba(37,99,235,0.18)]' : 'border-[#c7d7ed] bg-[#f8fbff] text-[#17427f] hover:bg-[#eef6ff]',
                                 )}
                                 onClick={() => selectBox(box)}
                             >
@@ -311,7 +313,7 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                     </form>
                 </div>
 
-                <form onSubmit={createPart} className="grid gap-2 border-b border-[#dbeafe] bg-[#eff6ff] p-3 md:grid-cols-[8rem_1fr_8rem_auto] md:items-end">
+                <form onSubmit={createPart} className="grid gap-2 border-b border-[#dbe7f6] bg-[#f4f8ff] p-3 md:grid-cols-[8rem_1fr_8rem_auto] md:items-end">
                     <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-[#1d4ed8]">
                         Cantidad
                         <input
@@ -353,7 +355,7 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
 
                 <div className="overflow-x-auto">
                     <div className="min-w-[760px]">
-                        <div className="grid grid-cols-[7rem_1fr_8rem_7rem] gap-2 bg-[#0f172a] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-white">
+                        <div className="grid grid-cols-[7rem_1fr_8rem_7rem] gap-2 bg-[#102a56] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-white">
                             <span>Cantidad</span>
                             <span>Modelo</span>
                             <span>Caja</span>
@@ -363,15 +365,19 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                         {filteredParts.map((part) => {
                             const isSaving = savingIds.includes(part.id);
                             const isDirty = dirtyIds.includes(part.id);
+                            const isReserved = part.reserved_order_id !== null && part.reserved_order_id !== undefined;
+                            const reservationLabel = isReserved ? `RESERVADO ORDEN ${part.reserved_order_id} TRABAJO ${part.reserved_repair_number ?? 1}` : '';
 
                             return (
                                 <article
                                     key={part.id}
                                     className={cn(
                                         'grid grid-cols-[7rem_1fr_8rem_7rem] gap-2 border-b px-3 py-2 transition-colors',
-                                        isDirty
+                                        isReserved
+                                            ? 'border-[#f59e0b] bg-[#fffbeb]'
+                                            : isDirty
                                             ? 'border-[#f59e0b] bg-[#fff7ed] ring-1 ring-inset ring-[#f59e0b55]'
-                                            : 'border-[#dbeafe] odd:bg-white even:bg-[#f8fbff]',
+                                            : 'border-[#dbe7f6] odd:bg-white even:bg-[#f8fbff]',
                                     )}
                                 >
                                     <input
@@ -382,14 +388,16 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                                         onBlur={() => savePart(part)}
                                         className={tableInputClass}
                                         aria-label={`Cantidad de ${part.model}`}
+                                        disabled={isReserved}
                                     />
                                     <input
                                         type="text"
-                                        value={part.model}
+                                        value={isReserved ? `${part.model} (${reservationLabel})` : part.model}
                                         onChange={(event) => updatePart(part.id, { model: event.target.value })}
                                         onBlur={() => savePart(part)}
-                                        className={tableInputClass}
+                                        className={cn(tableInputClass, isReserved && 'text-[#92400e]')}
                                         aria-label={`Modelo ${part.model}`}
+                                        disabled={isReserved}
                                     />
                                     <input
                                         type="text"
@@ -398,14 +406,16 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                                         onBlur={() => savePart(part)}
                                         className={cn(tableInputClass, 'uppercase')}
                                         aria-label={`Caja de ${part.model}`}
+                                        disabled={isReserved}
                                     />
                                     <div className="flex items-center justify-end gap-1">
-                                        <span className={cn('w-10 text-right text-[0.68rem] font-black uppercase tracking-[0.08em]', isDirty ? 'text-[#92400e]' : 'text-[#64748b]')}>{isSaving ? 'Guard.' : isDirty ? 'Edit.' : ''}</span>
+                                        <span className={cn('w-10 text-right text-[0.68rem] font-black uppercase tracking-[0.08em]', isReserved || isDirty ? 'text-[#92400e]' : 'text-[#64748b]')}>{isReserved ? 'Res.' : isSaving ? 'Guard.' : isDirty ? 'Edit.' : ''}</span>
                                         <button
                                             type="button"
-                                            className="grid h-9 w-9 place-items-center rounded-lg border border-[#bfdbfe] bg-white text-[#1d4ed8] shadow-sm transition hover:bg-[#eff6ff]"
+                                            className="grid h-9 w-9 place-items-center rounded-lg border border-[#c7d7ed] bg-white text-[#17427f] shadow-sm transition hover:bg-[#f4f8ff]"
                                             onClick={() => savePart(part)}
                                             title="Guardar"
+                                            disabled={isReserved}
                                         >
                                             <FaSave aria-hidden="true" />
                                         </button>
@@ -414,6 +424,7 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                                             className="grid h-9 w-9 place-items-center rounded-lg bg-[#ffe4e6] text-[#be123c] shadow-sm transition hover:bg-[#fecdd3]"
                                             onClick={() => deletePart(part)}
                                             title="Eliminar"
+                                            disabled={isReserved}
                                         >
                                             <FaTrashAlt aria-hidden="true" />
                                         </button>
@@ -434,8 +445,8 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                 ) : null}
             </section>
 
-            <section className="overflow-hidden rounded-[18px] border border-[#bfdbfe] bg-white shadow-[0_14px_34px_rgba(15,23,42,0.09)]">
-                <div className="grid gap-3 border-b border-[#dbeafe] bg-[#eff6ff] px-4 py-3 md:grid-cols-[1fr_auto] md:items-center">
+            <section className="overflow-hidden rounded-[18px] border border-[#dbe7f6] bg-white/96 shadow-[0_16px_38px_rgba(15,23,42,0.10)] ring-1 ring-white/70">
+                <div className="grid gap-3 border-b border-[#dbe7f6] bg-[#f4f8ff] px-4 py-3 md:grid-cols-[1fr_auto] md:items-center">
                     <div className="min-w-0">
                         <p className="text-[0.7rem] font-black uppercase tracking-[0.18em] text-[#1d4ed8]">Pedidos desde ordenes</p>
                         <h2 className="text-lg font-black text-[#0f172a]">Repuestos pendientes</h2>
@@ -456,14 +467,14 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                     </div>
                 </div>
 
-                <div className="flex min-h-10 items-center overflow-hidden border-b border-[#dbeafe] bg-[#f8fbff] text-sm font-black text-[#1d4ed8]">
+                <div className="flex min-h-10 items-center overflow-hidden border-b border-[#dbe7f6] bg-[#f8fbff] text-sm font-black text-[#17427f]">
                     <div className="animate-[marquee_28s_linear_infinite] whitespace-nowrap px-4">
                         {rows.length} pedido{rows.length === 1 ? '' : 's'} de repuesto en filtro {periodLabels[period].toLowerCase()}.
                     </div>
                 </div>
 
                 <div className="grid gap-2 p-3">
-                    <div className="hidden grid-cols-[1fr_1.4fr_1fr_2rem] gap-2 rounded-xl bg-[#0f172a] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-white md:grid">
+                    <div className="hidden grid-cols-[1fr_1.4fr_1fr_2rem] gap-2 rounded-xl bg-[#102a56] px-3 py-2 text-xs font-black uppercase tracking-[0.08em] text-white md:grid">
                         <span>Tipo de repuesto</span>
                         <span>Repuesto</span>
                         <span>Pedido</span>
@@ -471,7 +482,7 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                     </div>
 
                     {rows.map((row) => (
-                        <article key={row.registro_id} className="grid gap-2 rounded-xl border border-[#dbeafe] bg-[#f8fbff] p-3 shadow-sm md:grid-cols-[1fr_1.4fr_1fr_2rem] md:items-center">
+                        <article key={row.registro_id} className="grid gap-2 rounded-xl border border-[#dbe7f6] bg-[#f8fbff] p-3 shadow-sm transition hover:border-[#93c5fd] hover:bg-white md:grid-cols-[1fr_1.4fr_1fr_2rem] md:items-center">
                             <div className="grid gap-0.5">
                                 <span className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-[#64748b] md:hidden">Tipo de repuesto</span>
                                 <strong className="text-sm text-[#0f172a]">{row.tipo_repuesto}</strong>

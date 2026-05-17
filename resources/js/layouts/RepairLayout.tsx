@@ -33,19 +33,19 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     ];
 
     const navLinkClasses =
-        'inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-lg px-2 text-[0.68rem] font-black uppercase tracking-[0.02em] text-[#dbeafe] no-underline transition duration-150 hover:bg-white/12 hover:text-white focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-white/35 xl:min-h-10 xl:rounded-xl xl:px-3.5 xl:py-2 xl:text-[0.86rem] xl:tracking-[0.03em]';
-    const navLinkActiveClasses = 'bg-white text-[#17408b] shadow-[0_10px_22px_rgba(6,24,64,0.18)]';
-    const newOrderLinkClasses = 'border border-[#fde68a] bg-[#facc15] text-[#111827] shadow-[0_10px_24px_rgba(250,204,21,0.34)] hover:bg-[#fde047] hover:text-[#111827]';
-    const newOrderActiveClasses = 'bg-[#fef3c7] text-[#92400e] shadow-[0_10px_24px_rgba(146,64,14,0.24)]';
+        'inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 text-[0.68rem] font-bold text-[#334155] no-underline transition duration-150 hover:border-[#cbd5e1] hover:bg-[#f8fafc] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#2563eb33] xl:min-h-9 xl:px-3 xl:py-2 xl:text-[0.82rem]';
+    const navLinkActiveClasses = 'border-[#cbd5e1] bg-[#f1f5f9] text-[#0f172a]';
+    const newOrderLinkClasses = 'border-[#ca8a04] bg-[#facc15] text-[#111827] hover:border-[#a16207] hover:bg-[#eab308] hover:text-[#111827]';
+    const newOrderActiveClasses = 'border-[#a16207] bg-[#facc15] text-[#111827]';
 
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen bg-[linear-gradient(135deg,#e8f3ff_0%,#f8fbff_38%,#eef4ff_72%,#e5f7ff_100%)] bg-fixed px-2 py-2 text-[#0f172a] md:px-4 md:py-3">
-                <header className="sticky top-1 z-30 mx-auto mb-1.5 w-[min(100%,1920px)] rounded-[12px] border border-white/70 bg-[linear-gradient(135deg,#173b7d_0%,#235ac4_55%,#1e40af_100%)] px-2 py-1.5 text-white shadow-[0_8px_22px_rgba(15,23,42,0.14)] backdrop-blur xl:top-2 xl:mb-3 xl:rounded-[22px] xl:px-4 xl:py-3">
+            <div className="min-h-screen bg-[#f1f5f9] px-2 py-2 text-[#0f172a] md:px-4 md:py-3">
+                <header className="sticky top-1 z-30 mx-auto mb-3 w-[min(100%,1920px)] rounded-lg border border-[#cbd5e1] bg-white px-2 py-1.5 text-[#0f172a] shadow-sm xl:top-2 xl:mb-4 xl:px-3 xl:py-2">
                     <nav className="grid gap-1 xl:flex xl:flex-wrap xl:items-center xl:gap-2">
                         <div className="flex min-w-0 items-center gap-1.5 xl:contents">
-                            <Link href={route('repairs.workbench')} className="mr-auto inline-flex min-h-7 min-w-0 items-center gap-1.5 rounded-lg px-1 text-[0.8rem] font-black text-white no-underline xl:mr-3 xl:min-h-10 xl:rounded-xl xl:px-2 xl:text-[1rem]">
+                            <Link href={route('repairs.workbench')} className="mr-auto inline-flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1 text-[0.8rem] font-bold text-[#0f172a] no-underline transition hover:text-[#1d4ed8] xl:mr-3 xl:min-h-9 xl:px-2 xl:text-[0.95rem]">
                                 <FaTools className="shrink-0" aria-hidden="true" />
                                 <span className="truncate xl:hidden">{title}</span>
                                 <span className="hidden xl:inline">Gestion de Ordenes</span>
@@ -111,7 +111,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                         )}
                     </nav>
                 </header>
-                <main className="mx-auto grid w-[min(100%,1920px)] gap-3">
+                <main className="mx-auto grid w-[min(100%,1920px)] gap-4 pb-6">
                     <FlashMessages />
                     {children}
                 </main>

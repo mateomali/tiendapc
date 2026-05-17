@@ -45,7 +45,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
         <>
             <Head title={`Ticket #${ticket.id}`} />
 
-            <div className="min-h-screen bg-[#f3f4f6] px-3 py-2 text-black print:w-[80mm] print:bg-white print:p-0">
+            <div className="min-h-screen bg-[linear-gradient(180deg,#eef5ff,#f8fbff)] px-3 py-3 text-black print:w-[80mm] print:bg-white print:p-0">
                 <div className="mx-auto mb-2 flex w-[80mm] flex-wrap justify-center gap-1.5 print:hidden">
                     <Link href={returnUrl} className={buttonClass('soft', 'sm')}>
                         Volver
@@ -60,7 +60,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                     ) : null}
                 </div>
 
-                <main className="mx-auto w-[80mm] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_10px_24px_rgba(15,23,42,0.16)] print:mx-auto print:w-[80mm] print:px-[4mm] print:pt-[4mm] print:pb-[6mm] print:shadow-none">
+                <main className="mx-auto w-[80mm] rounded-[10px] border border-[#dbe7f6] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_16px_34px_rgba(15,23,42,0.16)] print:mx-auto print:w-[80mm] print:rounded-none print:border-0 print:px-[4mm] print:pt-[4mm] print:pb-[6mm] print:shadow-none">
                     <div className="hidden print:block print:h-[4mm]" />
 
                     <header className="text-center">

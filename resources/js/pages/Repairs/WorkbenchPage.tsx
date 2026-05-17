@@ -59,6 +59,7 @@ interface WorkbenchPageProps {
 }
 
 interface RepairJobFormData {
+    marca: string;
     modelo: string;
     tipo_servicio: string;
     descripcion: string;
@@ -86,6 +87,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
     const today = new Date().toISOString().slice(0, 10);
 
     return {
+        marca: '',
         modelo: '',
         tipo_servicio: '',
         descripcion: '',
@@ -101,6 +103,8 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         images: null,
     };
 }
+
+const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'TCL', 'LG', 'OTRAS'] as const;
 
 function SummaryCard({
     label,
@@ -123,11 +127,11 @@ function SummaryCard({
     }[tone];
 
     return (
-        <article className="flex min-h-[98px] min-w-0 flex-col justify-between gap-2 rounded-[18px] border border-white/70 bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.10),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(34,197,94,0.10),transparent_40%),rgba(255,255,255,0.97)] px-3.5 py-3 text-left shadow-[0_10px_26px_rgba(15,23,42,0.08)]">
-            <div className="text-[0.9rem] font-bold uppercase tracking-[0.018em] text-[#6b7280]">{label}</div>
+        <article className="flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border border-[#cbd5e1] bg-white px-3 py-2.5 text-left shadow-sm">
+            <div className="text-[0.78rem] font-semibold text-[#475569]">{label}</div>
             <div className="flex items-center justify-between gap-2.5">
                 <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
-                <div className={cn('grid h-[26px] w-[26px] place-items-center rounded-lg bg-gradient-to-br text-[0.9rem] text-white', iconTone)}>
+                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md text-[0.72rem] text-transparent', iconTone)}>
                     ●
                 </div>
             </div>
@@ -179,14 +183,14 @@ function SummaryFilterCard({
             href={href}
             preserveScroll
             className={cn(
-                'flex min-h-[98px] min-w-0 flex-col justify-between gap-2 rounded-[18px] border bg-[radial-gradient(circle_at_20%_20%,rgba(99,102,241,0.10),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(34,197,94,0.10),transparent_40%),rgba(255,255,255,0.97)] px-3.5 py-3 text-left no-underline shadow-[0_10px_26px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_34px_rgba(15,23,42,0.13)]',
-                active ? 'border-[#2563eb] ring-2 ring-[#2563eb26]' : 'border-white/70',
+                'flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border bg-white px-3 py-2.5 text-left no-underline shadow-sm transition hover:border-[#94a3b8]',
+                active ? 'border-[#2563eb] bg-[#eff6ff]' : 'border-[#cbd5e1]',
             )}
         >
-            <div className="text-[0.9rem] font-bold uppercase tracking-[0.018em] text-[#6b7280]">{label}</div>
+            <div className="text-[0.78rem] font-semibold text-[#475569]">{label}</div>
             <div className="flex items-center justify-between gap-2.5">
                 <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
-                <div className={cn('grid h-[32px] w-[32px] place-items-center rounded-lg bg-gradient-to-br text-[0.95rem] text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)]', iconTone)}>
+                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border border-[#cbd5e1] bg-[#f8fafc] text-[0.86rem]', trendTone)}>
                     {icon}
                 </div>
             </div>
@@ -201,10 +205,10 @@ function FilterPill({ label, href, active }: { label: string; href: string; acti
             href={href}
             preserveScroll
             className={cn(
-                'min-h-9 rounded-full border px-3.5 py-2 text-center text-[0.76rem] font-black uppercase tracking-[0.04em] no-underline transition',
+                'min-h-8 rounded-md border px-3 py-1.5 text-center text-[0.76rem] font-bold no-underline transition',
                 active
-                    ? 'border-[#2563eb] bg-[#2563eb] text-white shadow-[0_8px_18px_rgba(37,99,235,0.22)]'
-                    : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
+                    ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                    : 'border-[#cbd5e1] bg-white text-[#334155] hover:border-[#94a3b8] hover:bg-[#f8fafc]',
             )}
         >
             {label}
@@ -311,6 +315,58 @@ export default function WorkbenchPage({
         );
     };
 
+    const isPhoneCategory = (value: string): boolean => {
+        const category = serviceCategories.find((item) => String(item.value) === String(value));
+
+        return category?.label.trim().toLowerCase() === 'celulares';
+    };
+
+    const modelWithBrand = (brand: string, currentModel: string): string => {
+        const trimmedBrand = brand.trim().toUpperCase();
+        const trimmedModel = currentModel.trimStart();
+
+        if (trimmedBrand === '') {
+            return currentModel;
+        }
+
+        const brandPattern = new RegExp(`^(${phoneBrandOptions.join('|')})\\b\\s*`, 'i');
+        const modelWithoutBrand = trimmedModel.replace(brandPattern, '');
+
+        return modelWithoutBrand === '' ? `${trimmedBrand} ` : `${trimmedBrand} ${modelWithoutBrand}`;
+    };
+
+    const partSearchFromModel = (model: string): string => {
+        const trimmedModel = model.trimStart();
+        const brandPattern = new RegExp(`^(${phoneBrandOptions.join('|')})\\b\\s*`, 'i');
+
+        return trimmedModel.replace(brandPattern, '').trim();
+    };
+
+    const changeJobModel = (index: number, value: string): void => {
+        updateJob(index, (current) => ({ ...current, modelo: value }));
+
+        if (isPhoneCategory(createForm.data.jobs[index]?.categorias_reparacion ?? '')) {
+            setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(value) }));
+        }
+    };
+
+    const changeJobCategory = (index: number, value: string): void => {
+        updateJob(index, (current) => ({
+            ...current,
+            categorias_reparacion: value,
+            marca: isPhoneCategory(value) ? current.marca : '',
+        }));
+    };
+
+    const changeJobBrand = (index: number, value: string): void => {
+        updateJob(index, (current) => ({
+            ...current,
+            marca: value,
+            modelo: modelWithBrand(value, current.modelo),
+        }));
+        setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(modelWithBrand(value, createForm.data.jobs[index]?.modelo ?? '')) }));
+    };
+
     const addJob = (job?: RepairJobFormData): void => {
         createForm.setData('jobs', [...createForm.data.jobs, job ? { ...job, images: null } : createEmptyJob(states[0] ?? 'PENDIENTE')]);
     };
@@ -411,14 +467,14 @@ export default function WorkbenchPage({
     );
 
     const formatMoney = (value: number): string => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-    const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-black text-[#334155]';
+    const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-semibold text-[#334155]';
     const compactInputClass = ui.repairDenseInput;
     const compactTextareaClass = ui.repairDenseTextarea;
-    const fieldPanelBase = 'min-w-0 rounded-[16px] border p-3 shadow-[0_8px_20px_rgba(15,23,42,0.045)]';
-    const fieldPanelBlue = `${fieldPanelBase} border-[#bfdbfe] bg-[#f8fbff]`;
-    const fieldPanelGreen = `${fieldPanelBase} border-[#bbf7d0] bg-[#f4fdf8]`;
-    const fieldPanelAmber = `${fieldPanelBase} border-[#fed7aa] bg-[#fff8ed]`;
-    const fieldPanelPurple = `${fieldPanelBase} border-[#ddd6fe] bg-[#f7f3ff]`;
+    const fieldPanelBase = 'min-w-0 rounded-lg border p-3';
+    const fieldPanelBlue = `${fieldPanelBase} border-[#cbd5e1] bg-white`;
+    const fieldPanelGreen = `${fieldPanelBase} border-[#bbf7d0] bg-[#f0fdf4]`;
+    const fieldPanelAmber = `${fieldPanelBase} border-[#fed7aa] bg-[#fff7ed]`;
+    const fieldPanelPurple = `${fieldPanelBase} border-[#ddd6fe] bg-[#f5f3ff]`;
 
     const failureTemplates = [
         { label: 'No enciende', value: 'No enciende.' },
@@ -567,7 +623,7 @@ export default function WorkbenchPage({
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
-            <section className="sticky top-2 z-20 grid gap-2 rounded-[18px] border border-white/70 bg-white/95 p-2 shadow-[0_10px_24px_rgba(15,23,42,0.10)] backdrop-blur-md xl:hidden">
+            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 shadow-sm xl:hidden">
                 <form
                     className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
                     onSubmit={(event) => {
@@ -576,34 +632,34 @@ export default function WorkbenchPage({
                     }}
                 >
                     <input
-                        className="min-h-10 min-w-0 rounded-full border border-[#bfdbfe] bg-white px-3 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="min-h-10 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         placeholder="Buscar"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
-                    <button type="submit" className="grid min-h-10 place-items-center rounded-full bg-[#2563eb] text-white shadow-[0_8px_18px_rgba(37,99,235,0.22)]" aria-label="Buscar">
+                    <button type="submit" className="grid min-h-10 place-items-center rounded-md bg-[#2563eb] text-white" aria-label="Buscar">
                         <FaSearch aria-hidden="true" />
                     </button>
-                    <button type="button" className="relative grid min-h-10 place-items-center rounded-full border border-[#bfdbfe] bg-white text-[#1d4ed8]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
+                    <button type="button" className="relative grid min-h-10 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
                         <FaFilter aria-hidden="true" />
-                        {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#ef4444] px-1 text-[0.65rem] font-black text-white">{activeMobileFilters}</span> : null}
+                        {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-md bg-[#ef4444] px-1 text-[0.65rem] font-bold text-white">{activeMobileFilters}</span> : null}
                     </button>
                 </form>
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-black uppercase text-[#334155]">
-                    <span className="rounded-full bg-[#eff6ff] px-2 py-1">Todas {summary.active}</span>
-                    <span className="rounded-full bg-[#fff7ed] px-2 py-1">Pend. {summary.pending}</span>
-                    <span className="rounded-full bg-[#ecfdf5] px-2 py-1">Listas {summary.ready}</span>
-                    <span className="rounded-full bg-[#fff1f2] px-2 py-1">Venc. {summary.overdue}</span>
-                    <span className="rounded-full bg-[#fefce8] px-2 py-1">Hoy {summary.today}</span>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-bold text-[#334155]">
+                    <span className="rounded-md bg-[#eff6ff] px-2 py-1">Todas {summary.active}</span>
+                    <span className="rounded-md bg-[#fff7ed] px-2 py-1">Pend. {summary.pending}</span>
+                    <span className="rounded-md bg-[#ecfdf5] px-2 py-1">Listas {summary.ready}</span>
+                    <span className="rounded-md bg-[#fff1f2] px-2 py-1">Venc. {summary.overdue}</span>
+                    <span className="rounded-md bg-[#fefce8] px-2 py-1">Hoy {summary.today}</span>
                 </div>
             </section>
             ) : null}
 
             {isConsultas ? (
-            <section className="hidden rounded-[22px] border border-white/70 bg-white/92 px-3.5 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.08)] backdrop-blur-md xl:block">
+            <section className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 shadow-sm xl:block">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-black uppercase tracking-[0.08em] text-[#64748b]">Periodo:</span>
+                        <span className="mr-1 text-[0.78rem] font-semibold text-[#475569]">Periodo</span>
                         {periodOptions.map((option) => (
                             <FilterPill
                                 key={option.value}
@@ -621,7 +677,7 @@ export default function WorkbenchPage({
                         ))}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-black uppercase tracking-[0.08em] text-[#64748b]">Categorias:</span>
+                        <span className="mr-1 text-[0.78rem] font-semibold text-[#475569]">Categorias</span>
                         {categoryOptions.map((option) => (
                             <FilterPill
                                 key={option.value || 'all'}
@@ -637,34 +693,34 @@ export default function WorkbenchPage({
 
             {isConsultas && summaryRange === 'custom' ? (
                 <form
-                    className="hidden gap-2 rounded-[18px] border border-[#bfdbfe] bg-white/90 p-3 shadow-[0_8px_20px_rgba(15,23,42,0.06)] md:grid-cols-[180px_180px_auto] md:items-end xl:grid"
+                    className="hidden gap-2 rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-sm md:grid-cols-[180px_180px_auto] md:items-end xl:grid"
                     onSubmit={(event) => {
                         event.preventDefault();
                         filtersForm.get(route('repairs.workbench'), { preserveScroll: true });
                     }}
                 >
                     <input type="hidden" name="summary_range" value="custom" />
-                    <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                    <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                         Desde
                         <input
-                            className="min-h-10 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                            className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                             type="date"
                             value={filtersForm.data.summary_from}
                             onChange={(event) => filtersForm.setData('summary_from', event.target.value)}
                             required
                         />
                     </label>
-                    <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                    <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                         Hasta
                         <input
-                            className="min-h-10 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                            className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-bold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                             type="date"
                             value={filtersForm.data.summary_to}
                             onChange={(event) => filtersForm.setData('summary_to', event.target.value)}
                             required
                         />
                     </label>
-                    <button className="min-h-10 rounded-full border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-black text-white shadow-[0_10px_20px_rgba(37,99,235,0.18)] transition hover:bg-[#1d4ed8]" type="submit">
+                    <button className="min-h-10 rounded-md border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]" type="submit">
                         Aplicar
                     </button>
                 </form>
@@ -694,7 +750,7 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <form
-                className="hidden rounded-[22px] border border-white/60 bg-white/90 px-4 py-3 shadow-[0_10px_26px_rgba(15,23,42,0.08)] backdrop-blur-md xl:block"
+                className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-3 shadow-sm xl:block"
                 onSubmit={(event) => {
                     event.preventDefault();
                     submitCleanSearch();
@@ -703,21 +759,21 @@ export default function WorkbenchPage({
                 <div className="grid gap-2 md:grid-cols-[minmax(16rem,0.85fr)_200px_180px_160px_auto] md:items-center">
                     <div className="relative min-w-0">
                     <input
-                        className="min-h-11 w-full rounded-full border border-[rgba(37,99,235,0.22)] bg-white py-2 pl-4 pr-11 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="min-h-10 w-full rounded-md border border-[#cbd5e1] bg-white py-2 pl-3 pr-10 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         placeholder="Buscar por cliente, ticket, modelo, descripción, contacto o DNI"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
                         <button
                             type="submit"
-                            className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-[#2563eb] transition hover:bg-[#eff6ff]"
+                            className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-[#2563eb] transition hover:bg-[#eff6ff]"
                             aria-label="Buscar"
                         >
                             <FaSearch aria-hidden="true" />
                         </button>
                     </div>
                     <select
-                        className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         value={filtersForm.data.estado}
                         onChange={(event) => {
                             filtersForm.setData('estado', event.target.value);
@@ -732,7 +788,7 @@ export default function WorkbenchPage({
                         ))}
                     </select>
                     <select
-                        className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         value={filtersForm.data.ordenar_por}
                         onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}
                         aria-label="Ordenar por"
@@ -746,7 +802,7 @@ export default function WorkbenchPage({
                         <option value="saldo">Ordenar: saldo</option>
                     </select>
                     <select
-                        className="min-h-11 rounded-full border border-[rgba(37,99,235,0.22)] bg-white px-4 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         value={filtersForm.data.direccion}
                         onChange={(event) => filtersForm.setData('direccion', event.target.value)}
                         aria-label="Direccion del orden"
@@ -754,7 +810,7 @@ export default function WorkbenchPage({
                         <option value="desc">DESCENDENTE</option>
                         <option value="asc">ASCENDENTE</option>
                     </select>
-                    <button className="min-h-11 rounded-full border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-bold text-white shadow-[0_10px_20px_rgba(37,99,235,0.18)] transition hover:bg-[#1d4ed8]" type="submit">
+                    <button className="min-h-10 rounded-md border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]" type="submit">
                         Buscar
                     </button>
                 </div>
@@ -764,7 +820,7 @@ export default function WorkbenchPage({
             {isConsultas && mobileFiltersOpen ? (
                 <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 xl:hidden" role="dialog" aria-modal="true">
                     <form
-                        className="max-h-[86vh] w-full overflow-y-auto rounded-t-[24px] bg-white p-4 shadow-[0_-18px_46px_rgba(15,23,42,0.24)]"
+                        className="max-h-[86vh] w-full overflow-y-auto rounded-t-lg bg-white p-4 shadow-lg"
                         onSubmit={(event) => {
                             event.preventDefault();
                             filtersForm.get(route('repairs.workbench'), {
@@ -774,14 +830,14 @@ export default function WorkbenchPage({
                         }}
                     >
                         <div className="mb-3 flex items-center justify-between gap-3">
-                            <h2 className="text-base font-black uppercase tracking-[0.08em] text-[#0f172a]">Filtros</h2>
-                            <button type="button" className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-[#334155]" onClick={() => setMobileFiltersOpen(false)} aria-label="Cerrar filtros">
+                            <h2 className="text-base font-black text-[#0f172a]">Filtros</h2>
+                            <button type="button" className="grid h-9 w-9 place-items-center rounded-md bg-slate-100 text-[#334155]" onClick={() => setMobileFiltersOpen(false)} aria-label="Cerrar filtros">
                                 <FaTimes aria-hidden="true" />
                             </button>
                         </div>
 
                         <div className="grid gap-3">
-                            <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                            <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                 Estado
                                 <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.estado} onChange={(event) => { filtersForm.setData('estado', event.target.value); filtersForm.setData('prioridad', ''); }}>
                                     <option value="">Todos los estados</option>
@@ -789,7 +845,7 @@ export default function WorkbenchPage({
                                 </select>
                             </label>
 
-                            <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                            <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                 Prioridad
                                 <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.prioridad} onChange={(event) => { filtersForm.setData('prioridad', event.target.value); filtersForm.setData('estado', ''); }}>
                                     <option value="">Todas</option>
@@ -799,14 +855,14 @@ export default function WorkbenchPage({
                             </label>
 
                             <div className="grid grid-cols-2 gap-3">
-                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Categoria
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.categoria_filter} onChange={(event) => filtersForm.setData('categoria_filter', event.target.value)}>
                                         {categoryOptions.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </label>
 
-                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Periodo
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.summary_range} onChange={(event) => filtersForm.setData('summary_range', event.target.value)}>
                                         {periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
@@ -816,11 +872,11 @@ export default function WorkbenchPage({
 
                             {filtersForm.data.summary_range === 'custom' ? (
                                 <div className="grid grid-cols-2 gap-3">
-                                    <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                    <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                         Desde
                                         <input className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" type="date" value={filtersForm.data.summary_from} onChange={(event) => filtersForm.setData('summary_from', event.target.value)} />
                                     </label>
-                                    <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                    <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                         Hasta
                                         <input className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" type="date" value={filtersForm.data.summary_to} onChange={(event) => filtersForm.setData('summary_to', event.target.value)} />
                                     </label>
@@ -828,7 +884,7 @@ export default function WorkbenchPage({
                             ) : null}
 
                             <div className="grid grid-cols-2 gap-3">
-                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Ordenar
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.ordenar_por} onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}>
                                         <option value="ticket">Ticket</option>
@@ -840,7 +896,7 @@ export default function WorkbenchPage({
                                         <option value="saldo">Saldo</option>
                                     </select>
                                 </label>
-                                <label className="grid gap-1 text-xs font-black uppercase tracking-[0.06em] text-[#475569]">
+                                <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Direccion
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.direccion} onChange={(event) => filtersForm.setData('direccion', event.target.value)}>
                                         <option value="desc">DESCENDENTE</option>
@@ -851,10 +907,10 @@ export default function WorkbenchPage({
                         </div>
 
                         <div className="sticky bottom-0 mt-4 grid grid-cols-[1fr_1.2fr] gap-2 bg-white pt-3">
-                            <Link href={route('repairs.workbench')} className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#bfdbfe] bg-white px-4 text-sm font-black text-[#1d4ed8] no-underline">
+                            <Link href={route('repairs.workbench')} className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-[#334155] no-underline">
                                 Limpiar
                             </Link>
-                            <button type="submit" className="min-h-11 rounded-full bg-[#2563eb] px-4 text-sm font-black text-white shadow-[0_10px_20px_rgba(37,99,235,0.20)]">
+                            <button type="submit" className="min-h-11 rounded-md bg-[#2563eb] px-4 text-sm font-bold text-white">
                                 Aplicar
                             </button>
                         </div>
@@ -865,25 +921,25 @@ export default function WorkbenchPage({
             {isIngreso ? (
             <>
             <details className={cn(ui.repairShell, 'group mx-auto w-full max-w-6xl')} open>
-                <summary className="cursor-pointer list-none rounded-[18px] border border-[#cfe2ff] bg-[linear-gradient(180deg,#ffffff_0%,#eef6ff_100%)] px-4 py-3 text-sm font-black uppercase tracking-[0.08em] text-[#1d4ed8] transition hover:border-[#93c5fd] md:px-5">
+                <summary className="cursor-pointer list-none rounded-lg border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] transition hover:bg-[#f8fafc] md:px-5">
                     <span className="inline-flex items-center gap-2">
                         <FaPlusCircle aria-hidden="true" />
                         Nueva orden de reparacion
                     </span>
                 </summary>
                 <div className="mx-auto grid w-full max-w-5xl gap-3 pt-3 md:gap-4">
-                    <section className="rounded-[20px] border border-[#dbeafe] bg-[radial-gradient(circle_at_10%_10%,rgba(59,130,246,0.12),transparent_35%),linear-gradient(135deg,#f4f9ff,#ffffff)] p-4 shadow-[0_12px_28px_rgba(37,99,235,0.08)]">
+                    <section className="rounded-lg border border-[#cbd5e1] bg-white p-4 shadow-sm">
                         <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center lg:gap-4">
                             <div>
-                                <div className="mb-1.5 inline-flex items-center gap-2 rounded-full bg-white px-2.5 py-1 text-[0.68rem] font-black uppercase tracking-[0.08em] text-[#2563eb] md:mb-2 md:px-3 md:text-xs">
+                                <div className="mb-1.5 inline-flex items-center gap-2 text-[0.78rem] font-semibold text-[#475569] md:mb-2 md:text-xs">
                                     <FaClipboardList aria-hidden="true" /> Panel de ingreso
                                 </div>
                                 <h2 className="text-xl font-black tracking-tight text-[#0f172a] md:text-2xl">Nueva orden de reparacion</h2>
                                 <p className="mt-1 max-w-3xl text-xs font-semibold text-[#64748b] md:text-sm">Carga al cliente una sola vez y suma una o varias reparaciones dentro de la misma orden.</p>
                             </div>
-                            <div className="flex items-center justify-between gap-3 rounded-[14px] border border-[#bfdbfe] bg-white px-3 py-2 sm:justify-start md:rounded-[18px] md:px-4 md:py-3">
+                            <div className="flex items-center justify-between gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 sm:justify-start md:px-4 md:py-3">
                                 <div>
-                                    <div className="text-[0.68rem] font-black uppercase tracking-[0.08em] text-[#64748b] md:text-xs">Orden actual</div>
+                                    <div className="text-[0.78rem] font-semibold text-[#64748b] md:text-xs">Orden actual</div>
                                     <div className="text-xl font-black text-[#0f172a] md:text-2xl">#{createForm.data.id_orden || nextOrderId}</div>
                                 </div>
                                 <FaReceipt className="text-2xl text-[#16a34a] md:text-3xl" aria-hidden="true" />
@@ -896,7 +952,7 @@ export default function WorkbenchPage({
                     </section>
 
                     <form
-                        className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 rounded-[24px] border border-[#c8dcf6] bg-[linear-gradient(180deg,#ffffff_0%,#f6faff_100%)] p-4 shadow-[0_18px_42px_rgba(15,23,42,0.10)] md:p-5 xl:p-6"
+                        className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 rounded-lg border border-[#cbd5e1] bg-white p-4 shadow-sm md:p-5 xl:p-6"
                         onSubmit={(event) => {
                             event.preventDefault();
                             createForm.post(route('repairs.orders.store'), {
@@ -922,17 +978,17 @@ export default function WorkbenchPage({
                             </div>
                         </div>
 
-                        <div className="grid items-start gap-3 rounded-[20px] border border-[#bfdbfe] bg-[linear-gradient(180deg,#f8fbff,#eef6ff)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] md:grid-cols-2 md:p-4 xl:grid-cols-[10rem_minmax(18rem,1fr)_12rem_14rem]">
+                        <div className="grid items-start gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3 md:grid-cols-2 md:p-4 xl:grid-cols-[10rem_minmax(18rem,1fr)_12rem_14rem]">
                             <label className={repairLabelClass}>ID de orden *<input className={compactInputClass} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required /><span className="text-xs font-semibold text-[#64748b]">Editable si esta libre.</span></label>
                             <label className={repairLabelClass}>Nombre del cliente *<input className={compactInputClass} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required /></label>
                             <label className={repairLabelClass}>DNI<div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => createForm.setData('dni', event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
                             <label className={repairLabelClass}>Telefono / contacto<input className={compactInputClass} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Si queda vacio se guarda sin contacto.</span></label>
-                            {lookupFeedback !== '' ? <p className="md:col-span-4 rounded-xl bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
+                            {lookupFeedback !== '' ? <p className="md:col-span-4 rounded-md bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
                         </div>
 
                         <div className="grid gap-4">
                             {createForm.data.jobs.map((job, index) => (
-                                <article key={`job-v2-${index}`} className={cn('rounded-[20px] border bg-white p-3 shadow-[0_12px_28px_rgba(15,23,42,0.08)] md:p-4', Number(job.monto || 0) <= 0 ? 'border-[#fed7aa]' : Number(job.senia || 0) > 0 ? 'border-[#bbf7d0]' : 'border-[#bfdbfe]')}>
+                                <article key={`job-v2-${index}`} className={cn('rounded-lg border bg-white p-3 shadow-sm md:p-4', Number(job.monto || 0) <= 0 ? 'border-[#fed7aa]' : Number(job.senia || 0) > 0 ? 'border-[#bbf7d0]' : 'border-[#cbd5e1]')}>
                                     <div className="mb-3 flex flex-wrap items-start justify-between gap-2 md:mb-4 md:gap-3">
                                         <div className={ui.cardTitleWrap}>
                                             <p className={ui.eyebrow}>Reparacion activa</p>
@@ -949,10 +1005,25 @@ export default function WorkbenchPage({
 
                                     <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
                                         <div className={fieldPanelPurple}>
-                                            <label className={repairLabelClass}>Categoria<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => updateJob(index, (current) => ({ ...current, categorias_reparacion: event.target.value }))}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
+                                            <label className={repairLabelClass}>Categoria<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
                                         </div>
+                                        {isPhoneCategory(job.categorias_reparacion) ? (
+                                            <div className={fieldPanelPurple}>
+                                                <label className={repairLabelClass}>
+                                                    Marca
+                                                    <select className={compactInputClass} value={job.marca} onChange={(event) => changeJobBrand(index, event.target.value)}>
+                                                        <option value="">Elegir marca...</option>
+                                                        {phoneBrandOptions.map((brand) => (
+                                                            <option key={brand} value={brand}>
+                                                                {brand}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                            </div>
+                                        ) : null}
                                         <div className={fieldPanelBlue}>
-                                            <label className={repairLabelClass}>Modelo / equipo<input className={compactInputClass} value={job.modelo} onChange={(event) => updateJob(index, (current) => ({ ...current, modelo: event.target.value }))} /></label>
+                                            <label className={repairLabelClass}>Modelo / equipo<input className={compactInputClass} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} /></label>
                                         </div>
                                         <div className={cn(fieldPanelBlue, 'md:col-span-2')}>
                                             <label className={repairLabelClass}>Tipo de servicio / descripcion de la falla *</label>
@@ -979,10 +1050,10 @@ export default function WorkbenchPage({
                                         <div className={fieldPanelPurple}>
                                             <label className={repairLabelClass}>Observaciones<textarea className={compactTextareaClass} rows={4} value={job.observaciones} onFocus={() => { if (job.observaciones.trim().toLowerCase() === 'sin observaciones') updateJob(index, (current) => ({ ...current, observaciones: '' })); }} onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))} /></label>
                                         </div>
-                                        <div className="grid min-w-0 gap-3 rounded-[16px] border border-dashed border-[#7cc7ff] bg-[#f2f9ff] p-3 shadow-[0_8px_20px_rgba(15,23,42,0.045)]">
+                                        <div className="grid min-w-0 gap-3 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] p-3">
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <strong className="text-sm text-[#0f172a]">Imagenes ({imagePreviews[index]?.length ?? 0}/2)</strong>
-                                                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{imagePreviews[index]?.length ?? 0}/2</span>
+                                                <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{imagePreviews[index]?.length ?? 0}/2</span>
                                             </div>
                                             <div className="grid gap-2 sm:grid-cols-2">
                                                 <label className={buttonClass('primary', 'sm')}><FaCamera aria-hidden="true" /> Sacar foto<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => setJobImages(index, event.target.files)} /></label>
@@ -995,7 +1066,7 @@ export default function WorkbenchPage({
                                                         <div key={`${src}-${previewIndex}`} className="relative overflow-hidden rounded-lg border border-[#bfdbfe] bg-white">
                                                             <img className="aspect-[4/3] w-full object-cover" src={src} alt={`Vista previa ${previewIndex + 1}`} />
                                                             <span className="absolute bottom-1 left-1 rounded bg-slate-950/70 px-1.5 py-0.5 text-[0.65rem] font-bold text-white">Nueva {previewIndex + 1}</span>
-                                                            <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-[#ef4444] text-xs font-black text-white shadow-md" onClick={() => removeJobImage(index, previewIndex)} aria-label={`Quitar imagen ${previewIndex + 1}`}>
+                                                            <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-[#ef4444] text-xs font-bold text-white" onClick={() => removeJobImage(index, previewIndex)} aria-label={`Quitar imagen ${previewIndex + 1}`}>
                                                                 <FaTimes aria-hidden="true" />
                                                             </button>
                                                         </div>
@@ -1008,7 +1079,7 @@ export default function WorkbenchPage({
                                         <div className={cn(fieldPanelAmber, 'md:col-span-2')}>
                                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                                                 <span className="text-sm font-black text-[#334155]">Repuesto a pedir</span>
-                                                <label className="inline-flex items-center gap-2 rounded-full border border-[#f59e0b33] bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.05em] text-[#92400e]">
+                                                <label className="inline-flex items-center gap-2 rounded-md border border-[#f59e0b33] bg-white px-3 py-1 text-xs font-bold text-[#92400e]">
                                                     <input type="checkbox" checked={job.pedir_repuesto} onChange={(event) => togglePartRequest(index, event.target.checked)} />
                                                     Mandar a pedidos
                                                 </label>
@@ -1036,7 +1107,7 @@ export default function WorkbenchPage({
                                                             key={part.id}
                                                             type="button"
                                                             className={cn(
-                                                                'grid gap-1 rounded-xl border px-3 py-2 text-left text-sm transition hover:-translate-y-px',
+                                                                'grid gap-1 rounded-lg border px-3 py-2 text-left text-sm transition hover:bg-[#f8fafc]',
                                                                 job.inventory_part_id === String(part.id)
                                                                     ? 'border-[#16a34a] bg-[#dcfce7] text-[#14532d]'
                                                                     : 'border-[#fed7aa] bg-white text-[#334155] hover:bg-[#fff7ed]',
@@ -1049,14 +1120,14 @@ export default function WorkbenchPage({
                                                     ))}
                                                 </div>
                                             ) : (partSearches[index] ?? job.repuesto).trim().length >= 2 ? (
-                                                <div className="mt-2 rounded-xl border border-dashed border-[#fed7aa] bg-white px-3 py-2 text-sm font-bold text-[#92400e]">
+                                                <div className="mt-2 rounded-lg border border-dashed border-[#fed7aa] bg-white px-3 py-2 text-sm font-bold text-[#92400e]">
                                                     No hay coincidencias en cajas. Si hace falta pedirlo, marca Mandar a pedidos.
                                                 </div>
                                             ) : null}
                                             {job.inventory_part_id !== '' ? (
-                                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
+                                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
                                                     <span>Asignado desde caja. Al guardar se descuenta del inventario.</span>
-                                                    <button type="button" className="text-xs font-black uppercase tracking-[0.05em] text-[#15803d] underline-offset-2 hover:underline" onClick={() => clearInventoryPart(index)}>
+                                                    <button type="button" className="text-xs font-bold text-[#15803d] underline-offset-2 hover:underline" onClick={() => clearInventoryPart(index)}>
                                                         Quitar seleccion
                                                     </button>
                                                 </div>
@@ -1075,11 +1146,11 @@ export default function WorkbenchPage({
                             ))}
                         </div>
 
-                        <section className="grid gap-3 rounded-[20px] border border-[#c8dcf6] bg-[linear-gradient(135deg,#f8fbff_0%,#edf6ff_100%)] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.08),inset_0_1px_0_rgba(255,255,255,0.9)] md:grid-cols-[repeat(4,minmax(0,1fr))]">
-                            <div className="rounded-[16px] border border-white/80 bg-white/88 p-3"><span className="text-xs font-black uppercase tracking-[0.08em] text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
-                            <div className="rounded-[16px] border border-white/80 bg-white/88 p-3"><span className="text-xs font-black uppercase tracking-[0.08em] text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong></div>
-                            <div className="rounded-[16px] border border-white/80 bg-white/88 p-3"><span className="text-xs font-black uppercase tracking-[0.08em] text-[#64748b]">Senas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
-                            <div className="rounded-[16px] border border-white/80 bg-white/88 p-3"><span className="text-xs font-black uppercase tracking-[0.08em] text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
+                        <section className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4 md:grid-cols-[repeat(4,minmax(0,1fr))]">
+                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
+                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong></div>
+                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Senas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
+                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
                             <div className="hidden gap-2 border-t border-[#dbeafe] pt-3 md:col-span-4 lg:grid lg:grid-cols-[auto_auto] lg:justify-end">
                                 <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Agregar reparacion</button>
                                 <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}><FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
@@ -1090,18 +1161,18 @@ export default function WorkbenchPage({
                             <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Agregar reparacion</button>
                             <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}><FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
                         </div>
-                        {duplicateNotice !== '' ? <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full bg-[#111827] px-4 py-2 text-sm font-black text-white shadow-xl">{duplicateNotice}</div> : null}
+                        {duplicateNotice !== '' ? <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-[#111827] px-4 py-2 text-sm font-bold text-white shadow-lg">{duplicateNotice}</div> : null}
                     </form>
                 </div>
             </details>
 
             <details className="hidden">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-extrabold uppercase tracking-[0.08em] text-[#1d4ed8]">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-[#334155]">
                     Nueva orden
                 </summary>
                 <div className="px-4 pb-4">
                     <form
-                        className="grid gap-4 rounded-[18px] border border-slate-200 bg-white/95 p-4"
+                        className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4"
                         onSubmit={(event) => {
                             event.preventDefault();
                             createForm.post(route('repairs.orders.store'), {
@@ -1185,7 +1256,7 @@ export default function WorkbenchPage({
                                         <select
                                             className={ui.input}
                                             value={job.categorias_reparacion}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, categorias_reparacion: event.target.value }))}
+                                            onChange={(event) => changeJobCategory(index, event.target.value)}
                                         >
                                             {serviceCategories.map((category) => (
                                                 <option key={category.value} value={category.value}>
@@ -1193,11 +1264,21 @@ export default function WorkbenchPage({
                                                 </option>
                                             ))}
                                         </select>
+                                        {isPhoneCategory(job.categorias_reparacion) ? (
+                                            <select className={ui.input} value={job.marca} onChange={(event) => changeJobBrand(index, event.target.value)}>
+                                                <option value="">Marca</option>
+                                                {phoneBrandOptions.map((brand) => (
+                                                    <option key={brand} value={brand}>
+                                                        {brand}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : null}
                                         <input
                                             className={ui.input}
                                             placeholder="Modelo"
                                             value={job.modelo}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, modelo: event.target.value }))}
+                                            onChange={(event) => changeJobModel(index, event.target.value)}
                                         />
                                         <textarea
                                             className={`${ui.textarea} ${ui.repairFull}`}
@@ -1297,9 +1378,9 @@ export default function WorkbenchPage({
                     <span>Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}.</span>
                     <span>Consulta técnica</span>
                 </div>
-                <div className="hidden overflow-x-auto rounded-[16px] border border-[#cbd7e6] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.08)] xl:block">
+                <div className="hidden overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
                     <div className="min-w-[1320px]">
-                        <div className={cn('grid min-w-[1320px] items-stretch divide-x divide-blue-400/60 bg-[linear-gradient(180deg,#1774f5,#0d56c8)] text-[0.62rem] font-extrabold uppercase tracking-[0.015em] text-white [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
+                        <div className={cn('grid min-w-[1320px] items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#f8fafc] text-[0.62rem] font-bold text-[#475569] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
                             <span className="text-center">ID</span>
                             <span>Cliente</span>
                             <span>DNI</span>
@@ -1347,7 +1428,7 @@ export default function WorkbenchPage({
                             allowAddRepair
                         />
                     ))}
-                    {tickets.length === 0 ? <div className="rounded-[22px] border border-white/70 bg-white/90 p-6 text-center font-semibold text-[#475569] shadow-[0_10px_26px_rgba(15,23,42,0.08)]">No hay tickets activos para los filtros actuales.</div> : null}
+                    {tickets.length === 0 ? <div className="rounded-lg border border-[#cbd5e1] bg-white p-6 text-center font-semibold text-[#475569] shadow-sm">No hay tickets activos para los filtros actuales.</div> : null}
                 </div>
             </section>
             ) : null}

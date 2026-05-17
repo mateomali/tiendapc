@@ -127,9 +127,9 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                     </div>
                 </div>
 
-                <div className="hidden overflow-x-auto rounded-[16px] border border-[#cbd7e6] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.08)] xl:block">
+                <div className="hidden overflow-x-auto rounded-[16px] border border-[#dbe7f6] bg-white shadow-[0_14px_32px_rgba(15,23,42,0.09)] ring-1 ring-white/70 xl:block">
                     <div className="min-w-[1320px]">
-                        <div className={cn('grid min-w-[1320px] items-stretch divide-x divide-emerald-400/60 bg-[linear-gradient(180deg,#059669,#047857)] text-[0.62rem] font-extrabold uppercase tracking-[0.015em] text-white [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
+                        <div className={cn('grid min-w-[1320px] items-stretch divide-x divide-emerald-300/45 bg-[linear-gradient(180deg,#047857,#065f46)] text-[0.62rem] font-extrabold uppercase tracking-[0.015em] text-white [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
                             <span className="text-center">ID</span>
                             <span>Cliente</span>
                             <span>DNI</span>

@@ -11,6 +11,9 @@ class RepairPart extends Model
         'model',
         'box',
         'sort_order',
+        'reserved_order_id',
+        'reserved_repair_number',
+        'reserved_at',
     ];
 
     protected function casts(): array
@@ -18,6 +21,9 @@ class RepairPart extends Model
         return [
             'quantity' => 'integer',
             'sort_order' => 'integer',
+            'reserved_order_id' => 'integer',
+            'reserved_repair_number' => 'integer',
+            'reserved_at' => 'datetime',
         ];
     }
 }

@@ -29,16 +29,16 @@ interface LightboxState {
 }
 
 const pageShellClass =
-    'min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(74,172,255,0.26),transparent_26%),radial-gradient(circle_at_top_left,rgba(38,82,180,0.14),transparent_24%),linear-gradient(180deg,#eff5ff_0%,#dce9ff_22%,#d4e3ff_100%)] px-4 py-10';
-const cardClass = `${surfaceClass} mx-auto grid w-full max-w-5xl justify-items-center gap-6 border-[#b8cff2] bg-white px-5 py-6 text-[#0f2348] shadow-[0_24px_60px_rgba(14,48,105,0.16)] md:gap-7 md:p-8`;
+    'min-h-screen bg-[linear-gradient(180deg,#eef5ff_0%,#f8fbff_42%,#e4efff_100%)] px-4 py-8 md:py-10';
+const cardClass = `${surfaceClass} mx-auto grid w-full max-w-5xl justify-items-center gap-6 border-[#c7d7ed] bg-white px-5 py-6 text-[#0f2348] shadow-[0_24px_58px_rgba(14,48,105,0.14)] md:gap-7 md:p-8`;
 const iconBaseClass = 'text-[#174ea6]';
 const inputClass =
-    'min-h-12 w-full rounded-2xl border border-sky-200/90 bg-white/95 px-4 py-3 text-sm font-medium text-ink-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10';
+    'min-h-12 w-full rounded-xl border border-[#c7d7ed] bg-white px-4 py-3 text-sm font-bold text-ink-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10';
 const fieldClass = 'grid gap-2';
 const fieldLabelClass = 'whitespace-nowrap text-sm font-black uppercase tracking-[0.12em] text-[#17427f]';
 const repairLookupFormClass =
-    'mx-auto grid w-full max-w-xl gap-4 rounded-[1.35rem] border border-[#b8d7ff]/80 bg-[linear-gradient(180deg,#ffffff_0%,#f4f9ff_100%)] p-5 shadow-[0_16px_32px_rgba(18,58,132,0.11),0_0_0_3px_rgba(184,215,255,0.14)] sm:grid-cols-[minmax(0,10.5rem)_minmax(0,12rem)] sm:items-end sm:justify-center md:w-fit md:max-w-none md:grid-cols-[10.5rem_12rem_3rem] md:p-5';
-const actionButtonClass = buttonClass('primary', 'default', 'min-h-12 w-full rounded-2xl px-4 sm:col-span-2 md:col-span-1 md:w-12 md:min-w-12 md:p-0 md:self-end');
+    'mx-auto grid w-full max-w-xl gap-4 rounded-[1.1rem] border border-[#c7d7ed] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] p-5 shadow-[0_16px_32px_rgba(18,58,132,0.10)] sm:grid-cols-[minmax(0,10.5rem)_minmax(0,12rem)] sm:items-end sm:justify-center md:w-fit md:max-w-none md:grid-cols-[10.5rem_12rem_3rem] md:p-5';
+const actionButtonClass = buttonClass('primary', 'default', 'min-h-12 w-full rounded-xl px-4 sm:col-span-2 md:col-span-1 md:w-12 md:min-w-12 md:p-0 md:self-end');
 
 const variantStyles: Record<string, string> = {
     success: 'border-emerald-300 bg-emerald-50 text-emerald-950',
@@ -58,7 +58,7 @@ function feedbackClass(variant?: string): string {
 
 function orderClass(variant: string, highlight: boolean): string {
     return cn(
-        'grid gap-5 rounded-[1.75rem] border bg-white p-5 shadow-[0_18px_34px_rgba(18,58,132,0.13)]',
+        'grid gap-5 rounded-[1.25rem] border bg-white p-5 shadow-[0_16px_32px_rgba(18,58,132,0.11)]',
         variantStyles[variant] ?? variantStyles.secondary,
         highlight && 'ring-4 ring-brand-500/12',
     );
@@ -66,7 +66,7 @@ function orderClass(variant: string, highlight: boolean): string {
 
 function sectionTintClass(variant: string): string {
     return cn(
-        'grid gap-4 rounded-[1.5rem] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]',
+        'grid gap-4 rounded-[1.1rem] border px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]',
         variantStyles[variant] ?? variantStyles.secondary,
     );
 }
@@ -170,7 +170,7 @@ export default function PublicTrackingPage({
 
             <div className={pageShellClass}>
                 <div className={cardClass}>
-                    <a href={publicView.brandUrl} className="mx-auto flex w-full max-w-xl items-center justify-center overflow-hidden rounded-[1.1rem] border border-sky-100 bg-white/82 p-2.5 shadow-[0_12px_24px_rgba(18,58,132,0.06)]" aria-label="Ir a Sudoku">
+                    <a href={publicView.brandUrl} className="mx-auto flex w-full max-w-xl items-center justify-center overflow-hidden rounded-[1rem] border border-[#dbe7f6] bg-white/90 p-2.5 shadow-[0_12px_24px_rgba(18,58,132,0.06)]" aria-label="Ir a Sudoku">
                         <img
                             src={publicView.bannerUrl}
                             alt={bannerAlt}
@@ -240,7 +240,7 @@ export default function PublicTrackingPage({
                                 <div
                                     key={ticket.id}
                                     className={cn(
-                                        'grid gap-5 rounded-[2rem] border px-4 py-4 shadow-[0_18px_40px_rgba(18,58,132,0.09)] md:px-5',
+                                        'grid gap-5 rounded-[1.4rem] border px-4 py-4 shadow-[0_18px_40px_rgba(18,58,132,0.09)] md:px-5',
                                         ticket.clusterVariant === 'warning'
                                             ? 'border-amber-300 bg-amber-50'
                                             : 'border-sky-200 bg-white',
@@ -255,8 +255,8 @@ export default function PublicTrackingPage({
                                                 {repair.headline}
                                             </h2>
 
-                                            <div className="grid gap-4 rounded-[1.4rem] border border-sky-200 bg-white p-4 shadow-[0_12px_24px_rgba(18,58,132,0.08)] md:grid-cols-[auto_minmax(0,1fr)] md:items-start">
-                                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#dcecff] text-[#174ea6] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                                            <div className="grid gap-4 rounded-[1.1rem] border border-sky-200 bg-white p-4 shadow-[0_12px_24px_rgba(18,58,132,0.08)] md:grid-cols-[auto_minmax(0,1fr)] md:items-start">
+                                                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[#dcecff] text-[#174ea6] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                                                     <FaTools aria-hidden="true" className="text-2xl" />
                                                 </div>
                                                 <div className="grid gap-3">

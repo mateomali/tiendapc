@@ -92,12 +92,12 @@ function compactStatus(status: string): string {
 function repairStatusHeaderClass(status: string): string {
     const normalized = normalizeStatus(status);
 
-    if (normalized === 'LISTA') return 'bg-[linear-gradient(135deg,#34d399_0%,#22c55e_55%,#16a34a_100%)] text-white';
-    if (normalized === 'CANCELADA') return 'bg-[linear-gradient(135deg,#fb7185_0%,#ef4444_55%,#dc2626_100%)] text-white';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[linear-gradient(135deg,#a78bfa_0%,#8b5cf6_52%,#6d28d9_100%)] text-white';
-    if (normalized === 'PENDIENTE') return 'bg-[linear-gradient(135deg,#ffd54a_0%,#fbbf24_55%,#f59e0b_100%)] text-[#111827]';
+    if (normalized === 'LISTA') return 'bg-[#16a34a] text-white';
+    if (normalized === 'CANCELADA') return 'bg-[#dc2626] text-white';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#6d28d9] text-white';
+    if (normalized === 'PENDIENTE') return 'bg-[#facc15] text-[#111827]';
 
-    return 'bg-[linear-gradient(135deg,#94a3b8_0%,#64748b_55%,#475569_100%)] text-white';
+    return 'bg-[#64748b] text-white';
 }
 
 function repairStatusBadgeClass(status: string): string {
@@ -218,13 +218,13 @@ function ModalShell({
 }): JSX.Element {
     return (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/55 px-3 py-6" role="dialog" aria-modal="true">
-            <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-[18px] bg-white shadow-[0_24px_70px_rgba(15,23,42,0.32)]">
+            <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-lg border border-[#cbd5e1] bg-white shadow-lg">
                 <header
                     className={cn(
                         'flex items-center justify-between gap-3 border-b px-4 py-3',
                         tone === 'primary' && 'border-[#0b5ed7] bg-[#0d6efd] text-white',
                         tone === 'warning' && 'border-[#e0a800] bg-[#ffc107] text-[#111827]',
-                        tone === 'default' && 'border-slate-200 bg-[linear-gradient(180deg,#f8fbff,#eef4ff)] text-[#0f172a]',
+                        tone === 'default' && 'border-slate-200 bg-[#f8fafc] text-[#0f172a]',
                     )}
                 >
                     <h3 className="flex items-center gap-2 text-base font-black">
@@ -259,12 +259,12 @@ function FieldSummary({
         <Wrapper
             type={onClick ? 'button' : undefined}
             className={cn(
-                'grid min-w-0 gap-0.5 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-left shadow-[0_6px_14px_rgba(15,23,42,0.04)]',
-                onClick && 'cursor-pointer transition hover:border-[#0d6efd] hover:bg-[#eff6ff]',
+                'grid min-w-0 gap-0.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-left',
+                onClick && 'cursor-pointer transition hover:border-[#94a3b8] hover:bg-[#f8fafc]',
             )}
             onClick={onClick}
         >
-            <span className="text-[0.72rem] font-bold uppercase tracking-[0.04em] text-slate-500">{label}</span>
+            <span className="text-[0.72rem] font-semibold text-slate-500">{label}</span>
             <span className={cn('text-sm text-[#0f172a]', strong && 'font-black')}>{value}</span>
         </Wrapper>
     );
@@ -273,7 +273,7 @@ function FieldSummary({
 function PaymentStatus({ monto, senia }: { monto: number; senia: number }): JSX.Element {
     if (monto > 0 && senia >= monto) {
         return (
-            <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-black uppercase text-emerald-800 shadow-sm">
+            <span className="inline-flex w-fit items-center rounded-md border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-bold text-emerald-800">
                 PAGADO
             </span>
         );
@@ -325,10 +325,10 @@ function ImageUploadPicker({
     onRemove?: (index: number) => void;
 }): JSX.Element {
     return (
-        <div className={cn('grid gap-3 rounded-xl border border-dashed border-[#7cc7ff] bg-[#f2f9ff] p-3', disabled && 'opacity-60')}>
+        <div className={cn('grid gap-3 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] p-3', disabled && 'opacity-60')}>
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <strong className="text-sm text-[#0f172a]">{title}</strong>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{previews.length}/2</span>
+                <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{previews.length}/2</span>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
                 <label className={cn(buttonClass('primary', 'sm'), disabled && 'pointer-events-none')}>
@@ -350,7 +350,7 @@ function ImageUploadPicker({
                             <img src={preview} alt={`Vista previa ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
                             <span className="absolute bottom-1 left-1 rounded bg-slate-950/70 px-1.5 py-0.5 text-[0.65rem] font-bold text-white">Nueva {index + 1}</span>
                             {onRemove ? (
-                                <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-[#ef4444] text-xs font-black text-white shadow-md" onClick={() => onRemove(index)} aria-label={`Quitar imagen ${index + 1}`}>
+                                <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-[#ef4444] text-xs font-bold text-white" onClick={() => onRemove(index)} aria-label={`Quitar imagen ${index + 1}`}>
                                     <FaTimes aria-hidden="true" />
                                 </button>
                             ) : null}
@@ -383,7 +383,7 @@ function RepairImagesBlock({
         <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center justify-between gap-2">
                 <strong className="text-sm text-[#0f172a]">{title}</strong>
-                <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{images.length}/2</span>
+                <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{images.length}/2</span>
             </div>
             {images.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -755,7 +755,7 @@ function RepairEditCard({
     const InlineEditor = ({ mobile = false }: { mobile?: boolean }): JSX.Element => (
         <form
             className={cn(
-                'grid gap-2 rounded-[16px] border border-[#bfdbfe] bg-[linear-gradient(180deg,#eff6ff,#f8fbff)] p-3 shadow-inner',
+                'grid gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3',
                 mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(170px,1fr)_96px_128px_136px_minmax(180px,1.2fr)_138px_112px_142px]',
             )}
             onSubmit={submitEdit}
@@ -797,7 +797,7 @@ function RepairEditCard({
                 <>
                     <FaImage className="absolute text-slate-400" aria-hidden="true" />
                     <img src={firstImage.thumbnailUrl || firstImage.url} alt={firstImage.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
-                    {galleryImages.length > 1 ? <span className="absolute right-1 top-1 rounded-full bg-slate-950/75 px-1.5 py-0.5 text-[0.68rem] font-bold text-white">+{galleryImages.length - 1}</span> : null}
+                    {galleryImages.length > 1 ? <span className="absolute right-1 top-1 rounded-md bg-slate-950/75 px-1.5 py-0.5 text-[0.68rem] font-bold text-white">+{galleryImages.length - 1}</span> : null}
                 </>
             ) : (
                 <FaImage aria-hidden="true" />
@@ -924,7 +924,7 @@ function RepairEditCard({
                                             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
                                                 <span>Asignado: {currentInventoryLabel}</span>
                                                 {!readOnly ? (
-                                                    <button type="button" className="text-xs font-black uppercase tracking-[0.05em] underline-offset-2 hover:underline" onClick={returnCurrentInventoryPart}>
+                                                    <button type="button" className="text-xs font-bold underline-offset-2 hover:underline" onClick={returnCurrentInventoryPart}>
                                                         Devolver a caja
                                                     </button>
                                                 ) : null}
@@ -1070,7 +1070,7 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('grid min-h-[58px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-x-2 border-x-[#bfdbfe]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#bfdbfe]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#bfdbfe]', isGroupedDesktopRow && !isFirstGroupedDesktopRow && 'bg-[#f8fbff]', isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
+                <div className={cn('grid min-h-[58px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-x-2 border-x-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && !isFirstGroupedDesktopRow && 'bg-[#f8fafc]', isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
                     <div className="grid content-center gap-1 text-center">
                         {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">—</span>}
                     </div>
@@ -1078,7 +1078,7 @@ function RepairEditCard({
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
-                    <div className="flex items-center justify-center"><span className="rounded-full bg-[#eef2ff] px-2 py-1 text-xs font-black text-[#1d4ed8]">{rowTotal > 1 ? `${rowIndex + 1}/${rowTotal}` : `#${repair.reparacion}`}</span></div>
+                    <div className="flex items-center justify-center"><span className="rounded-md bg-[#f1f5f9] px-2 py-1 text-xs font-bold text-[#334155]">{rowTotal > 1 ? `${rowIndex + 1}/${rowTotal}` : `#${repair.reparacion}`}</span></div>
                     <div className="flex items-center justify-center"><Thumb large /></div>
                     <button type="button" className="flex items-center text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repair.modelo || '-'}>{repair.modelo || '-'}</button>
                     <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.descripcion || '-'}>
@@ -1095,7 +1095,7 @@ function RepairEditCard({
                     <div className="flex items-center justify-center">
                         <button
                             type="button"
-                            className={cn('rounded-full px-2.5 py-1 text-[0.68rem] font-black uppercase shadow-sm transition', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:-translate-y-0.5 hover:shadow-md', (readOnly || !canCycleStatus) && 'cursor-default')}
+                            className={cn('rounded-md px-2.5 py-1 text-[0.68rem] font-bold', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
                             onClick={cycleDesktopStatus}
                             disabled={readOnly || !canCycleStatus || form.processing}
                             title={!readOnly && canCycleStatus ? `Cambiar a ${compactStatus(nextStatus)}` : compactStatus(repair.estado)}
@@ -1131,25 +1131,27 @@ function RepairEditCard({
 
     return (
         <>
-            <details className="overflow-hidden rounded-[14px] border border-white/80 bg-white/95 shadow-[0_8px_22px_rgba(15,23,42,0.09)]">
+            <details className="overflow-hidden rounded-lg border border-[#cbd5e1] bg-white shadow-sm">
                 <summary className={cn('cursor-pointer list-none px-2.5 py-2', repairStatusHeaderClass(repair.estado))}>
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                             <div className="mb-1 flex items-center gap-1.5">
-                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[0.66rem] font-black text-[#0f172a]">#{repair.id}</span>
-                                <span className="rounded-full bg-white/80 px-1.5 py-0.5 text-[0.66rem] font-black text-[#1d4ed8]">{rowIndex + 1}/{rowTotal}</span>
-                                <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[0.62rem] font-black uppercase text-[#0f172a]">{compactStatus(repair.estado)}</span>
+                                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.66rem] font-bold text-[#0f172a]">#{repair.id}</span>
+                                <span className="rounded-md bg-white/80 px-1.5 py-0.5 text-[0.66rem] font-bold text-[#1d4ed8]">{rowIndex + 1}/{rowTotal}</span>
+                                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.62rem] font-bold text-[#0f172a]">{compactStatus(repair.estado)}</span>
                             </div>
-                            <h4 className="truncate text-[0.92rem] font-black uppercase leading-tight">{repair.nombre_cliente}</h4>
-                            <p className="truncate text-[0.78rem] font-bold opacity-90">{repair.modelo ? `${repair.modelo} - ` : ''}{repair.descripcion || 'Sin descripcion'}</p>
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
-                                <span className="rounded-full bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
-                                {isToday(repair.fecha_estimada) ? <span className="rounded-full bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
-                                {overdueText ? <span className="rounded-full bg-[#dc3545] px-1.5 py-0.5 text-white">{overdueText}</span> : null}
-                                <PaymentStatus monto={monto} senia={senia} />
+                            <h4 className="truncate text-[0.96rem] font-black leading-tight">{repair.modelo || 'Sin modelo'}</h4>
+                            <p className="truncate text-[0.78rem] font-bold opacity-90">{repair.descripcion || 'Sin descripcion'}</p>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
+                                <span className="rounded-md bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
+                                {isToday(repair.fecha_estimada) ? <span className="rounded-md bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
+                                {overdueText ? <span className="rounded-md bg-[#dc3545] px-1.5 py-0.5 text-white">{overdueText}</span> : null}
+                                <span className="rounded-md border border-[#111827] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
+                                    Saldo: <PaymentStatus monto={monto} senia={senia} />
+                                </span>
                             </div>
                         </div>
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-white/25 ring-1 ring-white/35">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/25 ring-1 ring-white/35">
                             <FaChevronDown aria-hidden="true" />
                         </span>
                     </div>
@@ -1172,11 +1174,8 @@ function RepairEditCard({
                         </div>
                     ) : null}
                     <div className="grid grid-cols-2 gap-1.5">
-                        <FieldSummary label="ID orden" value={`#${repair.id}`} strong onClick={openInlineEditor} />
-                        <FieldSummary label="Cliente" value={repair.nombre_cliente} strong onClick={openInlineEditor} />
                         {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={repair.dni} onClick={openInlineEditor} /> : null}
                         {repair.contacto ? <FieldSummary label="Contacto" value={repair.contacto} onClick={openInlineEditor} /> : null}
-                        {repair.modelo ? <FieldSummary label="Modelo" value={repair.modelo} strong onClick={openInlineEditor} /> : null}
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
                         <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
                         <FieldSummary label="Estado" value={compactStatus(repair.estado)} onClick={openInlineEditor} />
@@ -1189,7 +1188,7 @@ function RepairEditCard({
                         </button>
                     ) : null}
                     {showMore ? (
-                        <details className="rounded-xl border border-slate-200 bg-slate-50">
+                        <details className="rounded-lg border border-slate-200 bg-slate-50">
                             <summary className="cursor-pointer px-3 py-2 text-sm font-black text-[#1d4ed8]"><FaImages className="mr-1 inline" aria-hidden="true" />Ver mas</summary>
                             <div className="grid gap-2 p-3 text-sm">
                                 <FieldSummary label="F. ingreso" value={formatLegacyDate(repair.fecha)} onClick={openInlineEditor} />
@@ -1247,9 +1246,9 @@ export function RepairTicketPanel({
 
     return (
         <section className={ui.repairTicketPanel}>
-            <header className="flex flex-col gap-2 rounded-[16px] border border-[#dbeafe] bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(241,247,255,0.95))] px-3 py-3 md:flex-row md:items-start md:justify-between">
+            <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between">
                 <div className="min-w-0">
-                    <p className="text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-[#1d4ed8] md:text-xs">Ticket #{ticket.id}</p>
+                    <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs">Ticket #{ticket.id}</p>
                     <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl">{ticket.nombre_cliente}</h3>
                     <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.78rem] font-semibold text-[#475569] md:gap-2 md:text-sm">
                         <span>DNI: {ticket.dni}</span>
@@ -1276,9 +1275,9 @@ export function RepairTicketPanel({
                 </div>
             </header>
 
-            <div className="hidden overflow-x-auto rounded-[16px] border border-[#dbe4f0] bg-white shadow-[0_10px_26px_rgba(15,23,42,0.08)] xl:block">
+            <div className="hidden overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
                 <div className="w-full min-w-[1680px]">
-                    <div className="grid grid-cols-[76px_minmax(190px,1.15fr)_96px_128px_106px_78px_86px_minmax(170px,1fr)_122px_112px_142px_216px] items-center gap-2 bg-[linear-gradient(180deg,#1774f5,#0d56c8)] px-3 py-3 text-[0.7rem] font-extrabold uppercase tracking-[0.035em] text-white">
+                    <div className="grid grid-cols-[76px_minmax(190px,1.15fr)_96px_128px_106px_78px_86px_minmax(170px,1fr)_122px_112px_142px_216px] items-center gap-2 border-b border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 text-[0.7rem] font-bold text-[#475569]">
                         <span className="text-center">ID</span>
                         <span>Cliente</span>
                         <span>DNI</span>
@@ -1325,7 +1324,7 @@ export function RepairTicketPanel({
             </div>
 
             {allowAddRepair && !readOnly ? (
-                <button type="button" className="rounded-[16px] border border-sky-100 bg-white px-4 py-3 text-left text-sm font-black uppercase tracking-[0.16em] text-[#4f6fae] shadow-sm" onClick={() => setAddOpen(true)}>
+                <button type="button" className="rounded-lg border border-[#cbd5e1] bg-white px-4 py-3 text-left text-sm font-bold text-[#334155] shadow-sm" onClick={() => setAddOpen(true)}>
                     <FaPlus className="mr-1 inline" aria-hidden="true" />Agregar reparacion al ticket #{ticket.id}
                 </button>
             ) : null}
