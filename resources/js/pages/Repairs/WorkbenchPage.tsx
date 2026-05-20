@@ -412,20 +412,6 @@ export default function WorkbenchPage({
             .slice(0, 8);
     };
 
-    const appendJobObservation = (current: string, addition: string): string => {
-        const trimmed = current.trim();
-
-        if (trimmed === '' || ['sin observaciones', 'sin observacion'].includes(trimmed.toLowerCase())) {
-            return addition;
-        }
-
-        if (trimmed.toLowerCase().includes(addition.toLowerCase())) {
-            return current;
-        }
-
-        return `${trimmed}\n${addition}`;
-    };
-
     const selectInventoryPart = (index: number, part: RepairPartInventoryOption): void => {
         updateJob(index, (job) => ({
             ...job,
@@ -433,7 +419,6 @@ export default function WorkbenchPage({
             pedir_repuesto: false,
             inventory_part_id: String(part.id),
             estado: job.estado === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : job.estado,
-            observaciones: appendJobObservation(job.observaciones, `Repuesto en caja ${part.box.toUpperCase()}`),
         }));
         setPartSearches((current) => ({ ...current, [index]: part.model }));
     };
@@ -1039,7 +1024,7 @@ export default function WorkbenchPage({
                                             <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={cn(compactInputClass, 'number-input-no-spinners')} type="number" step="100" min="0" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
                                         </div>
                                         <div className={fieldPanelGreen}>
                                             <label className={repairLabelClass}>Sena ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
@@ -1404,6 +1389,7 @@ export default function WorkbenchPage({
                                             ticket={ticket}
                                             repair={repair}
                                             serviceCategories={serviceCategories}
+                                            serviceTemplates={serviceTemplates}
                                             partInventory={partInventory}
                                             rowIndex={repairIndex}
                                             rowTotal={ticket.repairs.length}
@@ -1424,6 +1410,7 @@ export default function WorkbenchPage({
                             ticket={ticket}
                             states={states}
                             serviceCategories={serviceCategories}
+                            serviceTemplates={serviceTemplates}
                             partInventory={partInventory}
                             allowAddRepair
                         />

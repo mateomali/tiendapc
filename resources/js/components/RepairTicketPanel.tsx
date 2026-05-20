@@ -1,6 +1,7 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import {
+    FaArrowRight,
     FaCamera,
     FaCheckCircle,
     FaChevronDown,
@@ -11,6 +12,7 @@ import {
     FaPlus,
     FaReceipt,
     FaSave,
+    FaSearch,
     FaTimes,
     FaTrashAlt,
     FaWhatsapp,
@@ -32,6 +34,13 @@ interface RepairPartInventoryOption {
     box: string;
 }
 
+interface ServiceTemplateOption {
+    value: string;
+    label: string;
+    description: string;
+    repuesto: string;
+}
+
 export const repairDesktopTableGridClass =
     'grid-cols-[3.4rem_minmax(8rem,0.65fr)_4.8rem_5.8rem_5.4rem_3.7rem_4.4rem_minmax(12rem,0.7fr)_minmax(12rem,0.7fr)_5.8rem_5rem_7.4rem_17.5rem]';
 
@@ -39,6 +48,7 @@ interface RepairTicketPanelProps {
     ticket: RepairTicketView;
     states: string[];
     serviceCategories: ServiceCategoryOption[];
+    serviceTemplates?: ServiceTemplateOption[];
     partInventory?: RepairPartInventoryOption[];
     allowAddRepair?: boolean;
     readOnly?: boolean;
@@ -67,7 +77,9 @@ interface RepairUpdateFormData {
 }
 
 interface AddRepairFormData {
+    marca: string;
     modelo: string;
+    tipo_servicio: string;
     descripcion: string;
     observaciones: string;
     monto: string;
@@ -75,11 +87,14 @@ interface AddRepairFormData {
     fecha_estimada: string;
     repuesto: string;
     repuesto_pedido: boolean;
+    inventory_part_id: string;
     categorias_reparacion: string;
     images: File[] | null;
 }
 
 type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
+
+const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'TCL', 'LG', 'OTRAS'] as const;
 
 function normalizeStatus(status: string): string {
     return status.toUpperCase();
@@ -309,6 +324,36 @@ function EditSection({ title, children }: { title: string; children: ReactNode }
     );
 }
 
+function InventoryAssignmentPanel({
+    model,
+    box,
+    readOnly,
+    onClear,
+}: {
+    model?: string | null;
+    box?: string | null;
+    readOnly?: boolean;
+    onClear?: () => void;
+}): JSX.Element | null {
+    if (!model || !box) {
+        return null;
+    }
+
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm text-[#166534]">
+            <div className="grid gap-0.5">
+                <strong className="font-black text-[#14532d]">Repuesto asignado</strong>
+                <span className="font-bold">{model} - Caja {box.toUpperCase()}</span>
+            </div>
+            {!readOnly && onClear ? (
+                <button type="button" className="rounded-md border border-[#86efac] bg-white px-2.5 py-1 text-xs font-bold text-[#166534] hover:bg-[#dcfce7]" onClick={onClear}>
+                    Devolver a caja
+                </button>
+            ) : null}
+        </div>
+    );
+}
+
 function ImageUploadPicker({
     title,
     help,
@@ -411,25 +456,34 @@ function RepairImagesBlock({
 function AddRepairModal({
     ticket,
     serviceCategories,
+    serviceTemplates,
+    partInventory,
     onClose,
 }: {
     ticket: RepairTicketView;
     serviceCategories: ServiceCategoryOption[];
+    serviceTemplates: ServiceTemplateOption[];
+    partInventory: RepairPartInventoryOption[];
     onClose: () => void;
 }): JSX.Element {
+    const today = new Date().toISOString().slice(0, 10);
     const form = useForm<AddRepairFormData>({
+        marca: '',
         modelo: '',
+        tipo_servicio: '',
         descripcion: '',
-        observaciones: '',
-        monto: '',
-        senia: '',
-        fecha_estimada: '',
+        observaciones: 'sin observaciones',
+        monto: '0',
+        senia: '0',
+        fecha_estimada: today,
         repuesto: '',
         repuesto_pedido: false,
+        inventory_part_id: '',
         categorias_reparacion: '4',
         images: null,
     });
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    const [partSearch, setPartSearch] = useState('');
     const baseUpdateAction = ticket.repairs[0]?.actions?.update ?? '';
     const action = ticket.addRepairAction ?? (baseUpdateAction !== '' ? `${baseUpdateAction.replace(/\/$/, '')}/add-repair` : '');
 
@@ -472,6 +526,89 @@ function AddRepairModal({
         }
     };
 
+    const isPhoneCategory = (value: string): boolean => {
+        const category = serviceCategories.find((item) => String(item.value) === String(value));
+
+        return category?.label.toLowerCase().includes('celular') ?? false;
+    };
+
+    const changeCategory = (value: string): void => {
+        form.setData((current) => ({
+            ...current,
+            categorias_reparacion: value,
+            marca: isPhoneCategory(value) ? current.marca : '',
+        }));
+    };
+
+    const changeBrand = (value: string): void => {
+        form.setData((current) => {
+            const currentModel = current.modelo.trim();
+            const previousBrand = phoneBrandOptions.find((brand) => currentModel.toUpperCase().startsWith(`${brand} `));
+            const cleanModel = previousBrand ? currentModel.slice(previousBrand.length).trimStart() : currentModel;
+
+            return {
+                ...current,
+                marca: value,
+                modelo: value !== '' ? `${value} ${cleanModel}`.trim() : cleanModel,
+            };
+        });
+    };
+
+    const applyDescriptionOption = (optionKey: string): void => {
+        if (optionKey === '') return;
+
+        const option = serviceTemplates.find((item) => item.value === optionKey);
+        if (!option) return;
+
+        form.setData((current) => {
+            const model = current.modelo.trim();
+            const description = option.description.trim();
+            const nextDescription = [current.descripcion.trim(), model !== '' && description !== '' ? `${description} ${model}` : description]
+                .filter(Boolean)
+                .join('\n');
+
+            return {
+                ...current,
+                tipo_servicio: option.value,
+                descripcion: nextDescription,
+                repuesto: current.repuesto.trim() !== '' ? current.repuesto : option.repuesto,
+            };
+        });
+
+        if (partSearch.trim() === '' && option.repuesto.trim() !== '') {
+            setPartSearch(option.repuesto);
+        }
+    };
+
+    const matchingInventoryParts = (): RepairPartInventoryOption[] => {
+        const query = (partSearch || form.data.repuesto).trim().toLowerCase();
+
+        if (query.length < 2) {
+            return [];
+        }
+
+        return partInventory
+            .filter((part) => part.quantity > 0 && part.model.toLowerCase().includes(query))
+            .slice(0, 6);
+    };
+
+    const selectInventoryPart = (part: RepairPartInventoryOption): void => {
+        form.setData((current) => ({
+            ...current,
+            repuesto: part.model,
+            repuesto_pedido: false,
+            inventory_part_id: String(part.id),
+        }));
+        setPartSearch(part.model);
+    };
+
+    const clearInventoryPart = (): void => {
+        form.setData((current) => ({
+            ...current,
+            inventory_part_id: '',
+        }));
+    };
+
     return (
         <ModalShell title={`Agregar reparacion al ticket #${ticket.id}`} onClose={onClose} tone="primary">
             <form className="grid gap-4" onSubmit={submit}>
@@ -487,20 +624,35 @@ function AddRepairModal({
                 <EditSection title="Trabajo">
                     <div className="grid gap-3 sm:grid-cols-2">
                         <EditField label="Categoria">
-                            <select className={ui.input} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)}>
+                            <select className={ui.input} value={form.data.categorias_reparacion} onChange={(event) => changeCategory(event.target.value)}>
                                 {serviceCategories.map((category) => (
                                     <option key={category.value} value={category.value}>{category.label}</option>
                                 ))}
                             </select>
                         </EditField>
+                        {isPhoneCategory(form.data.categorias_reparacion) ? (
+                            <EditField label="Marca">
+                                <select className={ui.input} value={form.data.marca} onChange={(event) => changeBrand(event.target.value)}>
+                                    <option value="">Elegir marca...</option>
+                                    {phoneBrandOptions.map((brand) => (
+                                        <option key={brand} value={brand}>{brand}</option>
+                                    ))}
+                                </select>
+                            </EditField>
+                        ) : null}
                         <EditField label="Modelo">
                             <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
                         </EditField>
-                        <EditField label="Trabajo a realizar">
-                            <textarea className={ui.textarea} placeholder="Descripcion de la reparacion" value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} />
+                        <EditField label="Tipo de servicio">
+                            <select className={ui.input} value="" onChange={(event) => applyDescriptionOption(event.target.value)}>
+                                <option value="">Agregar tipo o falla...</option>
+                                {serviceTemplates.map((option) => (
+                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                            </select>
                         </EditField>
-                        <EditField label="Observaciones">
-                            <textarea className={ui.textarea} placeholder="Estado, accesorios, claves o detalles internos" value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} />
+                        <EditField label="Descripcion de la falla">
+                            <textarea className={ui.textarea} placeholder="Descripcion de la reparacion" value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} required />
                         </EditField>
                     </div>
                 </EditSection>
@@ -511,24 +663,89 @@ function AddRepairModal({
                             <input className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                         </EditField>
                         <EditField label="Monto">
-                            <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                            <input className={cn(ui.input, 'number-input-no-spinners')} type="number" step="100" min="0" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
                         </EditField>
                         <EditField label="Senia">
-                            <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
+                            <input className={cn(ui.input, 'number-input-no-spinners')} type="number" step="100" min="0" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
                         </EditField>
                     </div>
                 </EditSection>
 
                 <EditSection title="Repuesto">
-                    <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-                        <EditField label="Repuesto asociado">
-                            <input className={ui.input} placeholder="Buscar o escribir repuesto" value={form.data.repuesto} onChange={(event) => form.setData('repuesto', event.target.value)} />
+                    <div className="grid gap-3">
+                        <EditField label="Buscar en cajas">
+                            <div className="relative">
+                                <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#92400e]" aria-hidden="true" />
+                                <input
+                                    className={cn(ui.input, 'pl-9')}
+                                    placeholder="Buscar modulo, bateria, modelo..."
+                                    value={partSearch || form.data.repuesto}
+                                    onChange={(event) => {
+                                        const value = event.target.value;
+                                        setPartSearch(value);
+                                        form.setData((current) => ({ ...current, repuesto: value, inventory_part_id: '' }));
+                                    }}
+                                />
+                            </div>
                         </EditField>
-                        <label className="inline-flex min-h-11 items-center gap-2 self-end rounded-lg border border-[#f59e0b55] bg-[#fff7ed] px-3 py-2 text-sm font-black text-[#92400e]">
-                            <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} />
+                        {matchingInventoryParts().length > 0 ? (
+                            <div className="grid gap-1">
+                                {matchingInventoryParts().map((part) => (
+                                    <button
+                                        key={part.id}
+                                        type="button"
+                                        className={cn(
+                                            'grid gap-1 rounded-lg border px-3 py-2 text-left text-sm transition hover:bg-[#f8fafc]',
+                                            form.data.inventory_part_id === String(part.id)
+                                                ? 'border-[#16a34a] bg-[#dcfce7] text-[#14532d]'
+                                                : 'border-[#fed7aa] bg-white text-[#334155] hover:bg-[#fff7ed]',
+                                        )}
+                                        onClick={() => selectInventoryPart(part)}
+                                    >
+                                        <span className="font-black">{part.model}</span>
+                                        <span className="text-xs font-bold text-slate-500">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (partSearch || form.data.repuesto).trim().length >= 2 ? (
+                            <div className="rounded-lg border border-dashed border-[#fed7aa] bg-white px-3 py-2 text-sm font-bold text-[#92400e]">
+                                No hay coincidencias en cajas. Si hace falta pedirlo, marca Mandar a pedidos.
+                            </div>
+                        ) : null}
+                        {form.data.inventory_part_id !== '' ? (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
+                                <span>Asignado desde caja. Al guardar se descuenta del inventario.</span>
+                                <button type="button" className="text-xs font-bold text-[#15803d] underline-offset-2 hover:underline" onClick={clearInventoryPart}>
+                                    Quitar seleccion
+                                </button>
+                            </div>
+                        ) : null}
+                        <textarea
+                            className={ui.textarea}
+                            rows={2}
+                            placeholder="Detalle del repuesto. Ej: modulo Samsung A54 negro"
+                            value={form.data.repuesto}
+                            onChange={(event) => form.setData((current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))}
+                        />
+                        <label className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#f59e0b55] bg-[#fff7ed] px-3 py-2 text-sm font-black text-[#92400e]">
+                            <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} disabled={form.data.inventory_part_id !== ''} />
                             Mandar a pedidos
                         </label>
                     </div>
+                </EditSection>
+                <EditSection title="Observaciones">
+                    <textarea
+                        className={ui.textarea}
+                        rows={3}
+                        placeholder="Estado, accesorios, claves o detalles internos"
+                        value={form.data.observaciones}
+                        onFocus={() => {
+                            if (form.data.observaciones.trim().toLowerCase() === 'sin observaciones') {
+                                form.setData('observaciones', '');
+                            }
+                        }}
+                        onChange={(event) => form.setData('observaciones', event.target.value)}
+                    />
                 </EditSection>
                 <EditSection title="Fotos de ingreso">
                     <ImageUploadPicker
@@ -614,28 +831,20 @@ function RepairEditCard({
     const isLastGroupedDesktopRow = isGroupedDesktopRow && rowIndex === rowTotal - 1;
     const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
     const overdueText = overdueLabel(repair);
-    const currentInventoryLabel = repair.inventory_part_box && repair.inventory_part_model
-        ? `${repair.inventory_part_model} - caja ${repair.inventory_part_box.toUpperCase()}`
-        : '';
     const partMatches = partSearch.trim().length >= 2
         ? partInventory
             .filter((part) => part.quantity > 0 && part.model.toLowerCase().includes(partSearch.trim().toLowerCase()))
             .slice(0, 8)
         : [];
-
-    const appendObservation = (current: string, addition: string): string => {
-        const trimmed = current.trim();
-
-        if (trimmed === '' || ['sin observaciones', 'sin observacion'].includes(trimmed.toLowerCase())) {
-            return addition;
-        }
-
-        if (trimmed.toLowerCase().includes(addition.toLowerCase())) {
-            return current;
-        }
-
-        return `${trimmed}\n${addition}`;
-    };
+    const selectedInventoryPart = form.data.inventory_part_id !== ''
+        ? partInventory.find((part) => String(part.id) === form.data.inventory_part_id) ?? null
+        : null;
+    const assignedInventoryModel = form.data.inventory_part_id !== ''
+        ? selectedInventoryPart?.model ?? repair.inventory_part_model ?? null
+        : null;
+    const assignedInventoryBox = form.data.inventory_part_id !== ''
+        ? selectedInventoryPart?.box ?? repair.inventory_part_box ?? null
+        : null;
 
     const selectInventoryPart = (part: RepairPartInventoryOption): void => {
         form.setData((current) => ({
@@ -643,7 +852,6 @@ function RepairEditCard({
             repuesto: part.model,
             repuesto_pedido: false,
             inventory_part_id: String(part.id),
-            observaciones: appendObservation(current.observaciones, `Repuesto en caja ${part.box.toUpperCase()}`),
         }));
         setPartSearch(part.model);
     };
@@ -770,6 +978,13 @@ function RepairEditCard({
         }
     };
 
+    const moveBackToConsultas = (): void => {
+        if (!repair.actions?.moveBack) return;
+        if (window.confirm(`Devolver orden #${repair.id} trabajo #${repair.reparacion} a consultas?`)) {
+            router.post(repair.actions.moveBack, {}, { preserveScroll: true });
+        }
+    };
+
     const deliverRepair = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
         if (!repair.actions?.deliver) return;
@@ -869,6 +1084,9 @@ function RepairEditCard({
                         <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
                             <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
                         </Link>
+                        <a href={ticket.trackingUrl} className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} title="Seguimiento">
+                            <FaArrowRight aria-hidden="true" />{iconOnly ? null : 'Seguimiento'}
+                        </a>
                     </>
                 ) : null}
                 {canDeliver ? (
@@ -960,16 +1178,12 @@ function RepairEditCard({
                                 </EditField>
                                 <EditField label="Repuesto a usar / pedir">
                                     <div className="grid gap-2">
-                                        {currentInventoryLabel !== '' ? (
-                                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
-                                                <span>Asignado: {currentInventoryLabel}</span>
-                                                {!readOnly ? (
-                                                    <button type="button" className="text-xs font-bold underline-offset-2 hover:underline" onClick={returnCurrentInventoryPart}>
-                                                        Devolver a caja
-                                                    </button>
-                                                ) : null}
-                                            </div>
-                                        ) : null}
+                                        <InventoryAssignmentPanel
+                                            model={assignedInventoryModel}
+                                            box={assignedInventoryBox}
+                                            readOnly={readOnly}
+                                            onClear={returnCurrentInventoryPart}
+                                        />
                                         <input
                                             className={ui.repairDenseInput}
                                             value={partSearch}
@@ -1153,6 +1367,11 @@ function RepairEditCard({
                                         Cambiar
                                     </button>
                                 ) : null}
+                                {repair.actions?.moveBack ? (
+                                    <button type="button" className="rounded-md border border-[#f59e0b] bg-[#fff7ed] px-2 py-1 text-[0.66rem] font-black uppercase text-[#92400e] transition hover:bg-[#ffedd5]" onClick={moveBackToConsultas}>
+                                        A consultas
+                                    </button>
+                                ) : null}
                             </div>
                         ) : null}
                         {!readOnly && !inlineOpen ? <ActionButtons showGeneralTicketActions={rowIndex === 0} /> : null}
@@ -1227,6 +1446,11 @@ function RepairEditCard({
                             Cambiar forma de entrega
                         </button>
                     ) : null}
+                    {readOnly && repair.actions?.moveBack ? (
+                        <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={moveBackToConsultas}>
+                            Devolver a consultas
+                        </button>
+                    ) : null}
                     {showMore ? (
                         <details className="rounded-lg border border-slate-200 bg-slate-50">
                             <summary className="cursor-pointer px-3 py-2 text-sm font-black text-[#1d4ed8]"><FaImages className="mr-1 inline" aria-hidden="true" />Ver mas</summary>
@@ -1251,6 +1475,7 @@ export function RepairDesktopRow({
     ticket,
     repair,
     serviceCategories,
+    serviceTemplates = [],
     partInventory = [],
     readOnly = false,
     rowIndex = 0,
@@ -1259,6 +1484,7 @@ export function RepairDesktopRow({
     ticket: RepairTicketView;
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
+    serviceTemplates?: ServiceTemplateOption[];
     partInventory?: RepairPartInventoryOption[];
     readOnly?: boolean;
     rowIndex?: number;
@@ -1269,7 +1495,7 @@ export function RepairDesktopRow({
     return (
         <>
             <RepairEditCard repair={repair} serviceCategories={serviceCategories} partInventory={partInventory} readOnly={readOnly} ticket={ticket} variant="desktop" rowIndex={rowIndex} rowTotal={rowTotal} onAddRepair={() => setAddOpen(true)} />
-            {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} onClose={() => setAddOpen(false)} /> : null}
+            {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
         </>
     );
 }
@@ -1278,6 +1504,7 @@ export function RepairTicketPanel({
     ticket,
     states,
     serviceCategories,
+    serviceTemplates = [],
     partInventory = [],
     allowAddRepair = false,
     readOnly = false,
@@ -1368,7 +1595,7 @@ export function RepairTicketPanel({
                 ))}
             </div>
 
-            {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} onClose={() => setAddOpen(false)} /> : null}
+            {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
             <span className="hidden">{states.length}</span>
         </section>
     );

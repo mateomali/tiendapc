@@ -29,6 +29,17 @@
         font: inherit;
     }
 
+    .number-input-no-spinners {
+        appearance: textfield;
+        -moz-appearance: textfield;
+    }
+
+    .number-input-no-spinners::-webkit-inner-spin-button,
+    .number-input-no-spinners::-webkit-outer-spin-button {
+        margin: 0;
+        -webkit-appearance: none;
+    }
+
     button,
     a,
     input,

@@ -37,6 +37,29 @@ it('shows delivered repairs in the dedicated technical view', function (): void 
             ->has('tickets', 1));
 });
 
+it('finds active repairs by ticket id from consultations search', function (): void {
+    RepairOrder::query()->create([
+        'id' => 1906,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Carlos',
+        'dni' => 12345678,
+        'modelo' => 'Joystick PS4',
+        'descripcion' => 'No carga',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => '1906']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 1)
+            ->where('tickets.0.id', 1906)
+            ->where('tickets.0.repairs.0.modelo', 'Joystick PS4'));
+});
+
 it('creates multi-job repair orders and redirects to the technical ticket', function (): void {
     $response = $this->withSession(['repair_tech_authenticated' => true])
         ->post(route('repairs.orders.store'), [

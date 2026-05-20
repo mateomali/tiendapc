@@ -339,11 +339,16 @@ class WorkbenchController extends Controller
             'fecha_estimada' => ['nullable', 'date'],
             'repuesto' => ['nullable', 'string', 'max:255'],
             'repuesto_pedido' => ['nullable', 'boolean'],
+            'inventory_part_id' => ['nullable', 'integer', 'min:1'],
             'categorias_reparacion' => ['nullable', 'integer', 'min:1'],
             'images.*' => ['nullable', 'file', 'image', 'max:8192'],
         ]);
 
-        $repairService->addRepair($repairOrder, $validated, $request->file('images', []));
+        try {
+            $repairService->addRepair($repairOrder, $validated, $request->file('images', []));
+        } catch (RuntimeException $exception) {
+            return back()->withInput()->with('error', $exception->getMessage());
+        }
 
         return back()->with('success', 'Nueva reparacion agregada al ticket.');
     }

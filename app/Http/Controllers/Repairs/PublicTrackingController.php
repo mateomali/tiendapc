@@ -39,11 +39,13 @@ class PublicTrackingController extends Controller
             );
         }
 
+        $showDniField = ! ($tickets !== [] && (int) ($validated['dni_buscado'] ?? 0) === (int) config('tienda.repair_default_dni'));
+
         return Inertia::render('Repairs/PublicTrackingPage', [
             'filters' => $filters,
             'searched' => $searched,
             'tickets' => $tickets,
-            'publicView' => $this->publicView($validated),
+            'publicView' => $this->publicView($validated, $showDniField),
             'feedback' => $this->feedback($searched, $tickets),
             'results' => $this->serializePublicResults($tickets),
         ]);
@@ -164,9 +166,9 @@ class PublicTrackingController extends Controller
 
     /**
      * @param array{id_buscado?: int|null, dni_buscado?: int|null, auto?: int|null} $filters
-     * @return array<string, string>
+     * @return array<string, string|bool>
      */
-    private function publicView(array $filters): array
+    private function publicView(array $filters, bool $showDniField = true): array
     {
         $whatsappNumber = $this->contactWhatsapp();
         $orderId = (int) ($filters['id_buscado'] ?? 0);
@@ -184,6 +186,7 @@ class PublicTrackingController extends Controller
             'orderPlaceholder' => 'Ej: 827',
             'dniLabel' => 'DNI del titular',
             'dniPlaceholder' => 'Ingrese su DNI',
+            'showDniField' => $showDniField,
             'submitLabel' => 'Consultar',
             'resetLabel' => 'Consultar otra orden',
             'resetUrl' => route('repairs.tracking'),
@@ -415,7 +418,7 @@ class PublicTrackingController extends Controller
             ];
         }
 
-        if ($state === 'EN REPARACION / ESPERA REPUESTO') {
+        if (in_array($state, ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'], true)) {
             return [
                 'variant' => 'waiting',
                 'message' => 'Tu equipo está en proceso de reparación.',
@@ -423,7 +426,7 @@ class PublicTrackingController extends Controller
             ];
         }
 
-        if (in_array($state, ['PENDIENTE', 'EN REPARACION'], true)) {
+        if ($state === 'PENDIENTE') {
             return [
                 'variant' => 'warning',
                 'message' => 'Todavía no pudimos revisar tu equipo. Por favor, intentá más tarde.',

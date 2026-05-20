@@ -265,6 +265,7 @@ export interface PublicRepairViewConfig {
     orderPlaceholder: string;
     dniLabel: string;
     dniPlaceholder: string;
+    showDniField: boolean;
     submitLabel: string;
     resetLabel: string;
     resetUrl: string;

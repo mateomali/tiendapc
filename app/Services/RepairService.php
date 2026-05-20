@@ -200,38 +200,49 @@ class RepairService
 
     public function addRepair(RepairOrder $order, array $payload, array $images = []): RepairOrder
     {
-        $repairNumber = ((int) RepairOrder::query()->where('id', $order->id)->max('reparacion')) + 1;
-        $storedImages = $this->storeImages($images, $order->id, $repairNumber, 'orig');
+        return DB::transaction(function () use ($order, $payload, $images): RepairOrder {
+            $repairNumber = ((int) RepairOrder::query()->where('id', $order->id)->max('reparacion')) + 1;
+            $storedImages = $this->storeImages($images, $order->id, $repairNumber, 'orig');
 
-        $partRequested = filter_var($payload['repuesto_pedido'] ?? false, FILTER_VALIDATE_BOOL);
-        $part = trim((string) ($payload['repuesto'] ?? ''));
+            $partRequested = filter_var($payload['repuesto_pedido'] ?? false, FILTER_VALIDATE_BOOL);
+            $part = trim((string) ($payload['repuesto'] ?? ''));
+            $requestedInventoryPartId = (int) ($payload['inventory_part_id'] ?? 0);
+            $allocation = $this->reserveInventoryPart($requestedInventoryPartId, $order->id, $repairNumber);
 
-        $repair = RepairOrder::query()->create([
-            'id' => $order->id,
-            'reparacion' => $repairNumber,
-            'fecha' => now()->toDateString(),
-            'nombre_cliente' => $order->nombre_cliente,
-            'dni' => $order->dni,
-            'contacto' => $order->contacto,
-            'modelo' => $payload['modelo'] ?? null,
-            'descripcion' => $payload['descripcion'],
-            'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
-            'monto' => $payload['monto'] ?? 0,
-            'senia' => min((float) ($payload['senia'] ?? 0), (float) ($payload['monto'] ?? 0)),
-            'fecha_estimada' => $payload['fecha_estimada'] ?? null,
-            'estado' => 'PENDIENTE',
-            'entregado' => 'no',
-            'repuesto' => $partRequested && $part !== '' ? $part : null,
-            'repuesto_pedido' => $partRequested && $part !== '',
-            'repuesto_pedido_at' => $partRequested && $part !== '' ? now() : null,
-            'repuesto_pedido_oculto_at' => null,
-            'categorias_reparacion' => $payload['categorias_reparacion'] ?? 4,
-            'imagen' => implode('|', $storedImages),
-        ]);
+            if ($requestedInventoryPartId > 0 && $allocation === null) {
+                throw new \RuntimeException('El repuesto seleccionado ya no esta disponible.');
+            }
 
-        $this->recordEvent($repair, 'CREADA', null, $repair->estado);
+            $repair = RepairOrder::query()->create([
+                'id' => $order->id,
+                'reparacion' => $repairNumber,
+                'fecha' => now()->toDateString(),
+                'nombre_cliente' => $order->nombre_cliente,
+                'dni' => $order->dni,
+                'contacto' => $order->contacto,
+                'modelo' => $payload['modelo'] ?? null,
+                'descripcion' => $payload['descripcion'],
+                'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
+                'monto' => $payload['monto'] ?? 0,
+                'senia' => min((float) ($payload['senia'] ?? 0), (float) ($payload['monto'] ?? 0)),
+                'fecha_estimada' => $payload['fecha_estimada'] ?? null,
+                'estado' => 'PENDIENTE',
+                'entregado' => 'no',
+                'repuesto' => $part,
+                'repuesto_pedido' => $requestedInventoryPartId <= 0 && $partRequested && $part !== '',
+                'repuesto_pedido_at' => $requestedInventoryPartId <= 0 && $partRequested && $part !== '' ? now() : null,
+                'repuesto_pedido_oculto_at' => null,
+                'inventory_part_id' => $allocation['id'] ?? null,
+                'inventory_part_model' => $allocation['model'] ?? null,
+                'inventory_part_box' => $allocation['box'] ?? null,
+                'categorias_reparacion' => $payload['categorias_reparacion'] ?? 4,
+                'imagen' => implode('|', $storedImages),
+            ]);
 
-        return $repair;
+            $this->recordEvent($repair, 'CREADA', null, $repair->estado);
+
+            return $repair;
+        });
     }
 
     private function reserveInventoryPart(int $partId, int $orderId, int $repairNumber): ?array
@@ -538,17 +549,6 @@ class RepairService
         return $base === '' ? $addition : $base . "\n\n" . $addition;
     }
 
-    private function appendObservation(?string $current, string $addition): string
-    {
-        $current = trim((string) $current);
-
-        if ($current === '' || in_array(mb_strtolower($current, 'UTF-8'), ['sin observaciones', 'sin observacion'], true)) {
-            return $addition;
-        }
-
-        return $current . "\n\n" . $addition;
-    }
-
     public function moveBackToConsultas(RepairOrder $order): RepairOrder
     {
         $previousState = $order->estado;
@@ -754,14 +754,24 @@ class RepairService
         }
 
         if (($filters['q'] ?? '') !== '') {
-            $search = '%' . trim((string) $filters['q']) . '%';
-            $query->where(function ($subQuery) use ($search): void {
+            $term = trim((string) $filters['q']);
+            $search = '%' . $term . '%';
+            $numericTerm = ctype_digit($term) ? (int) $term : null;
+
+            $query->where(function ($subQuery) use ($search, $numericTerm): void {
                 $subQuery
                     ->where('nombre_cliente', 'like', $search)
                     ->orWhere('modelo', 'like', $search)
                     ->orWhere('descripcion', 'like', $search)
                     ->orWhere('contacto', 'like', $search)
                     ->orWhere('dni', 'like', $search);
+
+                if ($numericTerm !== null) {
+                    $subQuery
+                        ->orWhere('id', $numericTerm)
+                        ->orWhere('registro_id', $numericTerm)
+                        ->orWhere('reparacion', $numericTerm);
+                }
             });
         }
 
