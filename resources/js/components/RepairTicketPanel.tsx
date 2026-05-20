@@ -42,7 +42,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[3.4rem_minmax(6.6rem,0.48fr)_4.8rem_5.8rem_5.4rem_3.7rem_4.4rem_minmax(12rem,0.75fr)_minmax(12rem,0.75fr)_5.8rem_5rem_7.4rem_19.5rem]';
+    'grid-cols-[3.4rem_minmax(6.2rem,0.42fr)_4.8rem_5.8rem_5.4rem_5.1rem_4.2rem_minmax(12rem,0.78fr)_minmax(12rem,0.82fr)_5.8rem_5rem_7.4rem_19.5rem]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -135,6 +135,17 @@ function repairStatusSelectClass(status: string): string {
     if (normalized === 'PENDIENTE') return 'border-[#ffc107] bg-[#fff8db] text-[#664d03]';
 
     return 'border-[#6c757d] bg-slate-100 text-slate-800';
+}
+
+function desktopGroupedRepairClass(index: number): string {
+    const tones = [
+        'border-l-[#1d4ed8] bg-white',
+        'border-l-[#7c3aed] bg-[#fbfaff]',
+        'border-l-[#0f766e] bg-[#f8fffd]',
+        'border-l-[#b45309] bg-[#fffdf8]',
+    ];
+
+    return tones[index % tones.length];
 }
 
 function nextQuickStatus(status: string): string {
@@ -831,6 +842,7 @@ function RepairEditCard({
     const isLastGroupedDesktopRow = isGroupedDesktopRow && rowIndex === rowTotal - 1;
     const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
     const overdueText = overdueLabel(repair);
+    const desktopWorkLabel = rowTotal > 1 ? `Trabajo ${rowIndex + 1} de ${rowTotal}` : `Trabajo ${repair.reparacion}`;
     const partMatches = partSearch.trim().length >= 2
         ? partInventory
             .filter((part) => part.quantity > 0 && part.model.toLowerCase().includes(partSearch.trim().toLowerCase()))
@@ -1324,7 +1336,7 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('grid min-h-[58px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-x-2 border-x-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && !isFirstGroupedDesktopRow && 'bg-[#f8fafc]', isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
+                <div className={cn('grid min-h-[64px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
                     <div className="grid content-center gap-1 text-center">
                         {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">-</span>}
                     </div>
@@ -1332,11 +1344,18 @@ function RepairEditCard({
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
-                    <div className="flex items-center justify-center"><span className="rounded-md bg-[#f1f5f9] px-2 py-1 text-xs font-bold text-[#334155]">{rowTotal > 1 ? `${rowIndex + 1}/${rowTotal}` : `#${repair.reparacion}`}</span></div>
+                    <div className="grid content-center justify-items-center gap-1 text-center">
+                        <span className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[0.68rem] font-black text-[#0f172a]">{rowTotal > 1 ? `${rowIndex + 1}/${rowTotal}` : `#${repair.reparacion}`}</span>
+                        <span className="text-[0.58rem] font-bold text-[#64748b]">Reg. {repair.registro_id || repair.reparacion}</span>
+                    </div>
                     <div className="flex items-center justify-center"><Thumb large /></div>
-                    <button type="button" className="flex items-center text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repair.modelo || '-'}>{repair.modelo || '-'}</button>
-                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.descripcion || '-'}>
-                        <span className="line-clamp-2">{repair.descripcion || '-'}</span>
+                    <button type="button" className="grid content-center gap-1 text-left" onClick={openInlineEditor} title={repair.modelo || '-'}>
+                        <span className="text-[0.62rem] font-black text-[#2563eb]">{desktopWorkLabel}</span>
+                        <span className="font-bold text-[#0f172a]">{repair.modelo || '-'}</span>
+                    </button>
+                    <button type="button" className="grid content-center gap-1 text-left" onClick={openInlineEditor} title={repair.descripcion || '-'}>
+                        <span className="text-[0.62rem] font-black text-[#64748b]">Falla del trabajo #{repair.reparacion}</span>
+                        <span className="line-clamp-2 font-semibold text-[#334155]">{repair.descripcion || '-'}</span>
                     </button>
                     <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
                         <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>

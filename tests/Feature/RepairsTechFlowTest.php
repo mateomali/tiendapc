@@ -140,3 +140,96 @@ it('allows delivering repairs with explicit date and delivery channel', function
     expect(optional($updated?->fecha_entregado)->format('Y-m-d'))->toBe('2026-04-23');
     expect(RepairEvent::query()->where('orden_id', 777)->where('evento', 'ENTREGA_VIA_TICKET')->exists())->toBeTrue();
 });
+
+it('marks only the selected job as ready in a multi-job ticket', function (): void {
+    $first = RepairOrder::query()->create([
+        'id' => 913,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Facundo Fernandez',
+        'dni' => 12345678,
+        'modelo' => 'E15 MODULO',
+        'descripcion' => 'Cambio de modulo E15',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $second = RepairOrder::query()->create([
+        'id' => 913,
+        'reparacion' => 2,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Facundo Fernandez',
+        'dni' => 12345678,
+        'modelo' => 'SAMSUNG a33',
+        'descripcion' => 'Cambio de modulo Samsung a33',
+        'estado' => 'EN REPARACION',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.mark_ready', $second))
+        ->assertRedirect();
+
+    expect($first->fresh()?->estado)->toBe('PENDIENTE');
+    expect($second->fresh()?->estado)->toBe('LISTA');
+});
+
+it('updates only the selected job details in a multi-job ticket', function (): void {
+    $first = RepairOrder::query()->create([
+        'id' => 914,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Multiple',
+        'dni' => 30111222,
+        'modelo' => 'Notebook',
+        'descripcion' => 'No enciende',
+        'observaciones' => 'sin observaciones',
+        'monto' => 35000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $second = RepairOrder::query()->create([
+        'id' => 914,
+        'reparacion' => 2,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Multiple',
+        'dni' => 30111222,
+        'modelo' => 'Joystick PS4',
+        'descripcion' => 'No carga',
+        'observaciones' => 'sin observaciones',
+        'monto' => 15000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.update', $second), [
+            'id_nuevo' => 914,
+            'fecha' => now()->toDateString(),
+            'nombre_cliente' => 'Cliente Multiple',
+            'dni' => 30111222,
+            'contacto' => '',
+            'modelo' => 'Joystick PS4 V2',
+            'descripcion' => 'Cambio de pin de carga',
+            'observaciones' => 'Probado en mesa',
+            'monto' => 22000,
+            'senia' => 0,
+            'fecha_estimada' => null,
+            'estado' => 'EN REPARACION',
+            'repuesto' => '',
+            'repuesto_pedido' => false,
+            'inventory_part_id' => '',
+            'categorias_reparacion' => 4,
+        ])
+        ->assertRedirect();
+
+    expect($first->fresh()?->modelo)->toBe('Notebook');
+    expect($first->fresh()?->descripcion)->toBe('No enciende');
+    expect($first->fresh()?->estado)->toBe('PENDIENTE');
+    expect($second->fresh()?->modelo)->toBe('Joystick PS4 V2');
+    expect($second->fresh()?->descripcion)->toBe('Cambio de pin de carga');
+    expect($second->fresh()?->estado)->toBe('EN REPARACION');
+});

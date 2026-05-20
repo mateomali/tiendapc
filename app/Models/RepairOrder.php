@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Schema;
@@ -84,6 +85,33 @@ class RepairOrder extends Model
         return $this->dni > 0 ? (int) $this->dni : (int) config('tienda.repair_default_dni');
     }
 
+    public function getRouteKey(): mixed
+    {
+        if ($this->usesLegacyPrimaryKey()) {
+            return ((int) $this->id) . '-' . ((int) $this->reparacion);
+        }
+
+        return parent::getRouteKey();
+    }
+
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        if (! $this->usesLegacyPrimaryKey()) {
+            return parent::resolveRouteBinding($value, $field);
+        }
+
+        $rawValue = trim((string) $value);
+        [$orderId, $repairNumber] = array_pad(explode('-', $rawValue, 2), 2, null);
+
+        $query = $this->newQuery()->where('id', (int) $orderId);
+
+        if ($repairNumber !== null && trim((string) $repairNumber) !== '') {
+            $query->where('reparacion', (int) $repairNumber);
+        }
+
+        return $query->orderBy('reparacion')->first();
+    }
+
     public function originalImages(): array
     {
         return $this->parsePipeImages($this->imagen);
@@ -101,6 +129,17 @@ class RepairOrder extends Model
         }
 
         return array_values(array_filter(array_map('trim', explode('|', $value))));
+    }
+
+    protected function setKeysForSaveQuery($query): Builder
+    {
+        if ($this->usesLegacyPrimaryKey()) {
+            return $query
+                ->where('id', $this->getOriginal('id', $this->id))
+                ->where('reparacion', $this->getOriginal('reparacion', $this->reparacion));
+        }
+
+        return parent::setKeysForSaveQuery($query);
     }
 
     private function usesLegacyPrimaryKey(): bool
