@@ -369,6 +369,17 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Orden actualizada.');
     }
 
+    public function updateState(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'estado' => ['required', 'string', 'in:PENDIENTE,EN REPARACION,EN REPARACION / ESPERA REPUESTO,LISTA,CANCELADA,ENTREGADA'],
+        ]);
+
+        $repairService->updateState($repairOrder, $validated['estado']);
+
+        return back()->with('success', 'Estado actualizado.');
+    }
+
     public function showTicket(int $orderId, RepairService $repairService): Response
     {
         $orders = $repairService->ticketOrders($orderId);
@@ -556,6 +567,7 @@ class WorkbenchController extends Controller
             ])->all(),
             'actions' => [
                 'update' => route('repairs.orders.update', $order),
+                'state' => route('repairs.orders.state', $order),
                 'deliver' => route('repairs.orders.deliver', $order),
                 'markReady' => route('repairs.orders.mark_ready', $order),
                 'cancel' => route('repairs.orders.cancel', $order),

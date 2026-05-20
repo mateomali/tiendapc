@@ -174,6 +174,57 @@ it('marks only the selected job as ready in a multi-job ticket', function (): vo
     expect($second->fresh()?->estado)->toBe('LISTA');
 });
 
+it('cycles only the selected job state from the desktop status action', function (): void {
+    $first = RepairOrder::query()->create([
+        'id' => 915,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Estado',
+        'dni' => 30111222,
+        'modelo' => 'Equipo A',
+        'descripcion' => 'Trabajo A',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $second = RepairOrder::query()->create([
+        'id' => 915,
+        'reparacion' => 2,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Estado',
+        'dni' => 30111222,
+        'modelo' => 'Equipo B',
+        'descripcion' => 'Trabajo B',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $third = RepairOrder::query()->create([
+        'id' => 915,
+        'reparacion' => 3,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Estado',
+        'dni' => 30111222,
+        'modelo' => 'Equipo C',
+        'descripcion' => 'Trabajo C',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.state', $second), [
+            'estado' => 'EN REPARACION',
+        ])
+        ->assertRedirect();
+
+    expect($first->fresh()?->estado)->toBe('PENDIENTE');
+    expect($first->fresh()?->modelo)->toBe('Equipo A');
+    expect($second->fresh()?->estado)->toBe('EN REPARACION');
+    expect($second->fresh()?->modelo)->toBe('Equipo B');
+    expect($third->fresh()?->estado)->toBe('PENDIENTE');
+    expect($third->fresh()?->modelo)->toBe('Equipo C');
+});
+
 it('updates only the selected job details in a multi-job ticket', function (): void {
     $first = RepairOrder::query()->create([
         'id' => 914,

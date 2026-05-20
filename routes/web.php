@@ -64,6 +64,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::post('/repairs/orders/{repairOrder}/parts/remove', [WorkbenchController::class, 'removePartRequest'])->name('repairs.parts.remove');
     Route::get('/repairs/api/client/by-dni', [WorkbenchController::class, 'lookupByDni'])->name('repairs.lookup');
     Route::post('/repairs/orders/{repairOrder}', [WorkbenchController::class, 'update'])->name('repairs.orders.update');
+    Route::post('/repairs/orders/{repairOrder}/state', [WorkbenchController::class, 'updateState'])->name('repairs.orders.state');
     Route::post('/repairs/orders/{repairOrder}/add-repair', [WorkbenchController::class, 'addRepair'])->name('repairs.orders.add_repair');
     Route::post('/repairs/orders/{repairOrder}/images/add', [WorkbenchController::class, 'addOriginalImages'])->name('repairs.orders.images.add');
     Route::post('/repairs/orders/{repairOrder}/images/remove', [WorkbenchController::class, 'removeOriginalImage'])->name('repairs.orders.images.remove');

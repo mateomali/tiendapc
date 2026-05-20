@@ -482,6 +482,11 @@ class RepairService
         return $this->setState($order, 'LISTA', 'LISTA');
     }
 
+    public function updateState(RepairOrder $order, string $state): RepairOrder
+    {
+        return $this->setState($order, $state, 'CAMBIO_ESTADO_DIRECTO');
+    }
+
     public function cancel(RepairOrder $order): RepairOrder
     {
         return $this->setState($order, 'CANCELADA', 'CANCELADA');

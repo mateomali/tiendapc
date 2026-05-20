@@ -205,6 +205,7 @@ export interface RepairOrderView {
     events?: RepairEventView[];
     actions?: {
         update: string;
+        state: string;
         deliver: string;
         markReady: string;
         cancel: string;

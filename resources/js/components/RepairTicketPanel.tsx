@@ -895,16 +895,12 @@ function RepairEditCard({
     };
 
     const cycleDesktopStatus = (): void => {
-        if (readOnly || !canCycleStatus || !repair.actions?.update || form.processing) return;
+        const action = repair.actions?.state ?? repair.actions?.update;
+        if (readOnly || !canCycleStatus || !action || form.processing) return;
 
         router.post(
-            repair.actions.update,
-            {
-                ...form.data,
-                estado: nextStatus,
-                images: null,
-                final_images: null,
-            },
+            action,
+            { estado: nextStatus },
             {
                 preserveScroll: true,
                 onSuccess: () => form.setData('estado', nextStatus),
@@ -1345,17 +1341,19 @@ function RepairEditCard({
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
                     <div className="grid content-center justify-items-center gap-1 text-center">
-                        <span className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[0.68rem] font-black text-[#0f172a]">{rowTotal > 1 ? `${rowIndex + 1}/${rowTotal}` : `#${repair.reparacion}`}</span>
-                        <span className="text-[0.58rem] font-bold text-[#64748b]">Reg. {repair.registro_id || repair.reparacion}</span>
+                        {rowTotal > 1 ? (
+                            <span className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[0.68rem] font-black text-[#0f172a]">{rowIndex + 1}/{rowTotal}</span>
+                        ) : (
+                            <span className="text-slate-300">-</span>
+                        )}
                     </div>
                     <div className="flex items-center justify-center"><Thumb large /></div>
                     <button type="button" className="grid content-center gap-1 text-left" onClick={openInlineEditor} title={repair.modelo || '-'}>
-                        <span className="text-[0.62rem] font-black text-[#2563eb]">{desktopWorkLabel}</span>
+                        {rowTotal > 1 ? <span className="text-[0.62rem] font-black text-[#2563eb]">{desktopWorkLabel}</span> : null}
                         <span className="font-bold text-[#0f172a]">{repair.modelo || '-'}</span>
                     </button>
-                    <button type="button" className="grid content-center gap-1 text-left" onClick={openInlineEditor} title={repair.descripcion || '-'}>
-                        <span className="text-[0.62rem] font-black text-[#64748b]">Falla del trabajo #{repair.reparacion}</span>
-                        <span className="line-clamp-2 font-semibold text-[#334155]">{repair.descripcion || '-'}</span>
+                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.descripcion || '-'}>
+                        <span className="line-clamp-2">{repair.descripcion || '-'}</span>
                     </button>
                     <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
                         <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>
