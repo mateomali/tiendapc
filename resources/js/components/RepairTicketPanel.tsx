@@ -42,7 +42,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[3.4rem_minmax(8rem,0.65fr)_4.8rem_5.8rem_5.4rem_3.7rem_4.4rem_minmax(12rem,0.7fr)_minmax(12rem,0.7fr)_5.8rem_5rem_7.4rem_17.5rem]';
+    'grid-cols-[3.4rem_minmax(6.6rem,0.48fr)_4.8rem_5.8rem_5.4rem_3.7rem_4.4rem_minmax(12rem,0.75fr)_minmax(12rem,0.75fr)_5.8rem_5rem_7.4rem_19.5rem]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -1512,8 +1512,8 @@ export function RepairTicketPanel({
     const [addOpen, setAddOpen] = useState(false);
 
     return (
-        <section className={ui.repairTicketPanel}>
-            <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between">
+        <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-xl max-xl:border-2 max-xl:border-[#94a3b8] max-xl:bg-[#eef4fb] max-xl:p-2 max-xl:shadow-[0_2px_8px_rgba(15,23,42,0.12)]')}>
+            <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between max-xl:border-[#94a3b8] max-xl:bg-white">
                 <div className="min-w-0">
                     <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs">Ticket #{ticket.id}</p>
                     <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl">{ticket.nombre_cliente}</h3>
@@ -1549,7 +1549,7 @@ export function RepairTicketPanel({
 
             <div className="hidden overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
                 <div className="w-full min-w-[1680px]">
-                    <div className="grid grid-cols-[76px_minmax(190px,1.15fr)_96px_128px_106px_78px_86px_minmax(170px,1fr)_122px_112px_142px_216px] items-center gap-2 border-b border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 text-[0.7rem] font-bold text-[#475569]">
+                    <div className={cn('grid items-center gap-2 border-b border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 text-[0.7rem] font-bold text-[#475569]', repairDesktopTableGridClass)}>
                         <span className="text-center">ID</span>
                         <span>Cliente</span>
                         <span>DNI</span>
@@ -1580,7 +1580,7 @@ export function RepairTicketPanel({
                 </div>
             </div>
 
-            <div className="grid gap-3 xl:hidden">
+            <div className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#dbeafe] p-2 xl:hidden">
                 {ticket.repairs.map((repair) => (
                     <RepairEditCard
                         key={`mobile-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
