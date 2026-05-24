@@ -47,7 +47,6 @@ export default function ServicesPage({ hero, services, cta }: ServicesPageProps)
                                 }}
                             />
                         </div>
-                        <p className="text-[0.84rem] font-black tracking-[0.04em] text-[#2f5eb6]">{service.indexLabel}</p>
                         <h2 className="text-[1.3rem] font-black text-[#1b2f58]">{service.title}</h2>
                         {service.subtitle ? <p className="text-[0.96rem] font-extrabold text-[#2b5aa8]">{service.subtitle}</p> : null}
                         {service.description ? <p className="leading-7 text-[#35517f]">{service.description}</p> : null}

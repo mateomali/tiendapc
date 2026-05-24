@@ -289,7 +289,7 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
 
     return (
         <SiteLayout title={product.name} headerSearch={headerSearch}>
-            <section className="mx-auto grid w-[min(980px,100%)] grid-cols-1 gap-[0.85rem]">
+            <section className="catalog-font-scope mx-auto grid w-[min(980px,100%)] grid-cols-1 gap-[0.85rem]">
                 <div className={productSurfaceClass(toneClass)}>
                     <div className={productGalleryCardClass}>
                         <Link href={route('store.catalog')} className={storeBackLinkClass} prefetch={['hover', 'click']} cacheFor="30s">
@@ -359,15 +359,15 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                     </div>
 
                     <div className={productInfoCardClass}>
-                        <p className={productDetailCategoryClass}>{product.categoryName}</p>
-                        <h1 className={productTitleClass}>{product.name}</h1>
-                        <div className={`${productPriceBoxClass} ${catalogPriceBoxToneClass(toneClass)}`}>
+                        <p className={`${productDetailCategoryClass} catalog-preview-title-font uppercase`}>{product.categoryName}</p>
+                        <h1 className={`${productTitleClass} uppercase`}>{product.name}</h1>
+                        <div className={`${productPriceBoxClass} ${catalogPriceBoxToneClass(toneClass)} justify-items-center text-center`}>
                             {product.hasOffer && product.offerPriceLabel !== '' ? (
-                                <span className={catalogPriceBeforeClass}>
+                                <span className={`${catalogPriceBeforeClass} catalog-preview-price-font`}>
                                     ANTES <span className={catalogPriceBeforeValueClass}>${product.priceLabel}</span>
                                 </span>
                             ) : null}
-                            <strong className={productPriceClass}>${product.displayPriceLabel}</strong>
+                            <strong className={`${productPriceClass} catalog-preview-price-font text-[2.4rem] max-[640px]:text-[2rem]`}>${product.displayPriceLabel}</strong>
                         </div>
 
                         <div className={productActionsClass}>
@@ -382,7 +382,7 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                                 </span>
                             </button>
                             <a href={product.whatsappUrl} className={catalogActionClass('success', 'min-h-12 px-[1.3rem]')}>
-                                <span>Consultar por WhatsApp</span>
+                                <span>Comprar ya!</span>
                                 <span className={catalogActionIconClass} aria-hidden="true">
                                     <WhatsAppIcon size={16} />
                                 </span>
@@ -390,8 +390,8 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                         </div>
 
                         <div className={productDescriptionClass}>
-                            <div className={productDescriptionHeaderClass}>Descripcion del producto:</div>
-                            <div className={productDescriptionBodyClass} dangerouslySetInnerHTML={{ __html: showFullDescription || !product.hasLongDescription ? product.description : product.descriptionShort }} />
+                            <div className={`${productDescriptionHeaderClass} catalog-preview-title-font uppercase`}>Descripcion del producto:</div>
+                            <div className={`${productDescriptionBodyClass} catalog-preview-title-font`} dangerouslySetInnerHTML={{ __html: showFullDescription || !product.hasLongDescription ? product.description : product.descriptionShort }} />
                             {product.hasLongDescription ? (
                                 <button type="button" className={productMoreButtonClass} onClick={() => setShowFullDescription((current) => !current)}>
                                     {showFullDescription ? 'Ver menos' : 'Leer descripcion completa'}

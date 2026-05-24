@@ -20,6 +20,10 @@ class CartController extends Controller
         $product = Product::query()->where('is_active', true)->findOrFail($validated['product_id']);
         $cartService->add($product, (int) ($validated['quantity'] ?? 1));
 
+        if ($request->boolean('inline_feedback')) {
+            return back();
+        }
+
         return back()->with('success', 'Producto agregado al carrito.');
     }
 

@@ -189,7 +189,7 @@ export const productInfoCardClass =
 export const productDetailCategoryClass =
     'm-0 w-full text-center text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700 max-[560px]:text-[0.64rem] max-[560px]:tracking-[0.035em]';
 export const productTitleClass =
-    'm-0 w-full text-center text-[1.55rem] font-bold leading-[1.22] text-[#1f365d] max-[560px]:text-[1.2rem] max-[560px]:leading-[1.2]';
+    'catalog-preview-title-font m-0 w-full text-center text-[1.55rem] font-[400] leading-[1.22] text-[#1f365d] max-[560px]:text-[1.2rem] max-[560px]:leading-[1.2]';
 export const productDetailBadgesClass =
     'flex min-h-0 w-full flex-wrap items-start gap-2 px-[0.8rem] pt-[0.2rem] max-[560px]:items-stretch max-[560px]:gap-[0.4rem]';
 export const productFeaturedFlagClass =
@@ -274,7 +274,7 @@ export const site = {
     mobileMenuSheet:
         'grid w-full min-w-0 grid-cols-[repeat(2,minmax(0,1fr))] gap-[0.5rem] rounded-[1.05rem] border border-[rgba(155,201,255,0.44)] bg-[linear-gradient(180deg,#f7fbff_0%,#e6f0ff_100%)] p-[0.75rem] text-[#102146] shadow-[0_24px_52px_rgba(3,12,34,0.35)] max-[380px]:gap-[0.34rem] max-[380px]:rounded-[0.9rem] max-[380px]:p-[0.5rem]',
     mobileMenuTitle:
-        'col-span-full px-1 text-[0.78rem] font-black uppercase tracking-[0.08em] text-[#17427f]',
+        'catalog-preview-title-font col-span-full px-1 text-[0.78rem] font-[400] uppercase tracking-[0.08em] text-[#17427f]',
     desktopNavRow:
         'mx-auto flex min-h-[2.45rem] w-full max-w-full flex-nowrap items-center justify-center overflow-hidden rounded-none border-x border-b border-[rgba(178,214,255,0.46)] border-t-0 bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.24rem] shadow-[0_8px_16px_rgba(33,74,154,0.09),inset_0_1px_0_rgba(255,255,255,0.08)] max-[1080px]:flex-wrap max-[860px]:hidden',
     desktopNavShell:
@@ -283,7 +283,7 @@ export const site = {
 };
 
 const navPillBase =
-    `${interactiveLift} inline-flex min-h-[1.9rem] min-w-0 items-center justify-center gap-[0.36rem] overflow-hidden rounded-none border-0 border-r border-[rgba(190,221,255,0.18)] bg-transparent px-[0.94rem] py-[0.3rem] text-center text-[0.88rem] font-black uppercase tracking-[0.035em] text-[#edf7ff] shadow-none first:rounded-l-[0.64rem] last:rounded-r-[0.64rem] last:border-r-0 hover:bg-white/10 hover:text-white max-[1080px]:min-h-[1.72rem] max-[1080px]:px-[0.72rem] max-[1080px]:py-[0.24rem] max-[1080px]:text-[0.78rem] max-[1080px]:tracking-[0.025em] max-[860px]:min-h-[2.2rem] max-[860px]:w-full max-[860px]:gap-[0.32rem] max-[860px]:rounded-[0.74rem] max-[860px]:border max-[860px]:border-[rgba(159,210,255,0.38)] max-[860px]:bg-[linear-gradient(180deg,rgba(38,93,190,0.98)_0%,rgba(24,64,144,0.98)_100%)] max-[860px]:px-[0.5rem] max-[860px]:py-[0.52rem] max-[860px]:text-[0.68rem] max-[860px]:leading-none max-[860px]:tracking-[0.02em] max-[860px]:shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] max-[560px]:text-[0.66rem] max-[380px]:min-h-[2rem] max-[380px]:px-[0.34rem] max-[380px]:text-[0.6rem] [&]:truncate`;
+    `${interactiveLift} catalog-preview-title-font inline-flex min-h-[1.9rem] min-w-0 items-center justify-center gap-[0.36rem] overflow-hidden rounded-none border-0 border-r border-[rgba(190,221,255,0.18)] bg-transparent px-[0.94rem] py-[0.3rem] text-center text-[0.88rem] font-[400] uppercase tracking-[0.035em] text-[#edf7ff] shadow-none first:rounded-l-[0.64rem] last:rounded-r-[0.64rem] last:border-r-0 hover:bg-white/10 hover:text-white max-[1080px]:min-h-[1.72rem] max-[1080px]:px-[0.72rem] max-[1080px]:py-[0.24rem] max-[1080px]:text-[0.78rem] max-[1080px]:tracking-[0.025em] max-[860px]:min-h-[2.2rem] max-[860px]:w-full max-[860px]:gap-[0.32rem] max-[860px]:rounded-[0.74rem] max-[860px]:border max-[860px]:border-[rgba(159,210,255,0.38)] max-[860px]:bg-[linear-gradient(180deg,rgba(38,93,190,0.98)_0%,rgba(24,64,144,0.98)_100%)] max-[860px]:px-[0.5rem] max-[860px]:py-[0.52rem] max-[860px]:text-[0.68rem] max-[860px]:leading-none max-[860px]:tracking-[0.02em] max-[860px]:shadow-[inset_0_1px_0_rgba(255,255,255,0.14)] max-[560px]:text-[0.66rem] max-[380px]:min-h-[2rem] max-[380px]:px-[0.34rem] max-[380px]:text-[0.6rem] [&]:truncate`;
 
 export function siteMobileToggleClass(open: boolean): string {
     return cn(
@@ -418,8 +418,8 @@ export const catalog = {
     tools: 'rounded-none border border-[rgba(155,194,242,0.72)] bg-[linear-gradient(180deg,#ffffff_0%,#eff6ff_100%)] p-0 shadow-[0_10px_20px_rgba(33,74,154,0.10)] max-[860px]:rounded-none',
     toolsInner:
         'flex flex-wrap items-center justify-between gap-1.5 rounded-none border border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.28rem_0.62rem] text-[#f3f8ff] shadow-[0_8px_16px_rgba(33,74,154,0.09),inset_0_1px_0_rgba(255,255,255,0.08)] max-[1200px]:flex-col max-[1200px]:items-stretch max-[860px]:gap-[0.42rem] max-[860px]:rounded-none max-[860px]:p-[0.42rem]',
-    toolbarLeft: 'flex min-w-0 flex-nowrap items-end gap-2 max-[860px]:grid max-[860px]:grid-cols-2 max-[860px]:items-end max-[860px]:gap-[0.42rem]',
-    toolbarRight: 'flex min-w-0 flex-nowrap items-end justify-end gap-2 max-[860px]:w-full max-[860px]:items-center max-[860px]:justify-between max-[860px]:gap-[0.42rem]',
+    toolbarLeft: 'flex min-w-0 flex-nowrap items-center gap-2 max-[860px]:grid max-[860px]:grid-cols-2 max-[860px]:items-end max-[860px]:gap-[0.42rem]',
+    toolbarRight: 'flex min-w-0 flex-nowrap items-center justify-end gap-2 max-[860px]:w-full max-[860px]:items-center max-[860px]:justify-between max-[860px]:gap-[0.42rem]',
     tooltipWrap:
         'group/tooltip relative inline-flex before:pointer-events-none before:absolute before:bottom-[calc(100%+0.48rem)] before:left-1/2 before:z-30 before:hidden before:-translate-x-1/2 before:whitespace-nowrap before:rounded-[0.58rem] before:border before:border-[rgba(190,221,255,0.36)] before:bg-[linear-gradient(180deg,rgba(8,31,78,0.98)_0%,rgba(10,45,105,0.98)_100%)] before:px-2.5 before:py-1.5 before:text-[0.68rem] before:font-bold before:normal-case before:tracking-normal before:text-[#eef7ff] before:shadow-[0_10px_20px_rgba(3,12,34,0.28),inset_0_1px_0_rgba(255,255,255,0.08)] before:content-[attr(data-tooltip)] after:pointer-events-none after:absolute after:bottom-[calc(100%+0.23rem)] after:left-1/2 after:z-30 after:hidden after:h-2 after:w-2 after:-translate-x-1/2 after:rotate-45 after:border-r after:border-b after:border-[rgba(190,221,255,0.30)] after:bg-[rgba(10,45,105,0.98)] group-hover/tooltip:before:block group-hover/tooltip:after:block group-focus-within/tooltip:before:block group-focus-within/tooltip:after:block max-[860px]:before:hidden max-[860px]:after:hidden',
     toolbarSegment: 'grid min-w-0 flex-[0_0_13.5rem] gap-1 max-[860px]:flex-auto max-[860px]:gap-[0.18rem]',
@@ -427,21 +427,21 @@ export const catalog = {
     toolbarSubcategoryHidden: 'pointer-events-none h-0 overflow-hidden opacity-0',
     sectionTitle: 'px-1 text-[0.62rem] font-black uppercase tracking-[0.09em] text-[#dcecff] [text-shadow:0_1px_8px_rgba(5,18,48,0.24)] max-[860px]:text-[0.58rem] max-[860px]:leading-none max-[860px]:tracking-[0.05em]',
     select:
-        'min-h-9 min-w-0 rounded-[0.62rem] border border-[rgba(204,226,255,0.72)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(235,244,255,0.94)_100%)] px-2.5 py-0 text-[0.78rem] font-semibold text-[#173b76] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_10px_rgba(7,32,88,0.08)] outline-none transition focus:border-[rgba(184,229,255,0.92)] focus:ring-2 focus:ring-sky-200/35 max-[860px]:min-h-8 max-[860px]:w-full max-[860px]:overflow-hidden max-[860px]:truncate max-[860px]:rounded-[0.56rem] max-[860px]:px-2 max-[860px]:pr-6 max-[860px]:text-[0.68rem]',
+        'catalog-preview-title-font min-h-9 min-w-0 rounded-[0.45rem] border border-slate-200 bg-white px-2.5 py-0 text-[0.78rem] font-[400] text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.05)] outline-none transition hover:border-slate-300 focus:border-[#2456b4] focus:ring-2 focus:ring-[#bfd8ff]/55 max-[860px]:min-h-8 max-[860px]:w-full max-[860px]:overflow-hidden max-[860px]:truncate max-[860px]:rounded-[0.45rem] max-[860px]:px-2 max-[860px]:pr-6 max-[860px]:text-[0.68rem]',
     orderForm: 'm-0 flex min-w-0 flex-none items-center gap-0 max-[860px]:flex-none',
     orderLabel: 'hidden',
     orderToggle: 'flex w-auto items-center gap-1 max-[860px]:gap-[0.34rem]',
     densityForm: 'relative m-0 hidden h-10 min-h-10 w-[8rem] min-w-[8rem] flex-none items-center justify-center min-[861px]:flex',
-    densityLabel: 'pointer-events-none absolute left-2 top-1/2 z-[1] inline-flex h-4 w-4 -translate-y-1/2 items-center justify-center text-[#17427f]',
+    densityLabel: 'pointer-events-none absolute left-2 top-1/2 z-[1] inline-flex h-4 w-4 -translate-y-1/2 items-center justify-center text-slate-500',
     densityIcon: 'inline-flex h-4 w-4 flex-none items-center justify-center [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-2 [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     densitySelect:
-        'h-10 min-h-10 w-full cursor-pointer rounded-[0.72rem] border border-[rgba(205,227,255,0.74)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(237,245,255,0.94)_100%)] py-0 pr-1.5 pl-7 text-[0.76rem] font-black text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_12px_rgba(7,32,88,0.10)] outline-none transition hover:brightness-[1.03] focus:border-[rgba(184,229,255,0.92)] focus:ring-2 focus:ring-sky-200/40',
+        'catalog-preview-title-font h-10 min-h-10 w-full cursor-pointer rounded-[0.45rem] border border-slate-200 bg-white py-0 pr-1.5 pl-7 text-[0.74rem] font-[400] uppercase text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.05)] outline-none transition hover:border-slate-300 focus:border-[#2456b4] focus:ring-2 focus:ring-[#bfd8ff]/55',
     clearButton:
-        'inline-flex h-9 min-h-9 min-w-9 items-center justify-center gap-1.5 rounded-[0.62rem] border border-[#fecdd3]/90 bg-[linear-gradient(180deg,#fff3f5_0%,#ffdce3_100%)] px-2 text-[0.68rem] font-black uppercase tracking-[0.02em] text-[#b42342] shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_5px_12px_rgba(7,32,88,0.08)] transition-[transform,box-shadow,filter] duration-150 hover:-translate-y-px hover:brightness-[1.02] focus-visible:-translate-y-px focus-visible:brightness-[1.03] max-[860px]:h-8 max-[860px]:min-h-8 max-[860px]:w-8 max-[860px]:min-w-8 max-[860px]:rounded-[0.56rem] max-[860px]:px-0 max-[860px]:text-[0px] max-[560px]:text-[0px]',
+        'catalog-preview-title-font inline-flex h-9 min-h-9 min-w-9 items-center justify-center gap-1.5 rounded-[0.45rem] border border-rose-200 bg-white px-2 text-[0.68rem] font-[400] uppercase tracking-[0.02em] text-[#b42342] shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[background-color,border-color,color] duration-150 hover:border-rose-300 hover:bg-rose-50 focus-visible:border-rose-300 focus-visible:bg-rose-50 max-[860px]:h-8 max-[860px]:min-h-8 max-[860px]:w-8 max-[860px]:min-w-8 max-[860px]:rounded-[0.45rem] max-[860px]:px-0 max-[860px]:text-[0px] max-[560px]:text-[0px]',
     clearIcon: 'inline-flex h-4 w-4 flex-none items-center justify-center text-current [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-2 [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     results: 'rounded-none border border-[rgba(91,192,255,0.30)] bg-[radial-gradient(circle_at_16%_12%,rgba(56,189,248,0.10)_0%,rgba(56,189,248,0)_28%),radial-gradient(circle_at_88%_18%,rgba(59,130,246,0.09)_0%,rgba(59,130,246,0)_30%),linear-gradient(180deg,#071a3f_0%,#0a2558_54%,#061634_100%)] pt-0 shadow-[inset_0_1px_0_rgba(186,230,253,0.10),0_16px_30px_rgba(4,18,48,0.18)] max-[860px]:rounded-none max-[860px]:pt-0',
     productToolbar:
-        'mb-0 hidden min-h-[3.25rem] w-full max-w-none grid-cols-[minmax(360px,1fr)_auto] items-center gap-2 rounded-none border-y border-x-0 border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.28rem_0.7rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md min-[861px]:grid max-[1120px]:grid-cols-1 max-[1120px]:items-stretch',
+        'mb-0 hidden min-h-[3.25rem] w-full max-w-none grid-cols-[minmax(360px,1fr)_auto] items-center gap-2 rounded-none border-y border-x-0 border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.42rem_0.7rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md min-[861px]:grid max-[1120px]:grid-cols-1 max-[1120px]:items-stretch',
     productToolbarFilters: 'min-w-0 min-[861px]:max-w-[1500px]',
     productToolbarActions: 'min-w-0 justify-self-end max-[1120px]:justify-self-stretch',
     grid: 'grid grid-cols-1 gap-2.5',
@@ -454,12 +454,12 @@ export const catalog = {
 };
 
 const orderButtonBase =
-    'inline-flex h-9 min-h-9 min-w-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.62rem] border border-[rgba(205,227,255,0.74)] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(237,245,255,0.94)_100%)] px-2 py-0 text-[0.68rem] font-black uppercase tracking-[0.02em] text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_10px_rgba(7,32,88,0.08)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:brightness-[1.03] focus-visible:-translate-y-px focus-visible:brightness-[1.03] max-[860px]:h-8 max-[860px]:min-h-8 max-[860px]:w-8 max-[860px]:min-w-8 max-[860px]:rounded-[0.56rem] max-[860px]:px-0 max-[860px]:text-[0px]';
+    'catalog-preview-title-font inline-flex h-9 min-h-9 min-w-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.45rem] border border-slate-200 bg-white px-2.5 py-0 text-[0.68rem] font-[400] uppercase tracking-[0.02em] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[background-color,border-color,color] duration-150 hover:border-slate-300 hover:bg-slate-50 focus-visible:border-[#2456b4] focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-[#bfd8ff]/55 max-[860px]:h-8 max-[860px]:min-h-8 max-[860px]:w-8 max-[860px]:min-w-8 max-[860px]:rounded-[0.45rem] max-[860px]:px-0 max-[860px]:text-[0px]';
 
 export function catalogOrderButtonClass(active: boolean): string {
     return cn(
         orderButtonBase,
-        active && '!border-[rgba(184,229,255,0.96)] !bg-[linear-gradient(180deg,#57a9ef_0%,#2759b7_100%)] !text-[#f7fbff] shadow-[inset_0_1px_0_rgba(255,255,255,0.24),0_10px_18px_rgba(13,53,126,0.24)]',
+        active && '!border-[#2456b4] !bg-[#2456b4] !text-white shadow-[0_2px_5px_rgba(36,86,180,0.22)]',
     );
 }
 
@@ -479,7 +479,7 @@ export const catalogOrderIconClass =
     'inline-flex h-[15px] w-[15px] flex-none items-center justify-center text-current [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-2 [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]';
 export const catalogOrderFireIconClass =
     'inline-flex h-auto w-auto flex-none items-center justify-center text-[0.95rem] leading-none text-current';
-export const catalogOrderCurrencyClass = 'text-[0.68rem] font-black leading-none';
+export const catalogOrderCurrencyClass = 'catalog-preview-title-font text-[0.68rem] font-[400] leading-none';
 
 const catalogCardBase =
     'relative grid h-[196px] min-h-[170px] grid-cols-[42%_minmax(0,1fr)] items-stretch overflow-hidden rounded-[0.82rem] border bg-white shadow-[0_8px_18px_rgba(15,23,42,0.075)] transition-[transform,box-shadow,filter,border-color] duration-200 min-[861px]:h-auto min-[861px]:min-h-full min-[861px]:grid-cols-1 min-[861px]:content-start min-[861px]:rounded-[0.95rem] min-[861px]:hover:-translate-y-1 min-[861px]:hover:brightness-[1.01] min-[861px]:hover:shadow-[0_14px_28px_rgba(15,23,42,0.105),0_0_0_3px_rgba(184,215,255,0.24)] max-[860px]:[contain:layout_paint_style] max-[860px]:[content-visibility:auto] max-[860px]:[contain-intrinsic-size:196px] max-[860px]:shadow-[0_6px_14px_rgba(15,23,42,0.065)] max-[560px]:h-[178px] max-[560px]:[contain-intrinsic-size:178px] max-[560px]:grid-cols-[41%_minmax(0,1fr)]';
@@ -520,7 +520,7 @@ export const catalogBadgesClass = 'flex min-h-6 items-center justify-between gap
 export const catalogImageBadgesClass = 'absolute right-2.5 bottom-2.5 left-2.5 z-[2] flex min-h-7 items-end justify-between gap-1.5 px-0 py-0 max-[560px]:right-1.5 max-[560px]:bottom-1.5 max-[560px]:left-1.5 max-[560px]:min-h-6 max-[560px]:gap-1';
 export const catalogImageNewBadgeClass = 'absolute top-2 right-2 z-[3] max-[560px]:top-1.5 max-[560px]:right-1.5';
 export const catalogFeaturedChipClass =
-    'inline-flex items-center gap-1 rounded-full bg-[linear-gradient(180deg,#ffe9a8_0%,#f2c95c_58%,#d7a92f_100%)] px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.08em] text-[#17376f] shadow-[0_6px_14px_rgba(13,53,126,0.14),inset_0_1px_0_rgba(255,255,255,0.44)] ring-1 ring-[#f8d978]/90 backdrop-blur-[2px] max-[560px]:px-2 max-[560px]:py-0.5 max-[560px]:text-[0.54rem]';
+    'catalog-preview-title-font inline-flex items-center gap-1 rounded-full bg-[linear-gradient(180deg,#ffe9a8_0%,#f2c95c_58%,#d7a92f_100%)] px-2.5 py-1 text-[0.62rem] font-[400] uppercase tracking-[0.08em] text-[#17376f] shadow-[0_6px_14px_rgba(13,53,126,0.14),inset_0_1px_0_rgba(255,255,255,0.44)] ring-1 ring-[#f8d978]/90 backdrop-blur-[2px] max-[560px]:px-2 max-[560px]:py-0.5 max-[560px]:text-[0.54rem]';
 export const catalogNewChipClass =
     'rounded-full bg-[#eefbff]/95 px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.1em] text-[#0b6f95] shadow-[0_6px_14px_rgba(8,91,117,0.14)] ring-1 ring-[#b7ecff]/90 backdrop-blur-[2px] max-[560px]:px-2 max-[560px]:py-0.5 max-[560px]:text-[0.54rem]';
 export const catalogImageLinkClass = 'group relative m-1 flex min-h-[158px] items-center justify-center overflow-hidden rounded-[0.62rem] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-1.5 shadow-inner ring-1 min-[861px]:m-2 min-[861px]:aspect-[6/7] min-[861px]:min-h-0 min-[861px]:rounded-[0.78rem] min-[861px]:p-2 max-[560px]:m-1 max-[560px]:min-h-[136px] max-[560px]:p-1';
@@ -528,8 +528,8 @@ export const catalogImageDetailsPillClass =
     'pointer-events-none absolute left-1/2 top-1/2 z-[3] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#071a3f]/88 px-3 py-1.5 text-[0.72rem] font-bold text-white opacity-0 shadow-[0_10px_20px_rgba(7,26,63,0.24)] backdrop-blur-sm transition duration-150 group-hover:opacity-100 group-focus-visible:opacity-100 max-[860px]:hidden';
 export const catalogImageClass = 'h-full max-h-full w-full max-w-full bg-transparent object-contain opacity-95 saturate-[0.96]';
 export const catalogBodyClass = 'grid min-w-0 content-start gap-[0.22rem] overflow-hidden px-2 py-1.5 font-sans min-[861px]:content-start min-[861px]:gap-[0.62rem] min-[861px]:overflow-visible min-[861px]:px-3 min-[861px]:pb-3 min-[861px]:pt-1';
-export const catalogCategoryClass = 'block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700 max-[560px]:text-[0.64rem] max-[560px]:tracking-[0.035em]';
-export const catalogTitleClass = 'line-clamp-2 min-h-0 text-[0.98rem] font-bold leading-[1.18] text-[#1f365d] min-[861px]:line-clamp-3 min-[861px]:min-h-[3.2rem] max-[560px]:text-[0.86rem] max-[560px]:leading-[1.16]';
+export const catalogCategoryClass = 'catalog-preview-title-font block min-w-0 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-[0.76rem] font-[500] uppercase tracking-[0.045em] text-blue-700 max-[560px]:text-[0.64rem] max-[560px]:tracking-[0.035em]';
+export const catalogTitleClass = 'catalog-preview-title-font line-clamp-2 min-h-0 text-[0.98rem] font-[400] uppercase leading-[1.18] text-[#1f365d] min-[861px]:line-clamp-3 min-[861px]:min-h-[3.2rem] max-[560px]:text-[0.86rem] max-[560px]:leading-[1.16]';
 export const catalogPriceBoxClass = 'mt-1 grid gap-0.5 rounded-[0.58rem] px-2 py-1.5 text-center ring-1 min-[861px]:mt-0 min-[861px]:py-2 max-[560px]:mt-[0.2rem]';
 const catalogPriceBoxToneClasses = {
     offer: '!bg-[#f2f8ff] ring-[#b8d7ff]/85',
@@ -543,10 +543,10 @@ const catalogImageToneClasses = {
     new: '!bg-white ring-slate-100/90',
     regular: '!bg-white ring-slate-100/90',
 } as const;
-export const catalogPriceBeforeClass = 'text-[0.7rem] font-semibold uppercase tracking-[0.045em] text-[#7d8794] opacity-100 no-underline max-[560px]:text-[0.64rem] max-[560px]:text-[#6f7a88]';
+export const catalogPriceBeforeClass = 'catalog-preview-price-font text-[0.7rem] font-semibold uppercase tracking-[0.045em] text-[#7d8794] opacity-100 no-underline max-[560px]:text-[0.64rem] max-[560px]:text-[#6f7a88]';
 export const catalogPriceBeforeValueClass = 'line-through';
-export const catalogPriceClass = 'text-[1.58rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.28rem]';
-export const productPriceClass = 'text-[1.75rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.45rem]';
+export const catalogPriceClass = 'catalog-preview-price-font text-[1.58rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.28rem]';
+export const productPriceClass = 'catalog-preview-price-font text-[1.75rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.45rem]';
 export const productPriceBoxClass =
     'mx-auto grid w-[min(100%,420px)] justify-items-center gap-[0.28rem] rounded-[1.2rem] border border-[var(--product-tone-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-[0.9rem_1rem_0.95rem] text-center shadow-[0_0_14px_color-mix(in_srgb,var(--product-tone-glow)_46%,transparent)]';
 export const catalogActionsClass = 'mt-[0.45rem] grid grid-cols-1 gap-1 min-[861px]:mt-0 max-[560px]:mt-[0.42rem]';

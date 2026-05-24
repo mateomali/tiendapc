@@ -191,7 +191,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
 
         const queryString = params.toString();
 
-        return `${route('store.catalog')}${queryString !== '' ? `?${queryString}` : ''}`;
+        return `${headerSearch?.actionUrl ?? route('store.catalog')}${queryString !== '' ? `?${queryString}` : ''}`;
     };
 
     const submitSearch = (query = search): void => {
@@ -279,7 +279,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
     return (
         <>
             <Head title={title} />
-            <div className={site.shell}>
+            <div className={`${site.shell} catalog-font-scope`}>
                 <div className={site.frame}>
                     <header className={site.header}>
                         <div className={site.headerInner}>
@@ -420,12 +420,12 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     </div>
                                 </div>
 
-                                <Link href={layout.cartUrl} className={site.mobileHeaderCart} aria-label={`Ir al carrito, ${cart.count} productos`} prefetch={['hover', 'click']} cacheFor="15s">
+                                <a href={layout.cartUrl} className={site.mobileHeaderCart} aria-label={`Ir al carrito, ${cart.count} productos`}>
                                     <span className={siteCartIconClass}>
                                         <CartNavIcon />
                                     </span>
                                     <span className={siteCartBadgeClass}>{cart.count}</span>
-                                </Link>
+                                </a>
                             </div>
                         </section>
                     ) : null}

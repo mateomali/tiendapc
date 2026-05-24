@@ -118,7 +118,7 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
                                                 />
                                                 <div className="grid gap-1">
                                                     <h2 className="text-[1.06rem] font-bold leading-[1.22] text-[#1f365d]">{item.name}</h2>
-                                                    <p className="text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700">Precio unitario: ${item.unitPriceLabel}</p>
+                                                    <p className="text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700">Precio unitario: <span className="catalog-preview-price-font">${item.unitPriceLabel}</span></p>
                                                 </div>
                                                 <div className="grid gap-2 md:justify-items-end">
                                                     <div className="flex items-center justify-center gap-2 rounded-[1rem] border border-[rgba(188,214,245,0.92)] bg-[linear-gradient(180deg,#f8fbff_0%,#ebf4ff_100%)] p-1">
@@ -152,7 +152,7 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
                                                             +
                                                         </button>
                                                     </div>
-                                                    <strong className="text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${lineSubtotalLabel}</strong>
+                                                    <strong className="catalog-preview-price-font text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${lineSubtotalLabel}</strong>
                                                     <button
                                                         type="button"
                                                         className={buttonClass('danger', 'sm', 'rounded-[0.95rem] px-4 py-2 text-[0.84rem]')}
@@ -178,7 +178,7 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
                     <aside className="grid h-fit gap-3 rounded-[1.35rem] border border-[rgba(124,180,243,0.76)] bg-[linear-gradient(180deg,#2f5daf_0%,#294f99_100%)] p-4 shadow-[0_16px_32px_rgba(34,75,154,0.16)] xl:sticky xl:top-[7.2rem]">
                         <form className="grid gap-3 rounded-[1.15rem] border border-[rgba(208,228,252,0.85)] bg-[linear-gradient(180deg,#ffffff_0%,#eff6ff_100%)] p-5 shadow-[0_14px_28px_rgba(33,74,154,0.12)]" onSubmit={finishCheckout}>
                         <p className="text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700">RESUMEN</p>
-                        <strong className="text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${totalLabel}</strong>
+                        <strong className="catalog-preview-price-font text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${totalLabel}</strong>
 
                         <label className="grid gap-1.5">
                             <span className="text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700">Nombre y apellido</span>

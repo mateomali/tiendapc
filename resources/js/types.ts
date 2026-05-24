@@ -72,6 +72,7 @@ export interface HeaderSearchState {
     onlyFeatured?: boolean;
     showDesktop: boolean;
     showMobileSticky: boolean;
+    actionUrl?: string;
 }
 
 export interface CatalogGroup {

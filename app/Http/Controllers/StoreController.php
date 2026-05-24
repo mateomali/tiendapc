@@ -27,6 +27,8 @@ class StoreController extends Controller
     public function catalog(Request $request, CartService $cartService): Response
     {
         $filters = $this->catalogFilters($request);
+        $isPreview = $request->routeIs('store.catalog.preview');
+        $clearRoute = $isPreview ? 'store.catalog.preview' : 'store.catalog';
         $newDays = max(1, (int) SiteGlobalConfig::value('catalog_new_days', '10'));
         $newSince = now()->subDays($newDays);
 
@@ -128,6 +130,7 @@ class StoreController extends Controller
                 'onlyFeatured' => $filters['onlyFeatured'],
                 'showDesktop' => true,
                 'showMobileSticky' => true,
+                'actionUrl' => route($clearRoute),
             ],
             'filters' => [
                 'query' => $filters['query'],
@@ -137,7 +140,7 @@ class StoreController extends Controller
                 'onlyNew' => $filters['onlyNew'],
                 'onlyOffers' => $filters['onlyOffers'],
                 'onlyFeatured' => $filters['onlyFeatured'],
-                'clearUrl' => route('store.catalog'),
+                'clearUrl' => route($clearRoute),
                 'emptyText' => SiteGlobalConfig::value('catalog_empty_text', 'Prueba con otra categoria o con un termino distinto.'),
                 'imageRotationMs' => max(2000, min(20000, (int) SiteGlobalConfig::value('catalog_product_image_rotation_ms', '10000'))),
             ],
@@ -150,14 +153,15 @@ class StoreController extends Controller
                     ->map(fn (SiteAnnouncement $announcement): array => $this->serializeAnnouncement($announcement))
                     ->values(),
             ],
-            'groups' => $this->serializeGroups($categories, $filters['selectedGroup'], $filters['selectedCategory'], $filters['query'], $filters['order'], $filters['onlyNew'], $filters['onlyOffers'], $filters['onlyFeatured']),
-            'categories' => $this->serializeCategories($categories, $filters, $products),
+            'groups' => $this->serializeGroups($categories, $filters['selectedGroup'], $filters['selectedCategory'], $filters['query'], $filters['order'], $filters['onlyNew'], $filters['onlyOffers'], $filters['onlyFeatured'], $clearRoute),
+            'categories' => $this->serializeCategories($categories, $filters, $products, $clearRoute),
             'products' => $products
                 ->map(fn (Product $product): array => $this->serializeCatalogProduct($product, (int) ($cartQuantities->get($product->id) ?? 0), $newSince))
                 ->values(),
             'summary' => [
                 'productCount' => $products->count(),
             ],
+            'previewCardGrid' => true,
         ]);
     }
 
@@ -219,6 +223,7 @@ class StoreController extends Controller
     public function services(): Response
     {
         $config = SiteServicesConfig::query()->find(1);
+        $usedServiceImages = [];
 
         return Inertia::render('Store/ServicesPage', [
             'kind' => 'services',
@@ -231,7 +236,7 @@ class StoreController extends Controller
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->get()
-                ->map(function (SiteService $service, int $index): array {
+                ->map(function (SiteService $service, int $index) use (&$usedServiceImages): array {
                     $points = preg_split('/\R+/', (string) ($service->points_text ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
                     return [
@@ -240,7 +245,7 @@ class StoreController extends Controller
                         'subtitle' => $service->subtitle,
                         'description' => $service->description,
                         'points' => array_values(array_map('trim', $points)),
-                        'imageUrl' => $this->normalizeMediaUrl($service->image_url) ?: asset('assets/img/logo-placeholder.svg'),
+                        'imageUrl' => $this->generatedServiceImageUrl($service, $index, $usedServiceImages),
                         'imageFallbackUrl' => asset('assets/img/logo-placeholder.svg'),
                     ];
                 })
@@ -329,19 +334,19 @@ class StoreController extends Controller
      * @param Collection<int, Product> $products
      * @return array<int, array{id: int, name: string, slug: string, groupKey: string, productCount: int, url: string, isSelected: bool}>
      */
-    private function serializeCategories(Collection $categories, array $filters, Collection $products): array
+    private function serializeCategories(Collection $categories, array $filters, Collection $products, string $catalogRouteName = 'store.catalog'): array
     {
         $productCountsByCategory = $products->countBy('category_id');
 
         return $categories
-            ->map(function (Category $category) use ($filters, $productCountsByCategory): array {
+            ->map(function (Category $category) use ($filters, $productCountsByCategory, $catalogRouteName): array {
                 return [
                     'id' => $category->id,
                     'name' => $category->name,
                     'slug' => $category->slug,
                     'groupKey' => (string) $category->group_key,
                     'productCount' => (int) ($productCountsByCategory->get($category->id) ?? 0),
-                    'url' => route('store.catalog', $this->catalogQuery([
+                    'url' => route($catalogRouteName, $this->catalogQuery([
                         'categoria' => $category->slug,
                     ], $filters)),
                     'isSelected' => $filters['selectedCategory'] === $category->slug,
@@ -363,7 +368,7 @@ class StoreController extends Controller
      *   categories: array<int, array{slug: string, name: string, groupKey: string, productCount: int, url: string, isSelected: bool}>
      * }>
      */
-    private function serializeGroups(Collection $categories, string $selectedGroup, string $selectedCategory, string $query, string $order, bool $onlyNew, bool $onlyOffers, bool $onlyFeatured): array
+    private function serializeGroups(Collection $categories, string $selectedGroup, string $selectedCategory, string $query, string $order, bool $onlyNew, bool $onlyOffers, bool $onlyFeatured, string $catalogRouteName = 'store.catalog'): array
     {
         $labels = $this->groupLabels();
         $grouped = $categories
@@ -377,7 +382,7 @@ class StoreController extends Controller
             : ($selectedCategoryGroup !== '' ? $selectedCategoryGroup : (string) $grouped->keys()->first());
 
         return $grouped
-            ->map(function (Collection $groupCategories, string $key) use ($labels, $selectedGroup, $selectedCategory, $query, $order, $onlyNew, $onlyOffers, $onlyFeatured, $defaultOpenKey): array {
+            ->map(function (Collection $groupCategories, string $key) use ($labels, $selectedGroup, $selectedCategory, $query, $order, $onlyNew, $onlyOffers, $onlyFeatured, $defaultOpenKey, $catalogRouteName): array {
                 $sortedCategories = $groupCategories
                     ->sortBy([
                         ['sort_order', 'asc'],
@@ -386,13 +391,13 @@ class StoreController extends Controller
                     ->values();
 
                 $categoriesPayload = $sortedCategories
-                    ->map(function (Category $category) use ($selectedCategory, $query, $order, $onlyNew, $onlyOffers, $onlyFeatured): array {
+                    ->map(function (Category $category) use ($selectedCategory, $query, $order, $onlyNew, $onlyOffers, $onlyFeatured, $catalogRouteName): array {
                         return [
                             'slug' => $category->slug,
                             'name' => $category->name,
                             'groupKey' => (string) $category->group_key,
                             'productCount' => (int) ($category->sellable_products_count ?? 0),
-                            'url' => route('store.catalog', array_filter([
+                            'url' => route($catalogRouteName, array_filter([
                                 'categoria' => $category->slug,
                                 'grupo' => (string) $category->group_key,
                                 'q' => $query !== '' ? $query : null,
@@ -410,7 +415,7 @@ class StoreController extends Controller
                     'key' => $key,
                     'label' => $labels[$key] ?? strtoupper($key),
                     'productCount' => array_sum(array_map(static fn (array $category): int => (int) $category['productCount'], $categoriesPayload)),
-                    'url' => route('store.catalog', array_filter([
+                    'url' => route($catalogRouteName, array_filter([
                         'grupo' => $key,
                         'q' => $query !== '' ? $query : null,
                         'orden' => $order !== 'fecha_ingreso' ? $order : null,
@@ -618,6 +623,56 @@ class StoreController extends Controller
         }
 
         return $value;
+    }
+
+    private function generatedServiceImageUrl(SiteService $service, int $index, array &$usedImages): string
+    {
+        $images = [
+            'phone' => 'assets/img/services/service-phone-repair-ai.png',
+            'pc' => 'assets/img/services/service-pc-support-ai.png',
+            'charging' => 'assets/img/services/service-charging-board-ai.png',
+            'battery' => 'assets/img/services/service-battery-replacement-ai.png',
+            'console' => 'assets/img/services/service-console-electronics-ai.png',
+            'custom' => 'assets/img/services/service-custom-electronics-ai.png',
+        ];
+        $text = mb_strtolower(implode(' ', array_filter([
+            $service->title,
+            $service->subtitle,
+            $service->description,
+            $service->points_text,
+        ])));
+
+        if (str_contains($text, 'placa de carga') || str_contains($text, 'conector de carga') || str_contains($text, 'pin de carga') || str_contains($text, 'carga intermitente')) {
+            $preferred = $images['charging'];
+        } elseif (str_contains($text, 'bateria') || str_contains($text, 'baterias') || str_contains($text, 'autonomia')) {
+            $preferred = $images['battery'];
+        } elseif (str_contains($text, 'pc') || str_contains($text, 'notebook') || str_contains($text, 'comput') || str_contains($text, 'netbook')) {
+            $preferred = $images['pc'];
+        } elseif (str_contains($text, 'consola') || str_contains($text, 'playstation') || str_contains($text, 'joystick') || str_contains($text, 'accesorio')) {
+            $preferred = $images['console'];
+        } elseif (str_contains($text, 'mucho mas') || str_contains($text, 'soluciones a medida') || str_contains($text, 'presupuesto') || str_contains($text, 'mostrador')) {
+            $preferred = $images['custom'];
+        } elseif (str_contains($text, 'celular') || str_contains($text, 'telefono') || str_contains($text, 'modulo')) {
+            $preferred = $images['phone'];
+        } else {
+            $preferred = array_values($images)[$index % count($images)];
+        }
+
+        if (! in_array($preferred, $usedImages, true)) {
+            $usedImages[] = $preferred;
+
+            return asset($preferred);
+        }
+
+        foreach ($images as $image) {
+            if (! in_array($image, $usedImages, true)) {
+                $usedImages[] = $image;
+
+                return asset($image);
+            }
+        }
+
+        return asset($preferred);
     }
 
     /**

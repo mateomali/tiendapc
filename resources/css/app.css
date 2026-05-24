@@ -25,6 +25,46 @@
         src: url('/assets/fonts/catalog/dancing-script-700.ttf') format('truetype');
     }
 
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-400.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-500.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-700.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 800;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-800.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Viga';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/viga-400.ttf') format('truetype');
+    }
+
     *,
     ::before,
     ::after {
@@ -80,9 +120,19 @@
     }
 
     .catalog-font-scope {
-        --font-sans: 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
+        --font-sans: 'Catalog Jost', 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
         --font-catalog-accent: 'Catalog Dancing Script', cursive;
+        --font-catalog-title-preview: 'Catalog Jost', 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
+        --font-catalog-price-preview: 'Catalog Viga', 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
         font-family: var(--font-sans);
+    }
+
+    .catalog-preview-title-font {
+        font-family: var(--font-catalog-title-preview) !important;
+    }
+
+    .catalog-preview-price-font {
+        font-family: var(--font-catalog-price-preview) !important;
     }
 
     @media (prefers-reduced-motion: reduce) {
