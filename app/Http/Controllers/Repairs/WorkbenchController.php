@@ -49,14 +49,34 @@ class WorkbenchController extends Controller
             'categoria_filter' => ['nullable', 'integer', 'min:0'],
             'ordenar_por' => ['nullable', 'string'],
             'direccion' => ['nullable', 'string'],
+            'filter_id' => ['nullable', 'string'],
+            'filter_cliente' => ['nullable', 'string'],
+            'filter_dni' => ['nullable', 'string'],
+            'filter_contacto' => ['nullable', 'string'],
+            'filter_ingreso' => ['nullable', 'date'],
+            'filter_trabajo' => ['nullable', 'string'],
+            'filter_modelo' => ['nullable', 'string'],
+            'filter_falla' => ['nullable', 'string'],
+            'filter_estimada' => ['nullable', 'date'],
+            'filter_saldo' => ['nullable', 'string'],
+            'filter_estado' => ['nullable', 'string'],
         ]);
 
         $orders = $repairService->activeOrders($filters);
+        $searchTerm = trim((string) ($filters['q'] ?? ''));
+        $deliveredSearchMatches = $searchTerm !== ''
+            ? $repairService->deliveredOrders([
+                ...$filters,
+                'estado' => '',
+                'prioridad' => '',
+            ])->count()
+            : 0;
 
         return Inertia::render('Repairs/WorkbenchPage', [
             'filters' => $filters,
             'tickets' => $this->groupTickets($orders, false),
             'summary' => $repairService->summary($filters),
+            'deliveredSearchMatches' => $deliveredSearchMatches,
             'states' => $repairService->availableStates(false),
             'serviceCategories' => $this->serviceCategories(),
             'serviceTemplates' => $repairService->serviceTemplates(),

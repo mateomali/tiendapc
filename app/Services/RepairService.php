@@ -10,6 +10,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class RepairService
@@ -663,7 +664,7 @@ class RepairService
         $orders = $this->summaryQuery($filters)->get();
 
         return [
-            'active' => $orders->where('entregado', 'no')->count(),
+            'active' => $orders->where('entregado', 'no')->where('estado', '!=', 'CANCELADA')->count(),
             'delivered' => $orders->where('entregado', 'si')->count(),
             'pending' => $orders->where('entregado', 'no')->where('estado', 'PENDIENTE')->count(),
             'inRepair' => $orders->where('entregado', 'no')->whereIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])->count(),
@@ -738,7 +739,11 @@ class RepairService
 
         $this->applySummaryFilters($query, $filters, false);
 
-        if (($filters['estado'] ?? '') !== '') {
+        $hasSearchTerm = trim((string) ($filters['q'] ?? '')) !== '';
+        $hasStateFilter = trim((string) ($filters['filter_estado'] ?? '')) !== '';
+        $this->applyColumnFilters($query, $filters);
+
+        if (! $hasSearchTerm && ($filters['estado'] ?? '') !== '') {
             $state = (string) $filters['estado'];
 
             if (in_array($state, ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'], true)) {
@@ -746,15 +751,17 @@ class RepairService
             } else {
                 $query->where('estado', $state);
             }
+        } elseif (! $hasSearchTerm && ! $hasStateFilter && ! $delivered) {
+            $query->where('estado', '!=', 'CANCELADA');
         }
 
-        if (($filters['prioridad'] ?? '') === 'vencidas') {
+        if (! $hasSearchTerm && ($filters['prioridad'] ?? '') === 'vencidas') {
             $query
                 ->whereIn('estado', ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])
                 ->whereDate('fecha_estimada', '<', now()->toDateString());
         }
 
-        if (($filters['prioridad'] ?? '') === 'hoy') {
+        if (! $hasSearchTerm && ($filters['prioridad'] ?? '') === 'hoy') {
             $query->whereDate('fecha_estimada', now()->toDateString());
         }
 
@@ -774,13 +781,75 @@ class RepairService
                 if ($numericTerm !== null) {
                     $subQuery
                         ->orWhere('id', $numericTerm)
-                        ->orWhere('registro_id', $numericTerm)
                         ->orWhere('reparacion', $numericTerm);
+
+                    if (Schema::hasColumn('ordenes', 'registro_id')) {
+                        $subQuery->orWhere('registro_id', $numericTerm);
+                    }
                 }
             });
         }
 
         return $query;
+    }
+
+    private function applyColumnFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
+    {
+        $likeFilters = [
+            'filter_cliente' => 'nombre_cliente',
+            'filter_dni' => 'dni',
+            'filter_contacto' => 'contacto',
+            'filter_modelo' => 'modelo',
+            'filter_falla' => 'descripcion',
+        ];
+
+        foreach ($likeFilters as $filter => $column) {
+            $value = trim((string) ($filters[$filter] ?? ''));
+
+            if ($value !== '') {
+                $query->where($column, 'like', '%' . $value . '%');
+            }
+        }
+
+        $id = trim((string) ($filters['filter_id'] ?? ''));
+
+        if ($id !== '' && ctype_digit($id)) {
+            $query->where('id', (int) $id);
+        }
+
+        $repairNumber = trim((string) ($filters['filter_trabajo'] ?? ''));
+
+        if ($repairNumber !== '' && ctype_digit($repairNumber)) {
+            $query->where('reparacion', (int) $repairNumber);
+        }
+
+        $entryDate = trim((string) ($filters['filter_ingreso'] ?? ''));
+
+        if ($entryDate !== '') {
+            $query->whereDate('fecha', $entryDate);
+        }
+
+        $estimatedDate = trim((string) ($filters['filter_estimada'] ?? ''));
+
+        if ($estimatedDate !== '') {
+            $query->whereDate('fecha_estimada', $estimatedDate);
+        }
+
+        $balance = trim((string) ($filters['filter_saldo'] ?? ''));
+
+        if ($balance !== '' && is_numeric($balance)) {
+            $query->whereRaw('(monto - senia) = ?', [(float) $balance]);
+        }
+
+        $state = trim((string) ($filters['filter_estado'] ?? ''));
+
+        if ($state !== '') {
+            if (in_array($state, ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'], true)) {
+                $query->whereIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO']);
+            } else {
+                $query->where('estado', $state);
+            }
+        }
     }
 
     private function applyDeliveredOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
@@ -803,7 +872,11 @@ class RepairService
             'ingreso' => $query->orderBy('fecha', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             'estimada' => $query->orderByRaw('fecha_estimada IS NULL')->orderBy('fecha_estimada', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             'cliente' => $query->orderBy('nombre_cliente', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'dni' => $query->orderBy('dni', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'contacto' => $query->orderBy('contacto', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'trabajo' => $query->orderBy('reparacion', $direction)->orderBy('id', 'desc'),
             'modelo' => $query->orderBy('modelo', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'falla' => $query->orderBy('descripcion', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             'estado' => $query->orderBy('estado', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             'saldo' => $query->orderByRaw('(monto - senia) ' . $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             default => $query->orderBy('id', $direction)->orderBy('reparacion'),

@@ -85,6 +85,11 @@ class RepairOrder extends Model
         return $this->dni > 0 ? (int) $this->dni : (int) config('tienda.repair_default_dni');
     }
 
+    public function getRegistroIdAttribute(mixed $value): int
+    {
+        return (int) ($value ?? $this->attributes['id'] ?? 0);
+    }
+
     public function getRouteKey(): mixed
     {
         if ($this->usesLegacyPrimaryKey()) {

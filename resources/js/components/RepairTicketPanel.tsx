@@ -297,6 +297,14 @@ function FieldSummary({
 }
 
 function PaymentStatus({ monto, senia }: { monto: number; senia: number }): JSX.Element {
+    if (monto <= 0 && senia <= 0) {
+        return (
+            <span className="inline-flex w-fit items-center rounded-md border border-amber-200 bg-amber-100 px-2.5 py-1 text-[0.68rem] font-bold text-amber-900">
+                COTIZAR
+            </span>
+        );
+    }
+
     if (monto > 0 && senia >= monto) {
         return (
             <span className="inline-flex w-fit items-center rounded-md border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-bold text-emerald-800">

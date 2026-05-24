@@ -37,6 +37,17 @@ interface WorkbenchPageProps {
         categoria_filter?: number | string;
         ordenar_por?: string;
         direccion?: string;
+        filter_id?: string;
+        filter_cliente?: string;
+        filter_dni?: string;
+        filter_contacto?: string;
+        filter_ingreso?: string;
+        filter_trabajo?: string;
+        filter_modelo?: string;
+        filter_falla?: string;
+        filter_estimada?: string;
+        filter_saldo?: string;
+        filter_estado?: string;
     };
     tickets: RepairTicketView[];
     summary: {
@@ -50,6 +61,7 @@ interface WorkbenchPageProps {
         today: number;
         cancelled: number;
     };
+    deliveredSearchMatches: number;
     states: string[];
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates: ServiceTemplateOption[];
@@ -220,10 +232,27 @@ function cleanQuery(query: Record<string, string | number | undefined>): Record<
     return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined && value !== '')) as Record<string, string | number>;
 }
 
+const columnFilterKeys = [
+    'filter_id',
+    'filter_cliente',
+    'filter_dni',
+    'filter_contacto',
+    'filter_ingreso',
+    'filter_trabajo',
+    'filter_modelo',
+    'filter_falla',
+    'filter_estimada',
+    'filter_saldo',
+    'filter_estado',
+] as const;
+
+type SortableRepairColumn = 'ticket' | 'cliente' | 'dni' | 'contacto' | 'ingreso' | 'trabajo' | 'modelo' | 'falla' | 'estimada' | 'saldo' | 'estado';
+
 export default function WorkbenchPage({
     filters,
     tickets,
     summary,
+    deliveredSearchMatches,
     states,
     serviceCategories,
     serviceTemplates,
@@ -243,6 +272,17 @@ export default function WorkbenchPage({
         categoria_filter: filters.categoria_filter ?? '',
         ordenar_por: filters.ordenar_por ?? 'ticket',
         direccion: filters.direccion ?? 'desc',
+        filter_id: filters.filter_id ?? '',
+        filter_cliente: filters.filter_cliente ?? '',
+        filter_dni: filters.filter_dni ?? '',
+        filter_contacto: filters.filter_contacto ?? '',
+        filter_ingreso: filters.filter_ingreso ?? '',
+        filter_trabajo: filters.filter_trabajo ?? '',
+        filter_modelo: filters.filter_modelo ?? '',
+        filter_falla: filters.filter_falla ?? '',
+        filter_estimada: filters.filter_estimada ?? '',
+        filter_saldo: filters.filter_saldo ?? '',
+        filter_estado: filters.filter_estado ?? '',
     });
     const createForm = useForm<WorkbenchCreateFormData>({
         id_orden: String(nextOrderId),
@@ -283,7 +323,9 @@ export default function WorkbenchPage({
         summaryRange !== 'month' ? summaryRange : '',
         filters.ordenar_por && filters.ordenar_por !== 'ticket' ? filters.ordenar_por : '',
         filters.direccion && filters.direccion !== 'desc' ? filters.direccion : '',
+        ...columnFilterKeys.map((key) => filters[key]),
     ].filter((value) => value !== undefined && value !== '').length;
+    const columnFilterQuery = Object.fromEntries(columnFilterKeys.map((key) => [key, filters[key]])) as Record<(typeof columnFilterKeys)[number], string | undefined>;
     const filterQuery = (overrides: Record<string, string | number | undefined> = {}): Record<string, string | number> =>
         cleanQuery({
             q: filters.q,
@@ -295,6 +337,7 @@ export default function WorkbenchPage({
             categoria_filter: categoryFilter,
             ordenar_por: filters.ordenar_por,
             direccion: filters.direccion,
+            ...columnFilterQuery,
             ...overrides,
         });
 
@@ -306,6 +349,44 @@ export default function WorkbenchPage({
             query !== '' ? { q: query } : {},
             { preserveScroll },
         );
+    };
+    const submitGridFilters = (): void => {
+        router.get(
+            route('repairs.workbench'),
+            cleanQuery({
+                ...filtersForm.data,
+                q: filtersForm.data.q.trim(),
+            }),
+            { preserveScroll: true },
+        );
+    };
+    const setSingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string): void => {
+        filtersForm.setData((current) => ({
+            ...current,
+            ...Object.fromEntries(columnFilterKeys.map((filterKey) => [filterKey, filterKey === key ? value : ''])),
+        }));
+    };
+    const gridFilterInputClass = 'h-7 w-full min-w-0 rounded-sm border border-[#cbd5e1] bg-white px-1.5 text-[0.68rem] font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb33]';
+    const clearGridFilterHref = route(
+        'repairs.workbench',
+        filterQuery(Object.fromEntries(columnFilterKeys.map((key) => [key, undefined])) as Record<string, undefined>),
+    );
+    const sortHeaderHref = (column: SortableRepairColumn): string => {
+        const currentSort = filters.ordenar_por ?? 'ticket';
+        const currentDirection = filters.direccion ?? 'desc';
+        const nextDirection = currentSort === column && currentDirection === 'asc' ? 'desc' : 'asc';
+
+        return route('repairs.workbench', filterQuery({ ordenar_por: column, direccion: nextDirection }));
+    };
+    const sortHeaderClass = (column: SortableRepairColumn): string =>
+        cn(
+            'inline-flex items-center gap-1 text-left text-[0.62rem] font-bold text-[#475569] no-underline hover:text-[#1d4ed8]',
+            (filters.ordenar_por ?? 'ticket') === column && 'text-[#1d4ed8]',
+        );
+    const sortIndicator = (column: SortableRepairColumn): string => {
+        if ((filters.ordenar_por ?? 'ticket') !== column) return '';
+
+        return (filters.direccion ?? 'desc') === 'asc' ? '↑' : '↓';
     };
 
     const updateJob = (index: number, updater: (job: RepairJobFormData) => RepairJobFormData): void => {
@@ -711,6 +792,15 @@ export default function WorkbenchPage({
                 </form>
             ) : null}
 
+            {isConsultas && deliveredSearchMatches > 0 ? (
+                <div className="rounded-lg border border-[#7dd3fc] bg-[#ecfeff] px-4 py-3 text-sm font-bold text-[#155e75] shadow-sm">
+                    Encontrado en entregados: {deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
+                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.delivered', { q: filters.q ?? '' })}>
+                        Ir a entregados.php
+                    </Link>
+                </div>
+            ) : null}
+
             {isConsultas ? (
             <section className="hidden grid-cols-2 gap-2 md:grid-cols-4 xl:grid xl:grid-cols-8">
                 <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: undefined }))} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
@@ -765,7 +855,7 @@ export default function WorkbenchPage({
                             filtersForm.setData('prioridad', '');
                         }}
                     >
-                        <option value="">Todos los estados</option>
+                        <option value="">Todos menos canceladas</option>
                         {states.map((state) => (
                             <option key={state} value={state}>
                                 {state}
@@ -825,7 +915,7 @@ export default function WorkbenchPage({
                             <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                 Estado
                                 <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.estado} onChange={(event) => { filtersForm.setData('estado', event.target.value); filtersForm.setData('prioridad', ''); }}>
-                                    <option value="">Todos los estados</option>
+                                    <option value="">Todos menos canceladas</option>
                                     {states.map((state) => <option key={state} value={state}>{state}</option>)}
                                 </select>
                             </label>
@@ -1365,21 +1455,67 @@ export default function WorkbenchPage({
                 </div>
                 <div className="hidden overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
                     <div className="min-w-[1320px]">
-                        <div className={cn('grid min-w-[1320px] items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#f8fafc] text-[0.62rem] font-bold text-[#475569] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
-                            <span className="text-center">ID</span>
-                            <span>Cliente</span>
-                            <span>DNI</span>
-                            <span>Contacto</span>
-                            <span>Ingreso</span>
-                            <span className="text-center">Trabajo</span>
-                            <span className="text-center">Imagen</span>
-                            <span>Modelo</span>
-                            <span>Falla</span>
-                            <span>Estimada</span>
-                            <span>Saldo</span>
-                            <span className="text-center">Estado</span>
-                            <span className="text-center">Acciones</span>
-                        </div>
+                        <form onSubmit={(event) => { event.preventDefault(); submitGridFilters(); }}>
+                            <div className={cn('grid min-w-[1320px] items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#eef4fb] [&>*]:min-w-0 [&>*]:px-1.5 [&>*]:py-1.5', repairDesktopTableGridClass)}>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('ticket')} preserveScroll className={cn(sortHeaderClass('ticket'), 'justify-center')}>ID {sortIndicator('ticket')}</Link>
+                                    <input className={cn(gridFilterInputClass, 'text-center')} inputMode="numeric" placeholder="ID" value={filtersForm.data.filter_id} onChange={(event) => setSingleGridFilter('filter_id', event.target.value)} />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('cliente')} preserveScroll className={sortHeaderClass('cliente')}>Cliente {sortIndicator('cliente')}</Link>
+                                    <input className={gridFilterInputClass} placeholder="Cliente" value={filtersForm.data.filter_cliente} onChange={(event) => setSingleGridFilter('filter_cliente', event.target.value)} />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('dni')} preserveScroll className={sortHeaderClass('dni')}>DNI {sortIndicator('dni')}</Link>
+                                    <input className={gridFilterInputClass} placeholder="DNI" value={filtersForm.data.filter_dni} onChange={(event) => setSingleGridFilter('filter_dni', event.target.value)} />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('contacto')} preserveScroll className={sortHeaderClass('contacto')}>Contacto {sortIndicator('contacto')}</Link>
+                                    <input className={gridFilterInputClass} placeholder="Contacto" value={filtersForm.data.filter_contacto} onChange={(event) => setSingleGridFilter('filter_contacto', event.target.value)} />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('ingreso')} preserveScroll className={sortHeaderClass('ingreso')}>Ingreso {sortIndicator('ingreso')}</Link>
+                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_ingreso} onChange={(event) => setSingleGridFilter('filter_ingreso', event.target.value)} aria-label="Filtrar por fecha de ingreso" />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('trabajo')} preserveScroll className={cn(sortHeaderClass('trabajo'), 'justify-center')}>Trabajo {sortIndicator('trabajo')}</Link>
+                                    <input className={cn(gridFilterInputClass, 'text-center')} inputMode="numeric" placeholder="Nro." value={filtersForm.data.filter_trabajo} onChange={(event) => setSingleGridFilter('filter_trabajo', event.target.value)} />
+                                </label>
+                                <span className="grid content-start gap-1 text-center text-[0.62rem] font-bold text-[#475569]">
+                                    Imagen
+                                </span>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('modelo')} preserveScroll className={sortHeaderClass('modelo')}>Modelo {sortIndicator('modelo')}</Link>
+                                    <input className={gridFilterInputClass} placeholder="Modelo" value={filtersForm.data.filter_modelo} onChange={(event) => setSingleGridFilter('filter_modelo', event.target.value)} />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('falla')} preserveScroll className={sortHeaderClass('falla')}>Falla {sortIndicator('falla')}</Link>
+                                    <input className={gridFilterInputClass} placeholder="Falla" value={filtersForm.data.filter_falla} onChange={(event) => setSingleGridFilter('filter_falla', event.target.value)} />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('estimada')} preserveScroll className={sortHeaderClass('estimada')}>Estimada {sortIndicator('estimada')}</Link>
+                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_estimada} onChange={(event) => setSingleGridFilter('filter_estimada', event.target.value)} aria-label="Filtrar por fecha estimada" />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('saldo')} preserveScroll className={sortHeaderClass('saldo')}>Saldo {sortIndicator('saldo')}</Link>
+                                    <input className={gridFilterInputClass} inputMode="decimal" placeholder="Saldo" value={filtersForm.data.filter_saldo} onChange={(event) => setSingleGridFilter('filter_saldo', event.target.value)} />
+                                </label>
+                                <label className="grid gap-1">
+                                    <Link href={sortHeaderHref('estado')} preserveScroll className={cn(sortHeaderClass('estado'), 'justify-center')}>Estado {sortIndicator('estado')}</Link>
+                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_estado} onChange={(event) => setSingleGridFilter('filter_estado', event.target.value)} aria-label="Filtrar por estado">
+                                        <option value="">Estado</option>
+                                        {states.map((state) => <option key={state} value={state}>{state}</option>)}
+                                    </select>
+                                </label>
+                                <span className="grid content-start gap-1">
+                                    <span className="text-center text-[0.62rem] font-bold text-[#475569]">Acciones</span>
+                                    <span className="flex items-center justify-center gap-1">
+                                        <button type="submit" className="h-7 rounded-sm border border-[#2563eb] bg-[#2563eb] px-2 text-[0.66rem] font-bold text-white">Aplicar</button>
+                                        <Link href={clearGridFilterHref} preserveScroll className="grid h-7 place-items-center rounded-sm border border-[#cbd5e1] bg-white px-2 text-[0.66rem] font-bold text-[#475569] no-underline">Limpiar</Link>
+                                    </span>
+                                </span>
+                            </div>
+                        </form>
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (
                                 tickets.flatMap((ticket) =>
