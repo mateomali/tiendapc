@@ -410,7 +410,7 @@ export const catalog = {
         'inline-flex min-h-10 items-center justify-center rounded-[0.75rem] border border-[rgba(184,229,255,0.96)] bg-[linear-gradient(180deg,#57a9ef_0%,#2759b7_100%)] px-3 text-[0.78rem] font-black uppercase tracking-[0.04em] text-white shadow-[0_10px_18px_rgba(13,53,126,0.22)]',
     mobileSheetOptionButton: (active: boolean): string =>
         cn(
-            'inline-flex min-h-10 items-center justify-center gap-[0.42rem] rounded-[0.75rem] border border-[#c7dbf7] bg-white px-3 text-[0.82rem] font-black text-[#17427f] shadow-[0_6px_14px_rgba(7,32,88,0.08)]',
+            'inline-flex min-h-10 items-center justify-center gap-[0.42rem] rounded-[0.75rem] border border-[#c7dbf7] bg-white px-3 text-[0.82rem] font-black uppercase tracking-[0.025em] text-[#17427f] shadow-[0_6px_14px_rgba(7,32,88,0.08)]',
             active && 'border-[rgba(184,229,255,0.96)] bg-[linear-gradient(180deg,#57a9ef_0%,#2759b7_100%)] text-white shadow-[0_10px_18px_rgba(13,53,126,0.22)]',
         ),
     panel:
@@ -510,7 +510,7 @@ export function productSurfaceClass(tone: StoreTone): string {
 }
 
 export const catalogOfferRibbonClass =
-    'absolute left-[-2.75rem] top-[1.05rem] z-[4] flex h-[1.8rem] min-w-[10.6rem] -rotate-45 items-center justify-center gap-0 bg-[linear-gradient(180deg,#ff4b4b_0%,#d71920_58%,#a80f17_100%)] px-[2.15rem] text-[0.68rem] font-black uppercase tracking-[0.055em] text-white shadow-[0_9px_20px_rgba(168,15,23,0.34),0_0_18px_rgba(255,99,99,0.24)] max-[560px]:left-0 max-[560px]:top-[0.48rem] max-[560px]:h-5 max-[560px]:min-w-[7.6rem] max-[560px]:px-[0.9rem] max-[560px]:text-[0.48rem] max-[560px]:tracking-[0.02em] max-[560px]:shadow-[0_7px_14px_rgba(168,15,23,0.26)]';
+    'absolute left-[-2.75rem] top-[1.05rem] z-[4] flex h-[1.8rem] min-w-[10.6rem] -rotate-45 items-center justify-center gap-0 bg-[linear-gradient(180deg,#ff4b4b_0%,#d71920_58%,#a80f17_100%)] px-[2.15rem] text-[0.68rem] font-black uppercase tracking-[0.055em] text-white shadow-[0_9px_20px_rgba(168,15,23,0.34),0_0_18px_rgba(255,99,99,0.24)] max-[560px]:left-[-2.05rem] max-[560px]:top-[0.72rem] max-[560px]:h-[1.05rem] max-[560px]:min-w-[7.4rem] max-[560px]:px-[0.75rem] max-[560px]:text-[0.46rem] max-[560px]:tracking-[0.018em] max-[560px]:shadow-[0_5px_10px_rgba(168,15,23,0.22)]';
 export const catalogOfferRibbonTextClass =
     'relative z-[1] text-[0.92rem] font-black leading-none tracking-[0.02em] [text-shadow:0_2px_8px_rgba(5,23,62,0.30)] max-[560px]:text-[0.68rem]';
 export const catalogOfferRibbonIconClass =
@@ -549,11 +549,11 @@ export const catalogPriceClass = 'text-[1.58rem] font-black leading-none text-bl
 export const productPriceClass = 'text-[1.75rem] font-black leading-none text-black [font-variant-numeric:tabular-nums] max-[560px]:text-[1.45rem]';
 export const productPriceBoxClass =
     'mx-auto grid w-[min(100%,420px)] justify-items-center gap-[0.28rem] rounded-[1.2rem] border border-[var(--product-tone-border)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-[0.9rem_1rem_0.95rem] text-center shadow-[0_0_14px_color-mix(in_srgb,var(--product-tone-glow)_46%,transparent)]';
-export const catalogActionsClass = 'mt-[0.45rem] grid grid-cols-2 gap-1 min-[861px]:mt-0 max-[560px]:mt-[0.42rem]';
+export const catalogActionsClass = 'mt-[0.45rem] grid grid-cols-1 gap-1 min-[861px]:mt-0 max-[560px]:mt-[0.42rem]';
 export const productActionsClass = 'flex w-full flex-wrap justify-center gap-[0.55rem]';
 
 const catalogActionBase =
-    'inline-flex min-h-9 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[0.72rem] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 active:translate-y-px hover:-translate-y-px hover:brightness-[1.03] max-[560px]:text-[0.66rem]';
+    'inline-flex min-h-9 items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[0.72rem] font-bold uppercase tracking-[0.025em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.26)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 active:translate-y-px hover:-translate-y-px hover:brightness-[1.03] max-[560px]:text-[0.66rem]';
 const catalogActionVariant = {
     primary: 'bg-[linear-gradient(180deg,#2f61bf_0%,#224592_100%)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_16px_rgba(13,53,126,0.20),0_0_0_3px_rgba(184,215,255,0.24)]',
     success: 'border border-[#128C7E] bg-[#128C7E] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_16px_rgba(18,140,126,0.20)] hover:bg-[#075E54]',

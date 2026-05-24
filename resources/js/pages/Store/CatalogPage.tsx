@@ -1,5 +1,6 @@
 ﻿import { Link, router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import type { FocusEvent } from 'react';
+import { useState } from 'react';
 import { SiteLayout } from '../../layouts/SiteLayout';
 import type { AnnouncementItem, CatalogCategory, CatalogGroup, CatalogProduct, HeaderSearchState, SharedPageProps } from '../../types';
 import {
@@ -68,7 +69,6 @@ interface CatalogPageProps extends SharedPageProps {
 
 interface CatalogProductCardProps {
     product: CatalogProduct;
-    imageRotationMs: number;
     cartUrl: string;
     eagerImage: boolean;
 }
@@ -178,14 +178,6 @@ function CartIcon({ size = 14 }: { size?: number }): JSX.Element {
     );
 }
 
-function WhatsAppIcon({ size = 16 }: { size?: number }): JSX.Element {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-            <path d="M13.601 2.326A7.85 7.85 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.9 7.9 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.9 7.9 0 0 0 13.6 2.326zM7.994 14.521a6.6 6.6 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.56 6.56 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592m3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.73.73 0 0 0-.529.247c-.182.198-.691.677-.691 1.654s.71 1.916.81 2.049c.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232" />
-        </svg>
-    );
-}
-
 function ClearIcon(): JSX.Element {
     return (
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -231,20 +223,32 @@ function buildCatalogQuery(
     };
 }
 
-function CatalogProductCard({ product, imageRotationMs, cartUrl, eagerImage }: CatalogProductCardProps): JSX.Element {
+function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCardProps): JSX.Element {
     const [imageIndex, setImageIndex] = useState(0);
 
-    useEffect(() => {
+    const showNextImage = (): void => {
         if (product.images.length <= 1) {
             return;
         }
 
-        const interval = window.setInterval(() => {
-            setImageIndex((current) => (current + 1) % product.images.length);
-        }, imageRotationMs);
+        setImageIndex((current) => (current + 1) % product.images.length);
+    };
 
-        return () => window.clearInterval(interval);
-    }, [imageRotationMs, product.images]);
+    const showFirstImage = (): void => {
+        setImageIndex(0);
+    };
+
+    const handleCardFocus = (event: FocusEvent<HTMLElement>): void => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+            showNextImage();
+        }
+    };
+
+    const handleCardBlur = (event: FocusEvent<HTMLElement>): void => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+            showFirstImage();
+        }
+    };
 
     const activeImage = product.images[imageIndex] ?? product.imageUrl;
     const cardTone: StoreTone = product.hasOffer
@@ -256,7 +260,14 @@ function CatalogProductCard({ product, imageRotationMs, cartUrl, eagerImage }: C
             : 'regular';
 
     return (
-        <article className={catalogCardClass(cardTone, product.cartQty > 0 ? 'max-[860px]:h-[218px] max-[560px]:h-[198px] max-[860px]:[contain-intrinsic-size:218px] max-[560px]:[contain-intrinsic-size:198px]' : undefined)} data-testid="catalog-product-card">
+        <article
+            className={catalogCardClass(cardTone, product.cartQty > 0 ? 'max-[860px]:h-[218px] max-[560px]:h-[198px] max-[860px]:[contain-intrinsic-size:218px] max-[560px]:[contain-intrinsic-size:198px]' : undefined)}
+            data-testid="catalog-product-card"
+            onMouseEnter={showNextImage}
+            onMouseLeave={showFirstImage}
+            onFocus={handleCardFocus}
+            onBlur={handleCardBlur}
+        >
             {product.hasOffer ? (
                 <div className={catalogOfferRibbonClass} aria-label={`Descuento del ${product.discountPercentage}%`}>
                     {'\u{1F525}'}Oferta -{product.discountPercentage}%
@@ -311,7 +322,7 @@ function CatalogProductCard({ product, imageRotationMs, cartUrl, eagerImage }: C
                 <div className={catalogActionsClass}>
                     <button
                         type="button"
-                        className={catalogActionClass('primary', 'min-w-0 flex-1')}
+                        className={catalogActionClass('primary', 'min-w-0 w-full')}
                         onClick={() => router.post(product.addToCartAction, { product_id: product.id, quantity: 1 }, { preserveScroll: true })}
                     >
                         <span>Agregar</span>
@@ -319,12 +330,6 @@ function CatalogProductCard({ product, imageRotationMs, cartUrl, eagerImage }: C
                             <CartIcon size={13} />
                         </span>
                     </button>
-                    <a href={product.buyWhatsappUrl} className={catalogActionClass('success', 'min-w-0 flex-1')}>
-                        <span>Consultar</span>
-                        <span className={catalogActionIconClass} aria-hidden="true">
-                            <WhatsAppIcon size={15} />
-                        </span>
-                    </a>
                 </div>
 
                 {product.cartQty > 0 ? (
@@ -583,7 +588,7 @@ export default function CatalogPage({
             announcements={announcements}
             announcementMode="catalogLegacy"
         >
-            <section className={catalog.layout}>
+            <section className={`${catalog.layout} catalog-font-scope`}>
                 <div className={catalog.layoutMain}>
                     <section className={catalog.mobileControls} aria-label="Controles del catálogo">
                         <div className={catalog.mobileControlsBar}>
@@ -675,7 +680,7 @@ export default function CatalogPage({
                         {products.length > 0 ? (
                             <section className={catalogGridClass(gridColumns)}>
                                 {products.map((product, index) => (
-                                    <CatalogProductCard key={product.id} product={product} imageRotationMs={filters.imageRotationMs} cartUrl={layout.cartUrl} eagerImage={index < 8} />
+                                    <CatalogProductCard key={product.id} product={product} cartUrl={layout.cartUrl} eagerImage={index < 8} />
                                 ))}
                             </section>
                         ) : (

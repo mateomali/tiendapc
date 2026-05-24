@@ -191,7 +191,7 @@ function RelatedProductCard({ product, cartUrl, imageRotationMs }: RelatedProduc
                 <div className={catalogActionsClass}>
                     <button
                         type="button"
-                        className={catalogActionClass('primary', 'min-w-0 flex-1')}
+                        className={catalogActionClass('primary', 'min-w-0 w-full')}
                         onClick={() => router.post(product.addToCartAction, { product_id: product.id, quantity: 1 }, { preserveScroll: true })}
                     >
                         <span>Agregar</span>
@@ -199,12 +199,6 @@ function RelatedProductCard({ product, cartUrl, imageRotationMs }: RelatedProduc
                             <CartIcon size={13} />
                         </span>
                     </button>
-                    <a href={product.buyWhatsappUrl} className={catalogActionClass('success', 'min-w-0 flex-1')}>
-                        <span>Consultar</span>
-                        <span className={catalogActionIconClass} aria-hidden="true">
-                            <WhatsAppIcon size={15} />
-                        </span>
-                    </a>
                 </div>
 
                 {product.cartQty > 0 ? (
@@ -376,16 +370,6 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                             <strong className={productPriceClass}>${product.displayPriceLabel}</strong>
                         </div>
 
-                        <div className={productDescriptionClass}>
-                            <div className={productDescriptionHeaderClass}>Descripcion del producto:</div>
-                            <div className={productDescriptionBodyClass} dangerouslySetInnerHTML={{ __html: showFullDescription || !product.hasLongDescription ? product.description : product.descriptionShort }} />
-                            {product.hasLongDescription ? (
-                                <button type="button" className={productMoreButtonClass} onClick={() => setShowFullDescription((current) => !current)}>
-                                    {showFullDescription ? 'Ver menos' : 'Leer descripcion completa'}
-                                </button>
-                            ) : null}
-                        </div>
-
                         <div className={productActionsClass}>
                             <button
                                 type="button"
@@ -403,6 +387,16 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                                     <WhatsAppIcon size={16} />
                                 </span>
                             </a>
+                        </div>
+
+                        <div className={productDescriptionClass}>
+                            <div className={productDescriptionHeaderClass}>Descripcion del producto:</div>
+                            <div className={productDescriptionBodyClass} dangerouslySetInnerHTML={{ __html: showFullDescription || !product.hasLongDescription ? product.description : product.descriptionShort }} />
+                            {product.hasLongDescription ? (
+                                <button type="button" className={productMoreButtonClass} onClick={() => setShowFullDescription((current) => !current)}>
+                                    {showFullDescription ? 'Ver menos' : 'Leer descripcion completa'}
+                                </button>
+                            ) : null}
                         </div>
 
                         {product.cartQty > 0 ? <p className={catalogCartQtyClass}>Este producto ya tiene {product.cartQty} unidad(es) en el carrito.</p> : null}

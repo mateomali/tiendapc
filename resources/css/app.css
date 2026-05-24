@@ -1,6 +1,30 @@
 @import 'tailwindcss';
 
 @layer base {
+    @font-face {
+        font-family: 'Catalog Roboto';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/roboto-500.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Roboto';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/roboto-700.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Dancing Script';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/dancing-script-700.ttf') format('truetype');
+    }
+
     *,
     ::before,
     ::after {
@@ -53,6 +77,12 @@
     video,
     canvas {
         max-width: 100%;
+    }
+
+    .catalog-font-scope {
+        --font-sans: 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
+        --font-catalog-accent: 'Catalog Dancing Script', cursive;
+        font-family: var(--font-sans);
     }
 
     @media (prefers-reduced-motion: reduce) {
