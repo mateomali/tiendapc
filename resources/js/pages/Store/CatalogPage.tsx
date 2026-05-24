@@ -506,6 +506,8 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
                         </span>
                     </div>
                 ) : null}
+
+                <span className={catalogImageDetailsPillClass}>Más detalles</span>
             </Link>
 
             <div className="grid min-w-0 content-start gap-2 p-3 max-[860px]:gap-1.5 max-[860px]:p-2.5">

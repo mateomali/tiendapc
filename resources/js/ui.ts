@@ -221,7 +221,7 @@ const interactiveLift =
 export const site = {
     shell:
         'min-h-screen px-0 pt-0 pb-[1.8rem] text-[#102146] bg-[radial-gradient(circle_at_top_right,rgba(87,182,255,0.28),transparent_24%),radial-gradient(circle_at_top_left,rgba(36,86,184,0.2),transparent_20%),linear-gradient(180deg,#edf4ff_0%,#d9e7ff_26%,#d6e4ff_100%)] max-[860px]:pt-0',
-    frame: 'mx-auto w-[min(1880px,calc(100vw-18px))] max-[860px]:w-full max-[860px]:px-[0.18rem]',
+    frame: 'mx-auto w-full max-[860px]:px-[0.18rem]',
     header:
         'sticky top-0 z-40 overflow-hidden rounded-none border-x border-b border-t-0 border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.24rem_0.72rem_0.3rem] shadow-[0_14px_28px_rgba(8,25,70,0.20),0_3px_10px_rgba(90,173,255,0.10),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[10px] after:pointer-events-none after:absolute after:right-[-12%] after:bottom-[-70%] after:h-[28rem] after:w-[28rem] after:rounded-full after:bg-[radial-gradient(circle,rgba(92,196,255,0.12)_0%,rgba(92,196,255,0)_68%)] after:content-[\"\"] max-[860px]:relative max-[860px]:top-auto max-[860px]:z-auto max-[860px]:overflow-visible max-[860px]:rounded-none max-[860px]:border-t max-[860px]:p-[0.2rem_0.3rem] max-[860px]:backdrop-blur-none max-[860px]:after:hidden',
     headerInner:
@@ -231,7 +231,7 @@ export const site = {
     mobileBrandTop:
         'contents max-[860px]:col-span-full max-[860px]:grid max-[860px]:grid-cols-[2.05rem_minmax(0,1fr)_2.05rem] max-[860px]:items-center max-[860px]:gap-[0.24rem]',
     logoLink: 'col-start-1 row-start-1 grid h-full items-center justify-items-center gap-[0.35rem] self-center max-[860px]:row-span-1 max-[860px]:col-start-2 max-[860px]:h-auto max-[860px]:w-full max-[860px]:translate-y-0 max-[860px]:justify-items-center',
-    logo: 'w-full max-w-[268px] translate-x-[-8px] object-contain drop-shadow-[0_10px_18px_rgba(4,17,43,0.30)] max-[1320px]:max-w-[238px] max-[1080px]:max-w-[218px] max-[860px]:max-w-[178px] max-[860px]:translate-x-0 max-[560px]:max-w-[164px]',
+    logo: 'w-full max-w-[268px] translate-x-[-8px] object-contain drop-shadow-[0_10px_18px_rgba(4,17,43,0.30)] max-[1320px]:max-w-[238px] max-[1080px]:max-w-[218px] max-[860px]:max-w-[208px] max-[860px]:translate-x-0 max-[560px]:max-w-[194px]',
     headerCenter:
         'col-start-2 row-start-1 grid min-w-0 justify-items-start gap-0 max-[860px]:hidden',
     mobileSearchDock:
@@ -350,7 +350,7 @@ export function siteAnnouncementItemClass(active: boolean, image: boolean, catal
 }
 
 export const siteAnnouncementImageShellClass =
-    'relative isolate w-full aspect-[6.6/1] overflow-hidden rounded-[0.66rem] shadow-[0_0_0_1px_rgba(202,236,255,0.20),0_10px_24px_rgba(10,28,72,0.18)] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:bg-[linear-gradient(90deg,rgba(10,26,65,0.18)_0%,rgba(10,26,65,0)_18%,rgba(10,26,65,0)_82%,rgba(10,26,65,0.18)_100%)] after:content-[\"\"] max-[860px]:aspect-[4.1/1] max-[860px]:rounded-[0.58rem] max-[860px]:shadow-[0_0_0_1px_rgba(202,236,255,0.16),0_7px_16px_rgba(10,28,72,0.14)] max-[560px]:aspect-[5.1/1] max-[560px]:rounded-[0.5rem]';
+    'relative isolate w-full aspect-[8.4/1] overflow-hidden rounded-[0.66rem] shadow-[0_0_0_1px_rgba(202,236,255,0.20),0_10px_24px_rgba(10,28,72,0.18)] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:bg-[linear-gradient(90deg,rgba(10,26,65,0.18)_0%,rgba(10,26,65,0)_18%,rgba(10,26,65,0)_82%,rgba(10,26,65,0.18)_100%)] after:content-[\"\"] max-[860px]:aspect-[4.1/1] max-[860px]:rounded-[0.58rem] max-[860px]:shadow-[0_0_0_1px_rgba(202,236,255,0.16),0_7px_16px_rgba(10,28,72,0.14)] max-[560px]:aspect-[5.1/1] max-[560px]:rounded-[0.5rem]';
 export const siteAnnouncementImageClass =
     'mx-auto h-full w-auto max-w-full rounded-[inherit] object-contain saturate-[1.04] contrast-[1.02] [mask-image:linear-gradient(90deg,transparent_0%,#000_5%,#000_95%,transparent_100%)] [-webkit-mask-image:linear-gradient(90deg,transparent_0%,#000_5%,#000_95%,transparent_100%)] max-[560px]:bg-[linear-gradient(90deg,rgba(9,24,58,0.96)_0%,rgba(12,30,70,0.94)_50%,rgba(9,24,58,0.96)_100%)] max-[560px]:[mask-image:linear-gradient(90deg,transparent_0%,#000_4%,#000_96%,transparent_100%)] max-[560px]:[-webkit-mask-image:linear-gradient(90deg,transparent_0%,#000_4%,#000_96%,transparent_100%)]';
 export const siteAnnouncementPlainImageClass = 'h-full w-full object-fill';

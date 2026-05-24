@@ -41,7 +41,7 @@ class SiteViewDataService
 
         return [
             'brandUrl' => route('store.catalog'),
-            'logoUrl' => asset('assets/img/header-sudoku.png'),
+            'logoUrl' => asset('assets/img/header-sudoku-ai-relief.png'),
             'logoFallbackUrl' => asset('assets/img/header-placeholder.svg'),
             'navItems' => [
                 [

@@ -40,17 +40,17 @@ interface LightboxState {
 }
 
 const pageShellClass =
-    'min-h-screen bg-[linear-gradient(180deg,#eef5ff_0%,#f8fbff_42%,#e4efff_100%)] px-4 py-8 md:py-10';
+    'min-h-screen bg-[radial-gradient(circle_at_top_right,rgba(87,182,255,0.24),transparent_24%),radial-gradient(circle_at_top_left,rgba(36,86,184,0.22),transparent_22%),linear-gradient(180deg,#2a57a9_0%,#22458f_38%,#17376f_100%)] px-4 py-8 md:py-10';
 const cardClass =
-    `${surfaceClass} mx-auto grid w-full max-w-5xl justify-items-center gap-6 border-[#c7d7ed] bg-white px-5 py-6 text-[#0f2348] shadow-[0_24px_58px_rgba(14,48,105,0.14)] md:gap-7 md:p-8`;
+    `${surfaceClass} mx-auto grid w-full max-w-5xl justify-items-center gap-6 border-[rgba(202,226,255,0.42)] bg-white px-5 py-6 text-[#0f2348] shadow-[0_24px_58px_rgba(4,16,47,0.28),inset_0_1px_0_rgba(255,255,255,0.8)] md:gap-7 md:p-8`;
 const iconBaseClass = 'text-[#174ea6]';
 const inputClass =
-    'min-h-12 w-full rounded-xl border border-[#c7d7ed] bg-white px-4 py-3 text-sm font-bold text-ink-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10';
+    'min-h-12 w-full rounded-xl border border-[rgba(190,221,255,0.84)] bg-white px-4 py-3 text-sm font-bold text-[#102146] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_6px_14px_rgba(8,25,70,0.12)] outline-none transition placeholder:text-[#6f87af] focus:border-[rgba(184,229,255,0.98)] focus:ring-4 focus:ring-sky-200/30';
 const fieldClass = 'grid gap-2';
 const fieldLabelClass =
     'whitespace-nowrap text-sm font-black uppercase tracking-[0.12em] text-[#17427f]';
 const repairLookupFormClass =
-    'mx-auto grid w-full max-w-xl gap-4 rounded-[1.1rem] border border-[#c7d7ed] bg-[linear-gradient(180deg,#ffffff_0%,#f7faff_100%)] p-5 shadow-[0_16px_32px_rgba(18,58,132,0.10)] sm:grid-cols-[minmax(0,10.5rem)_minmax(0,12rem)] sm:items-end sm:justify-center md:w-fit md:max-w-none md:grid-cols-[10.5rem_12rem_3rem] md:p-5';
+    'relative mx-auto grid w-full max-w-xl gap-4 overflow-hidden rounded-[1.1rem] border border-[#8bbcff] bg-[linear-gradient(180deg,#ffffff_0%,#eef6ff_100%)] p-5 shadow-[0_22px_46px_rgba(4,16,47,0.28),0_0_0_4px_rgba(184,215,255,0.32),inset_0_1px_0_rgba(255,255,255,0.96)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-1.5 before:bg-[linear-gradient(90deg,#35bcd7_0%,#2f61bf_42%,#17376f_100%)] before:content-[\"\"] sm:grid-cols-[minmax(0,10.5rem)_minmax(0,12rem)] sm:items-end sm:justify-center md:w-fit md:max-w-none md:grid-cols-[10.5rem_12rem_3rem] md:p-5';
 const actionButtonClass = buttonClass(
     'primary',
     'default',
@@ -355,7 +355,15 @@ export default function PublicTrackingPage({
                                 />
                             </a>
 
-                            <div className="grid w-full max-w-3xl gap-3 text-center">
+                            <div className="grid w-full max-w-3xl justify-items-center gap-3 text-center">
+                                <a
+                                    href={publicView.brandUrl}
+                                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-[#c7d7ed] bg-white px-4 py-2 text-sm font-bold text-[#17427f] shadow-[0_8px_18px_rgba(18,58,132,0.07)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:border-[#93c5fd] hover:bg-[#f8fbff] hover:brightness-[1.02] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgba(53,117,236,0.16)]"
+                                >
+                                    <FaArrowLeft aria-hidden="true" className="text-sm" />
+                                    <span>Volver al sitio</span>
+                                </a>
+
                                 <div className="flex items-center justify-center gap-3">
                                     <FaTools
                                         aria-hidden="true"
@@ -668,15 +676,17 @@ export default function PublicTrackingPage({
                         </section>
                     ) : null}
 
-                    <a
-                        href={publicView.whatsappUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mx-auto inline-flex min-h-11 w-full max-w-sm items-center justify-center gap-2 rounded-2xl border border-[#128C7E]/45 bg-white px-4 py-2.5 text-sm font-bold text-[#0f6b5f] shadow-[0_8px_18px_rgba(18,58,132,0.07)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:border-[#128C7E] hover:bg-[#f2fffb] hover:brightness-[1.02] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgba(53,117,236,0.16)]"
-                    >
-                        <span>{publicView.whatsappLabel}</span>
-                        <FaWhatsapp aria-hidden="true" className="text-lg" />
-                    </a>
+                    <div className="mx-auto grid w-full max-w-sm gap-2">
+                        <a
+                            href={publicView.whatsappUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#128C7E]/45 bg-white px-4 py-2.5 text-sm font-bold text-[#0f6b5f] shadow-[0_8px_18px_rgba(18,58,132,0.07)] transition-[transform,box-shadow,filter,background-color,border-color] duration-150 hover:-translate-y-px hover:border-[#128C7E] hover:bg-[#f2fffb] hover:brightness-[1.02] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[rgba(53,117,236,0.16)]"
+                        >
+                            <span>{publicView.whatsappLabel}</span>
+                            <FaWhatsapp aria-hidden="true" className="text-lg" />
+                        </a>
+                    </div>
 
                     <a
                         href={mapUrl}
