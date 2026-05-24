@@ -491,33 +491,51 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                             className={isCatalogLegacyAnnouncements ? siteAnnouncement.shellCatalog : siteAnnouncement.shell}
                             aria-label="Novedades"
                         >
-                            <button
-                                type="button"
-                                className={isCatalogLegacyAnnouncements ? siteAnnouncement.arrowCatalog : siteAnnouncement.arrow}
-                                onClick={() => moveAnnouncement(-1)}
-                                aria-label={isCatalogLegacyAnnouncements ? 'Mensaje anterior' : 'Anterior'}
-                                disabled={!showAnnouncementControls}
-                            >
-                                &#8249;
-                            </button>
-
                             {isCatalogLegacyAnnouncements ? (
                                 <div className={siteAnnouncement.track} aria-live="polite">
                                     {announcements?.items.map((item, index) => renderAnnouncementItem(item, index))}
+                                    <button
+                                        type="button"
+                                        className={`${siteAnnouncement.arrowCatalog} ${siteAnnouncement.arrowCatalogPrev}`}
+                                        onClick={() => moveAnnouncement(-1)}
+                                        aria-label="Mensaje anterior"
+                                        disabled={!showAnnouncementControls}
+                                    >
+                                        &#8249;
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={`${siteAnnouncement.arrowCatalog} ${siteAnnouncement.arrowCatalogNext}`}
+                                        onClick={() => moveAnnouncement(1)}
+                                        aria-label="Siguiente mensaje"
+                                        disabled={!showAnnouncementControls}
+                                    >
+                                        &#8250;
+                                    </button>
                                 </div>
                             ) : (
-                                renderAnnouncementItem(activeAnnouncement, announcementIndex)
+                                <>
+                                    <button
+                                        type="button"
+                                        className={siteAnnouncement.arrow}
+                                        onClick={() => moveAnnouncement(-1)}
+                                        aria-label="Anterior"
+                                        disabled={!showAnnouncementControls}
+                                    >
+                                        &#8249;
+                                    </button>
+                                    {renderAnnouncementItem(activeAnnouncement, announcementIndex)}
+                                    <button
+                                        type="button"
+                                        className={siteAnnouncement.arrow}
+                                        onClick={() => moveAnnouncement(1)}
+                                        aria-label="Siguiente"
+                                        disabled={!showAnnouncementControls}
+                                    >
+                                        &#8250;
+                                    </button>
+                                </>
                             )}
-
-                            <button
-                                type="button"
-                                className={isCatalogLegacyAnnouncements ? siteAnnouncement.arrowCatalog : siteAnnouncement.arrow}
-                                onClick={() => moveAnnouncement(1)}
-                                aria-label={isCatalogLegacyAnnouncements ? 'Siguiente mensaje' : 'Siguiente'}
-                                disabled={!showAnnouncementControls}
-                            >
-                                &#8250;
-                            </button>
                         </section>
                     ) : null}
 

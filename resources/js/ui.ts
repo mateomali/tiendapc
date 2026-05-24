@@ -324,17 +324,19 @@ export const siteAnnouncement = {
     shell:
         'mt-[0.24rem] grid min-h-0 grid-cols-[20px_minmax(0,1fr)_20px] items-center gap-[0.14rem] rounded-[0.72rem] border border-[rgba(121,185,255,0.5)] bg-[radial-gradient(circle_at_50%_44%,rgba(8,20,49,0.42)_0%,rgba(8,20,49,0)_42%),linear-gradient(90deg,#4872cf_0%,#2d5baa_18%,#16356a_50%,#24529f_80%,#37a6d7_100%)] p-[0.12rem] shadow-[0_6px_12px_rgba(15,45,103,0.14),inset_0_1px_0_rgba(255,255,255,0.12)] max-[860px]:mt-[0.18rem] max-[860px]:grid-cols-1 max-[860px]:items-center max-[860px]:justify-items-center max-[860px]:rounded-none max-[860px]:p-[0.1rem_0.14rem] max-[860px]:shadow-[0_4px_8px_rgba(15,45,103,0.10)]',
     shellCatalog:
-        'mt-0 grid grid-cols-[34px_minmax(0,1fr)_34px] items-center gap-[0.18rem] overflow-hidden rounded-none border-y border-[rgba(119,183,255,0.34)] border-x-0 bg-[linear-gradient(90deg,#345fba_0%,#1f4f98_20%,#173d78_50%,#1c5d9f_82%,#2198c8_100%)] p-[0.04rem_0.22rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(5,18,48,0.14)] max-[860px]:mt-0 max-[860px]:grid-cols-[34px_minmax(0,1fr)_34px] max-[860px]:justify-items-stretch max-[860px]:gap-[0.08rem] max-[860px]:rounded-none max-[860px]:border max-[860px]:border-[rgba(119,183,255,0.30)] max-[860px]:p-[0.08rem_0.08rem] max-[860px]:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] max-[560px]:gap-[0.06rem] max-[560px]:p-[0.07rem_0.06rem]',
+        'mt-0 block overflow-hidden rounded-none border-y border-[rgba(119,183,255,0.34)] border-x-0 bg-[linear-gradient(90deg,#345fba_0%,#1f4f98_20%,#173d78_50%,#1c5d9f_82%,#2198c8_100%)] p-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(5,18,48,0.14)] max-[860px]:mt-0 max-[860px]:rounded-none max-[860px]:border max-[860px]:border-[rgba(119,183,255,0.30)] max-[860px]:p-0 max-[860px]:shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]',
     arrow:
         `${interactiveLift} inline-flex min-h-[1.2rem] w-full cursor-pointer items-center justify-center rounded-[0.36rem] border-0 bg-white/12 text-[0.72rem] font-bold text-white/95 disabled:cursor-not-allowed disabled:opacity-35 disabled:transform-none disabled:brightness-100 max-[860px]:hidden`,
     arrowCatalog:
-        `${interactiveLift} inline-flex min-h-[32px] w-[32px] min-w-[32px] items-center justify-center rounded-full border border-[rgba(178,224,255,0.46)] bg-[rgba(225,244,255,0.16)] text-[1rem] font-black leading-none text-[#eaf7ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_5px_12px_rgba(4,18,55,0.16)] backdrop-blur-[6px] hover:border-[rgba(191,235,255,0.74)] hover:bg-[rgba(231,247,255,0.26)] hover:text-white hover:shadow-[0_7px_16px_rgba(30,129,220,0.16),0_0_0_2px_rgba(116,207,255,0.12),inset_0_1px_0_rgba(255,255,255,0.22)] disabled:cursor-not-allowed disabled:opacity-35 disabled:transform-none disabled:brightness-100 disabled:shadow-none max-[860px]:min-h-[32px] max-[860px]:w-[32px] max-[860px]:min-w-[32px] max-[860px]:border-[rgba(183,225,255,0.36)] max-[860px]:bg-[rgba(228,246,255,0.18)] max-[860px]:text-[0.94rem] max-[860px]:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_4px_8px_rgba(5,24,62,0.12)] max-[560px]:min-h-[32px] max-[560px]:w-[32px] max-[560px]:min-w-[32px] max-[560px]:text-[0.86rem]`,
+        `${interactiveLift} absolute top-1/2 z-[5] inline-flex min-h-[32px] w-[32px] min-w-[32px] -translate-y-1/2 items-center justify-center rounded-full border border-[rgba(178,224,255,0.46)] bg-[rgba(6,24,62,0.24)] text-[1rem] font-black leading-none text-[#eaf7ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.16),0_5px_12px_rgba(4,18,55,0.16)] backdrop-blur-[6px] hover:border-[rgba(191,235,255,0.74)] hover:bg-[rgba(6,24,62,0.36)] hover:text-white hover:shadow-[0_7px_16px_rgba(30,129,220,0.16),0_0_0_2px_rgba(116,207,255,0.12),inset_0_1px_0_rgba(255,255,255,0.22)] disabled:cursor-not-allowed disabled:opacity-35 disabled:transform-none disabled:brightness-100 disabled:shadow-none max-[860px]:min-h-[32px] max-[860px]:w-[32px] max-[860px]:min-w-[32px] max-[860px]:border-[rgba(183,225,255,0.36)] max-[860px]:bg-[rgba(6,24,62,0.28)] max-[860px]:text-[0.94rem] max-[860px]:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_4px_8px_rgba(5,24,62,0.12)] max-[560px]:min-h-[32px] max-[560px]:w-[32px] max-[560px]:min-w-[32px] max-[560px]:text-[0.86rem]`,
+    arrowCatalogPrev: 'left-[0.5rem] max-[560px]:left-[0.35rem]',
+    arrowCatalogNext: 'right-[0.5rem] max-[560px]:right-[0.35rem]',
     card:
         'flex h-40 min-h-40 overflow-hidden rounded-[0.52rem] bg-[linear-gradient(90deg,rgba(14,42,92,0.76)_0%,rgba(14,42,92,0.18)_18%,rgba(14,42,92,0.18)_82%,rgba(14,42,92,0.76)_100%),linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.02)_100%)] max-[860px]:m-0 max-[860px]:w-full max-[560px]:min-h-[2.45rem] max-[560px]:rounded-[0.52rem]',
     copy: 'grid content-center gap-[0.04rem] p-[0.22rem_0.5rem] text-[0.64rem] font-black leading-[1.08] text-white max-[560px]:gap-[0.1rem] max-[560px]:p-[0.34rem_0.56rem] max-[560px]:text-[0.72rem] max-[560px]:leading-[1.15]',
     kicker: 'text-[0.78rem] font-black uppercase tracking-[0.07em] max-[560px]:text-[0.52rem] max-[560px]:tracking-[0.05em]',
     track:
-        'relative mx-auto flex min-h-[clamp(27px,2.9vw,41px)] w-full max-w-none items-center overflow-hidden rounded-[0.64rem] bg-transparent shadow-none max-[860px]:min-h-[clamp(60px,17vw,83px)] max-[860px]:rounded-none max-[560px]:min-h-[clamp(44px,13vw,57px)]',
+        'relative mx-auto flex min-h-[clamp(27px,2.9vw,41px)] w-full max-w-none items-center overflow-hidden rounded-none bg-transparent shadow-none max-[860px]:min-h-[clamp(60px,17vw,83px)] max-[860px]:rounded-none max-[560px]:min-h-[clamp(44px,13vw,57px)]',
 };
 
 export function siteAnnouncementItemClass(active: boolean, image: boolean, catalogLegacy: boolean): string {
@@ -343,16 +345,16 @@ export function siteAnnouncementItemClass(active: boolean, image: boolean, catal
     }
 
     return cn(
-        'relative z-[1] hidden min-h-[inherit] w-full items-center justify-center px-[0.65rem] text-[#f3f8ff] no-underline max-[860px]:px-[0.35rem]',
-        image && 'px-[0.45rem] max-[860px]:px-[0.2rem]',
+        'relative z-[1] hidden min-h-[inherit] w-full items-center justify-center px-0 text-[#f3f8ff] no-underline',
+        image && 'px-0',
         active && 'inline-flex',
     );
 }
 
 export const siteAnnouncementImageShellClass =
-    'relative isolate w-full aspect-[8.4/1] overflow-hidden rounded-[0.66rem] shadow-[0_0_0_1px_rgba(202,236,255,0.20),0_10px_24px_rgba(10,28,72,0.18)] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:bg-[linear-gradient(90deg,rgba(10,26,65,0.18)_0%,rgba(10,26,65,0)_18%,rgba(10,26,65,0)_82%,rgba(10,26,65,0.18)_100%)] after:content-[\"\"] max-[860px]:aspect-[4.1/1] max-[860px]:rounded-[0.58rem] max-[860px]:shadow-[0_0_0_1px_rgba(202,236,255,0.16),0_7px_16px_rgba(10,28,72,0.14)] max-[560px]:aspect-[5.1/1] max-[560px]:rounded-[0.5rem]';
+    'relative isolate w-full aspect-[8.4/1] overflow-hidden rounded-none shadow-none after:pointer-events-none after:absolute after:inset-0 after:bg-[linear-gradient(90deg,rgba(10,26,65,0.14)_0%,rgba(10,26,65,0)_18%,rgba(10,26,65,0)_82%,rgba(10,26,65,0.14)_100%)] after:content-[\"\"] max-[860px]:aspect-[4.1/1] max-[860px]:rounded-none max-[860px]:shadow-none max-[560px]:aspect-[5.1/1] max-[560px]:rounded-none';
 export const siteAnnouncementImageClass =
-    'mx-auto h-full w-auto max-w-full rounded-[inherit] object-contain saturate-[1.04] contrast-[1.02] [mask-image:linear-gradient(90deg,transparent_0%,#000_5%,#000_95%,transparent_100%)] [-webkit-mask-image:linear-gradient(90deg,transparent_0%,#000_5%,#000_95%,transparent_100%)] max-[560px]:bg-[linear-gradient(90deg,rgba(9,24,58,0.96)_0%,rgba(12,30,70,0.94)_50%,rgba(9,24,58,0.96)_100%)] max-[560px]:[mask-image:linear-gradient(90deg,transparent_0%,#000_4%,#000_96%,transparent_100%)] max-[560px]:[-webkit-mask-image:linear-gradient(90deg,transparent_0%,#000_4%,#000_96%,transparent_100%)]';
+    'mx-auto h-full w-full max-w-none rounded-none object-cover saturate-[1.04] contrast-[1.02]';
 export const siteAnnouncementPlainImageClass = 'h-full w-full object-fill';
 export const siteAnnouncementTextClass =
     'relative z-[1] min-h-[34px] px-2.5 text-center text-[clamp(0.8rem,0.46vw+0.72rem,0.92rem)] font-extrabold leading-[1.2] text-[#f3f8ff] underline decoration-current underline-offset-2 shadow-none [text-shadow:0_0_12px_rgba(130,205,255,0.14)] max-[860px]:min-h-[30px] max-[860px]:px-2 max-[860px]:text-[0.78rem] max-[560px]:min-h-7 max-[560px]:px-1.5 max-[560px]:text-[0.72rem] max-[560px]:leading-[1.15]';
