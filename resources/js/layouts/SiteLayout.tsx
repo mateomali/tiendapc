@@ -108,10 +108,32 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
     const [searching, setSearching] = useState(false);
     const [announcementIndex, setAnnouncementIndex] = useState(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [cartPulse, setCartPulse] = useState(false);
 
     useEffect(() => {
         setSearch(headerSearch?.query ?? '');
     }, [headerSearch?.query]);
+
+    useEffect(() => {
+        const pulseCart = (): void => {
+            setCartPulse(false);
+            window.setTimeout(() => setCartPulse(true), 20);
+        };
+
+        window.addEventListener('sudoku:cart-added', pulseCart);
+
+        return () => window.removeEventListener('sudoku:cart-added', pulseCart);
+    }, []);
+
+    useEffect(() => {
+        if (!cartPulse) {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => setCartPulse(false), 1350);
+
+        return () => window.clearTimeout(timeout);
+    }, [cartPulse]);
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(min-width: 861px)');
@@ -285,16 +307,6 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                         <div className={site.headerInner}>
                             <div className={site.brandRow}>
                                 <div className={site.mobileBrandTop}>
-                                    <Link href={layout.brandUrl} className={site.logoLink} prefetch={['hover', 'click']} cacheFor="30s">
-                                        <img
-                                            src={layout.logoUrl}
-                                            alt="Sudoku"
-                                            className={site.logo}
-                                            onError={(event) => {
-                                                event.currentTarget.src = layout.logoFallbackUrl;
-                                            }}
-                                        />
-                                    </Link>
                                     <button
                                         type="button"
                                         className={siteMobileToggleClass(mobileMenuOpen)}
@@ -307,6 +319,16 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                             <MenuNavIcon open={mobileMenuOpen} />
                                         </span>
                                     </button>
+                                    <Link href={layout.brandUrl} className={site.logoLink} prefetch={['hover', 'click']} cacheFor="30s">
+                                        <img
+                                            src={layout.logoUrl}
+                                            alt="Sudoku"
+                                            className={site.logo}
+                                            onError={(event) => {
+                                                event.currentTarget.src = layout.logoFallbackUrl;
+                                            }}
+                                        />
+                                    </Link>
                                 </div>
 
                             <div className={site.headerCenter}>
@@ -340,11 +362,11 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     </div>
                                 ) : null}
 
-                                <Link href={layout.cartUrl} className={site.mobileHeaderCart} aria-label={`Ir al carrito, ${cart.count} productos`} prefetch={['hover', 'click']} cacheFor="15s">
+                                <Link href={layout.cartUrl} className={`${site.mobileHeaderCart} ${cartPulse ? site.mobileCartPulse : ''}`} aria-label={`Ir al carrito, ${cart.count} productos`} prefetch={['hover', 'click']} cacheFor="15s">
                                     <span className={siteCartIconClass}>
                                         <CartNavIcon />
                                     </span>
-                                    <span className={siteCartBadgeClass}>{cart.count}</span>
+                                    <span className={siteCartBadgeClass} data-cart-badge>{cart.count}</span>
                                 </Link>
                             </div>
 
@@ -356,11 +378,11 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     <span className={site.desktopStoreInfoWhatsappText}>¿Consultas?</span>
                                 </a>
 
-                                <Link href={layout.cartUrl} className={siteCartLinkClass} aria-label={`Ir al carrito, ${cart.count} productos`} prefetch={['hover', 'click']} cacheFor="15s">
+                                <Link href={layout.cartUrl} className={`${siteCartLinkClass} ${cartPulse ? site.mobileCartPulse : ''}`} aria-label={`Ir al carrito, ${cart.count} productos`} prefetch={['hover', 'click']} cacheFor="15s">
                                     <span className={siteCartIconClass}>
                                         <CartNavIcon />
                                     </span>
-                                    <span className={siteCartBadgeClass}>{cart.count}</span>
+                                    <span className={siteCartBadgeClass} data-cart-badge>{cart.count}</span>
                                 </Link>
                             </div>
                             </div>
@@ -420,11 +442,11 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     </div>
                                 </div>
 
-                                <a href={layout.cartUrl} className={site.mobileHeaderCart} aria-label={`Ir al carrito, ${cart.count} productos`}>
+                                <a href={layout.cartUrl} className={`${site.mobileHeaderCart} ${cartPulse ? site.mobileCartPulse : ''}`} aria-label={`Ir al carrito, ${cart.count} productos`}>
                                     <span className={siteCartIconClass}>
                                         <CartNavIcon />
                                     </span>
-                                    <span className={siteCartBadgeClass}>{cart.count}</span>
+                                    <span className={siteCartBadgeClass} data-cart-badge>{cart.count}</span>
                                 </a>
                             </div>
                         </section>

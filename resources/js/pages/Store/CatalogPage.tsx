@@ -92,6 +92,10 @@ type MobileCatalogPanel = 'filters' | 'sort' | null;
 const catalogGridColumnOptions: CatalogGridColumns[] = [2, 3, 4, 5, 6];
 const catalogGridColumnsStorageKey = 'sudoku.catalog.gridColumns';
 
+function notifyCartAdded(): void {
+    window.dispatchEvent(new CustomEvent('sudoku:cart-added'));
+}
+
 function ClockIcon(): JSX.Element {
     return (
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -282,7 +286,10 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
             { product_id: product.id, quantity: 1, inline_feedback: true },
             {
                 preserveScroll: true,
-                onSuccess: () => setShowAddedFeedback(true),
+                onSuccess: () => {
+                    setShowAddedFeedback(true);
+                    notifyCartAdded();
+                },
             },
         );
     };
@@ -443,7 +450,10 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
             { product_id: product.id, quantity: 1, inline_feedback: true },
             {
                 preserveScroll: true,
-                onSuccess: () => setShowAddedFeedback(true),
+                onSuccess: () => {
+                    setShowAddedFeedback(true);
+                    notifyCartAdded();
+                },
             },
         );
     };

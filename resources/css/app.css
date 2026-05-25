@@ -227,4 +227,69 @@
             opacity: 0.42;
         }
     }
+
+    @keyframes cart-nudge {
+        0%,
+        100% {
+            filter: brightness(1);
+            transform: translateX(0) rotate(0deg) scale(1);
+        }
+
+        14% {
+            filter: brightness(1.18);
+            transform: translateX(-9px) rotate(-8deg) scale(1.08);
+        }
+
+        28% {
+            filter: brightness(1.24);
+            transform: translateX(8px) rotate(8deg) scale(1.15);
+        }
+
+        42% {
+            transform: translateX(-7px) rotate(-6deg) scale(1.1);
+        }
+
+        58% {
+            transform: translateX(6px) rotate(6deg) scale(1.08);
+        }
+
+        74% {
+            transform: translateX(-3px) rotate(-3deg) scale(1.04);
+        }
+
+        88% {
+            transform: translateX(2px) rotate(2deg) scale(1.02);
+        }
+    }
+
+    @keyframes cart-badge-pop {
+        0%,
+        100% {
+            transform: scale(1);
+        }
+
+        28% {
+            transform: scale(1.72);
+        }
+
+        58% {
+            transform: scale(0.88);
+        }
+    }
+}
+
+@layer utilities {
+    .cart-nudge-active {
+        animation: cart-nudge 1.18s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+        box-shadow:
+            0 0 0 4px rgba(56, 189, 248, 0.22),
+            0 10px 22px rgba(8, 47, 110, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.24);
+        transform-origin: center;
+    }
+
+    .cart-nudge-active [data-cart-badge] {
+        animation: cart-badge-pop 1.18s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+        transform-origin: center;
+    }
 }

@@ -269,6 +269,8 @@ export const site = {
         'inline-flex h-[1.15rem] w-[1.15rem] items-center justify-center [&_img]:block [&_img]:h-full [&_img]:w-full [&_img]:object-contain [&_img]:brightness-0 [&_img]:invert [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-[2.4] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     mobileHeaderCart:
         `${interactiveLift} relative hidden h-[2.46rem] min-h-[2.46rem] w-[2.46rem] min-w-[2.46rem] items-center justify-center rounded-[0.64rem] border border-[rgba(157,234,255,0.8)] bg-[linear-gradient(180deg,#35bcd7_0%,#1388bb_100%)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] max-[860px]:inline-flex`,
+    mobileCartPulse:
+        'cart-nudge-active',
     mobileMenuOverlay:
         'fixed inset-0 z-50 hidden items-end bg-[rgba(5,18,48,0.42)] p-[0.55rem] max-[860px]:flex max-[380px]:p-[0.34rem]',
     mobileMenuSheet:
@@ -287,7 +289,7 @@ const navPillBase =
 
 export function siteMobileToggleClass(open: boolean): string {
     return cn(
-        'hidden min-h-10 w-[min(100%,27rem)] items-center justify-center rounded-[0.95rem] border border-[rgba(185,229,255,0.72)] bg-[linear-gradient(180deg,rgba(242,250,255,0.96)_0%,rgba(221,238,255,0.94)_100%)] text-[0.78rem] font-black uppercase tracking-[0.08em] text-[#18437f] shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_8px_16px_rgba(9,38,90,0.14)] max-[860px]:col-start-3 max-[860px]:inline-flex max-[860px]:h-[2.2rem] max-[860px]:min-h-[2.2rem] max-[860px]:w-[2.2rem] max-[860px]:rounded-[0.68rem] max-[860px]:p-0',
+        'hidden min-h-10 w-[min(100%,27rem)] items-center justify-center rounded-[0.95rem] border border-[rgba(185,229,255,0.72)] bg-[linear-gradient(180deg,rgba(242,250,255,0.96)_0%,rgba(221,238,255,0.94)_100%)] text-[0.78rem] font-black uppercase tracking-[0.08em] text-[#18437f] shadow-[inset_0_1px_0_rgba(255,255,255,0.88),0_8px_16px_rgba(9,38,90,0.14)] max-[860px]:col-start-1 max-[860px]:inline-flex max-[860px]:h-[2.2rem] max-[860px]:min-h-[2.2rem] max-[860px]:w-[2.2rem] max-[860px]:rounded-[0.68rem] max-[860px]:p-0',
         open && 'border-[rgba(211,236,255,0.94)] bg-[linear-gradient(180deg,#85d7ff_0%,#4da8ef_100%)] text-[#083b6c]',
     );
 }
