@@ -1,5 +1,5 @@
 import { Link, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
@@ -516,6 +516,12 @@ export default function WorkbenchPage({
 
         if (value.trim() === '' || Number(value) === 0) {
             updateJob(index, (current) => ({ ...current, [field]: '' }));
+        }
+    };
+
+    const preventAmountArrowStep = (event: KeyboardEvent<HTMLInputElement>): void => {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            event.preventDefault();
         }
     };
 
@@ -1114,10 +1120,10 @@ export default function WorkbenchPage({
                                             <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={cn(compactInputClass, 'number-input-no-spinners')} type="number" step="100" min="0" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={cn(compactInputClass, 'number-input-no-spinners')} type="number" step="100" min="0" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Sena ($)<input className={compactInputClass} type="number" step="100" min="0" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
+                                            <label className={repairLabelClass}>Sena ($)<input className={cn(compactInputClass, 'number-input-no-spinners')} type="number" step="100" min="0" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
                                         </div>
                                         <div className={fieldPanelAmber}>
                                             <label className={repairLabelClass}>Fecha estimada<input className={compactInputClass} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
@@ -1372,6 +1378,7 @@ export default function WorkbenchPage({
                                             placeholder="Monto"
                                             value={job.monto}
                                             onFocus={() => clearAmountForTyping(index, 'monto')}
+                                            onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))}
                                         />
                                         <input
@@ -1379,6 +1386,7 @@ export default function WorkbenchPage({
                                             placeholder="Senia"
                                             value={job.senia}
                                             onFocus={() => clearAmountForTyping(index, 'senia')}
+                                            onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))}
                                         />
                                         <input

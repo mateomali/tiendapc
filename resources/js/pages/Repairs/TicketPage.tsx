@@ -88,6 +88,7 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                             const senia = Number(repair.senia ?? 0);
                             const saldo = Math.max(0, monto - senia);
                             const saldoLabel = monto > 0 && senia >= monto ? 'PAGADO' : formatCurrency(saldo);
+                            const deliveredLabel = repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null;
 
                             return (
                                 <div key={`${repair.registro_id}-${repair.reparacion}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
@@ -97,7 +98,9 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                                         <span className="block">FALLA:</span>
                                         <strong className="mt-px block break-words text-left">{repair.descripcion || 'SIN DESCRIPCION'}</strong>
                                     </div>
-                                    {senia > 0 ? (
+                                    {deliveredLabel !== null ? (
+                                        <TicketLine label="TOTAL:" value={deliveredLabel} />
+                                    ) : senia > 0 ? (
                                         <>
                                             <TicketLine label="PRESUPUESTO:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
                                             <TicketLine label="SENA:" value={formatCurrency(senia)} />
@@ -136,6 +139,20 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
             </div>
         </>
     );
+}
+
+function formatDeliveredTicketDate(value?: string | null): string {
+    if (!value) {
+        return 'Entregado';
+    }
+
+    const [year, month, day] = value.split('-');
+
+    if (!year || !month || !day) {
+        return 'Entregado';
+    }
+
+    return `Entregado el ${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}`;
 }
 
 function TicketLine({ label, value }: { label: string; value: string }): JSX.Element {
