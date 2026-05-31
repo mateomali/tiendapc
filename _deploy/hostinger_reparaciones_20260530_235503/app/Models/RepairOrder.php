@@ -36,7 +36,6 @@ class RepairOrder extends Model
         'modelo',
         'descripcion',
         'observaciones',
-        'info',
         'monto',
         'senia',
         'fecha_estimada',

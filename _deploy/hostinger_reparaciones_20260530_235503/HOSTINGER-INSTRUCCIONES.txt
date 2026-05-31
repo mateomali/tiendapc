@@ -1,0 +1,24 @@
+﻿HOSTINGER - Bundle seguro reparaciones
+
+Contenido:
+- app/, routes/, database/migrations/: cambios backend Laravel.
+- resources/js/: fuente React actualizada.
+- public/build/: assets ya compilados para producción.
+- sql/hostinger_reparaciones_update.sql: script para phpMyAdmin.
+
+No incluye:
+- .env
+- .git
+- vendor
+- node_modules
+- storage/logs
+- backups ni datos locales
+
+Pasos sugeridos:
+1. Hacer backup de archivos y base de datos en Hostinger.
+2. Subir el contenido de este ZIP sobre la raíz del proyecto Laravel en Hostinger.
+3. En phpMyAdmin, ejecutar sql/hostinger_reparaciones_update.sql.
+4. Si tenés acceso SSH, preferible ejecutar: php artisan migrate --force
+5. Probar /consulta, /metricas y un ticket público con QR.
+
+Commit incluido: 9bb099a Add repair payment history and metrics

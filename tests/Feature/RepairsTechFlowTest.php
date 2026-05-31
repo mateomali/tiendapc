@@ -217,6 +217,35 @@ it('renders repair business metrics', function (): void {
         'entregado' => 'no',
     ]);
 
+    RepairOrder::query()->create([
+        'id' => 812,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Metricas Entregada',
+        'dni' => 30111223,
+        'modelo' => 'Samsung A52',
+        'descripcion' => 'Cambio de modulo',
+        'monto' => 30000,
+        'senia' => 30000,
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'fecha_entregado' => now()->toDateString(),
+    ]);
+
+    RepairOrder::query()->create([
+        'id' => 813,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Metricas Pendiente',
+        'dni' => 30111224,
+        'modelo' => 'Motorola G',
+        'descripcion' => 'Revision general',
+        'monto' => 50000,
+        'senia' => 10000,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
     RepairPayment::query()->create([
         'orden_id' => 811,
         'reparacion' => 1,
@@ -230,7 +259,10 @@ it('renders repair business metrics', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/MetricsPage')
-            ->where('metrics.totals.monthBilled', 80000)
+            ->where('metrics.totals.monthBilled', 160000)
+            ->where('metrics.totals.monthPaid', 60000)
+            ->where('metrics.totals.openBalance', 60000)
+            ->where('metrics.counts.delivered', 1)
             ->where('metrics.topWorkTypes.0.label', 'Cambio de modulo/pantalla'));
 });
 
@@ -437,4 +469,68 @@ it('updates only the selected job details in a multi-job ticket', function (): v
     expect($second->fresh()?->modelo)->toBe('Joystick PS4 V2');
     expect($second->fresh()?->descripcion)->toBe('Cambio de pin de carga');
     expect($second->fresh()?->estado)->toBe('EN REPARACION');
+});
+
+it('stores internal info notes for the whole repair order', function (): void {
+    $first = RepairOrder::query()->create([
+        'id' => 930,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Info',
+        'dni' => 30111222,
+        'modelo' => 'Moto G',
+        'descripcion' => 'No carga',
+        'observaciones' => 'sin observaciones',
+        'monto' => 18000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $second = RepairOrder::query()->create([
+        'id' => 930,
+        'reparacion' => 2,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Info',
+        'dni' => 30111222,
+        'modelo' => 'Joystick',
+        'descripcion' => 'Cambio de pin',
+        'observaciones' => 'sin observaciones',
+        'monto' => 9000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.update', $first), [
+            'id_nuevo' => 930,
+            'fecha' => now()->toDateString(),
+            'nombre_cliente' => 'Cliente Info',
+            'dni' => 30111222,
+            'contacto' => '',
+            'modelo' => 'Moto G',
+            'descripcion' => 'No carga',
+            'observaciones' => 'sin observaciones',
+            'info' => 'Avisar antes de cambiar pin.',
+            'monto' => 18000,
+            'senia' => 0,
+            'fecha_estimada' => null,
+            'estado' => 'PENDIENTE',
+            'repuesto' => '',
+            'repuesto_pedido' => false,
+            'inventory_part_id' => '',
+            'categorias_reparacion' => 4,
+        ])
+        ->assertRedirect();
+
+    expect($first->fresh()?->info)->toBe('Avisar antes de cambiar pin.')
+        ->and($second->fresh()?->info)->toBe('Avisar antes de cambiar pin.');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => '930']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('tickets.0.info', 'Avisar antes de cambiar pin.'));
 });

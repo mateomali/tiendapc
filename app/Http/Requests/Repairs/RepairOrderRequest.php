@@ -23,6 +23,7 @@ class RepairOrderRequest extends FormRequest
             'modelo' => ['nullable', 'string', 'max:255'],
             'descripcion' => ['nullable', 'string'],
             'observaciones' => ['nullable', 'string'],
+            'info' => ['nullable', 'string'],
             'monto' => ['nullable', 'numeric', 'min:0'],
             'senia' => ['nullable', 'numeric', 'min:0'],
             'fecha_estimada' => ['nullable', 'date'],

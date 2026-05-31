@@ -188,7 +188,6 @@ export interface RepairOrderView {
     modelo?: string | null;
     descripcion?: string | null;
     observaciones?: string | null;
-    info?: string | null;
     monto: number | string;
     senia: number | string;
     fecha_estimada?: string | null;
@@ -258,7 +257,6 @@ export interface RepairTicketView {
     trackingVerifierLabel?: string;
     hasClientDni?: boolean;
     contacto?: string | null;
-    info?: string | null;
     fecha?: string | null;
     repairsCount: number;
     totalMonto: number;

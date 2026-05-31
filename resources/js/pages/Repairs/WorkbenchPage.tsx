@@ -1491,10 +1491,10 @@ export default function WorkbenchPage({
                     <span>Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}.</span>
                     <span>Consulta técnica</span>
                 </div>
-                <div className="hidden overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
-                    <div className="min-w-[1320px]">
+                <div className="hidden w-full overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
+                    <div className="w-full min-w-0">
                         <form onSubmit={(event) => { event.preventDefault(); submitGridFilters(); }}>
-                            <div className={cn('grid min-w-[1320px] items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#eef4fb] [&>*]:min-w-0 [&>*]:px-1.5 [&>*]:py-1.5', repairDesktopTableGridClass)}>
+                            <div className={cn('grid w-full items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#eef4fb] [&>*]:min-w-0 [&>*]:px-1.5 [&>*]:py-1.5', repairDesktopTableGridClass)}>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('ticket')} preserveScroll className={cn(sortHeaderClass('ticket'), 'justify-center')}>ID {sortIndicator('ticket')}</Link>
                                     <input className={cn(gridFilterInputClass, 'text-center')} inputMode="numeric" placeholder="ID" value={filtersForm.data.filter_id} onChange={(event) => setSingleGridFilter('filter_id', event.target.value)} />
@@ -1514,10 +1514,6 @@ export default function WorkbenchPage({
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('ingreso')} preserveScroll className={sortHeaderClass('ingreso')}>Ingreso {sortIndicator('ingreso')}</Link>
                                     <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_ingreso} onChange={(event) => setSingleGridFilter('filter_ingreso', event.target.value)} aria-label="Filtrar por fecha de ingreso" />
-                                </label>
-                                <label className="grid gap-1">
-                                    <Link href={sortHeaderHref('trabajo')} preserveScroll className={cn(sortHeaderClass('trabajo'), 'justify-center')}>Trabajo {sortIndicator('trabajo')}</Link>
-                                    <input className={cn(gridFilterInputClass, 'text-center')} inputMode="numeric" placeholder="Nro." value={filtersForm.data.filter_trabajo} onChange={(event) => setSingleGridFilter('filter_trabajo', event.target.value)} />
                                 </label>
                                 <span className="grid content-start gap-1 text-center text-[0.62rem] font-bold text-[#475569]">
                                     Imagen

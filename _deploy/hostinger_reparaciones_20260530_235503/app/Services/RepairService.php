@@ -161,7 +161,6 @@ class RepairService
             $firstOrder = null;
             $dni = (int) ($payload['dni'] ?? config('tienda.repair_default_dni'));
             $trackingToken = $this->trackingTokenForDni($dni);
-            $info = trim((string) ($payload['info'] ?? ''));
 
             foreach ($jobs as $index => $job) {
                 $repairNumber = $index + 1;
@@ -188,7 +187,6 @@ class RepairService
                     'modelo' => $job['modelo'],
                     'descripcion' => $job['descripcion'],
                     'observaciones' => $job['observaciones'],
-                    'info' => $info !== '' ? $info : null,
                     'monto' => $job['monto'],
                     'senia' => 0,
                     'fecha_estimada' => $job['fecha_estimada'],
@@ -244,7 +242,6 @@ class RepairService
                 'modelo' => $payload['modelo'] ?? null,
                 'descripcion' => $payload['descripcion'],
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
-                'info' => $order->info,
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => 0,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
@@ -410,7 +407,6 @@ class RepairService
 
             $dni = (int) ($payload['dni'] ?? config('tienda.repair_default_dni'));
             $trackingToken = $this->trackingTokenForDni($dni, $order->tracking_token);
-            $info = trim((string) ($payload['info'] ?? ''));
 
             RepairOrder::query()
                 ->where('id', $newOrderId)
@@ -420,7 +416,6 @@ class RepairService
                     'tracking_token' => $trackingToken,
                     'contacto' => $payload['contacto'] ?? null,
                     'fecha' => $payload['fecha'] ?? $order->fecha,
-                    'info' => $info !== '' ? $info : null,
                 ]);
 
             $originalImages = array_slice(array_merge($order->originalImages(), $this->storeImages($images, $newOrderId, $order->reparacion, 'orig')), 0, 2);
@@ -468,7 +463,6 @@ class RepairService
                 'modelo' => $payload['modelo'] ?? null,
                 'descripcion' => $payload['descripcion'] ?? null,
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
-                'info' => $info !== '' ? $info : null,
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => $this->paymentTotal($order),
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
@@ -663,22 +657,23 @@ class RepairService
             ->whereNotIn('estado', ['CANCELADA'])
             ->where('monto', '>', 0);
 
+        $paymentsQuery = fn () => RepairPayment::query();
+
         $orders = RepairOrder::query()->get();
         $billableOrders = $orders->filter(fn (RepairOrder $order): bool => $order->estado !== 'CANCELADA' && (float) $order->monto > 0);
         $totalBilled = (float) $billableOrders->sum(fn (RepairOrder $order): float => (float) $order->monto);
-        $payments = RepairPayment::query()->get();
-        $totalPaid = $this->metricPaidTotal($billableOrders, $payments);
+        $totalPaid = (float) RepairPayment::query()->sum('amount');
 
         return [
             'totals' => [
                 'yearBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $yearStart->toDateString())->sum('monto'),
                 'quarterBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $quarterStart->toDateString())->sum('monto'),
                 'monthBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $monthStart->toDateString())->sum('monto'),
-                'yearPaid' => $this->metricPaidTotal($billableOrders, $payments, $yearStart),
-                'quarterPaid' => $this->metricPaidTotal($billableOrders, $payments, $quarterStart),
-                'monthPaid' => $this->metricPaidTotal($billableOrders, $payments, $monthStart),
+                'yearPaid' => (float) $paymentsQuery()->whereDate('paid_at', '>=', $yearStart->toDateString())->sum('amount'),
+                'quarterPaid' => (float) $paymentsQuery()->whereDate('paid_at', '>=', $quarterStart->toDateString())->sum('amount'),
+                'monthPaid' => (float) $paymentsQuery()->whereDate('paid_at', '>=', $monthStart->toDateString())->sum('amount'),
                 'openBalance' => (float) $orders
-                    ->filter(fn (RepairOrder $order): bool => $order->entregado !== 'si' && $order->estado === 'LISTA')
+                    ->filter(fn (RepairOrder $order): bool => $order->entregado !== 'si' && $order->estado !== 'CANCELADA')
                     ->sum(fn (RepairOrder $order): float => max(0, (float) $order->monto - (float) $order->senia)),
                 'averageTicket' => $billableOrders->count() > 0 ? round($totalBilled / $billableOrders->count(), 2) : 0,
                 'collectionRate' => $totalBilled > 0 ? round(($totalPaid / $totalBilled) * 100, 1) : 0,
@@ -699,44 +694,6 @@ class RepairService
                 ->all(),
             'monthlyBilled' => $this->monthlyBilled($yearStart),
         ];
-    }
-
-    private function metricPaidTotal(Collection $orders, Collection $payments, ?CarbonImmutable $since = null): float
-    {
-        $paymentGroups = $payments
-            ->filter(function (RepairPayment $payment) use ($since): bool {
-                if ($since === null) {
-                    return true;
-                }
-
-                return optional($payment->paid_at)->format('Y-m-d') >= $since->toDateString();
-            })
-            ->groupBy(fn (RepairPayment $payment): string => $payment->orden_id . ':' . $payment->reparacion);
-
-        return (float) $orders->sum(function (RepairOrder $order) use ($paymentGroups, $since): float {
-            if ($order->entregado === 'si') {
-                $deliveredDate = $order->fecha_entregado ?? $order->fecha;
-
-                if ($since !== null && optional($deliveredDate)->format('Y-m-d') < $since->toDateString()) {
-                    return 0;
-                }
-
-                return (float) $order->monto;
-            }
-
-            $key = $order->id . ':' . $order->reparacion;
-            $paymentsTotal = (float) ($paymentGroups->get($key, collect())->sum(fn (RepairPayment $payment): float => (float) $payment->amount));
-
-            if ($since === null) {
-                return max($paymentsTotal, (float) $order->senia);
-            }
-
-            if ($paymentsTotal > 0) {
-                return $paymentsTotal;
-            }
-
-            return optional($order->fecha)->format('Y-m-d') >= $since->toDateString() ? (float) $order->senia : 0;
-        });
     }
 
     private function setState(RepairOrder $order, string $state, string $event): RepairOrder

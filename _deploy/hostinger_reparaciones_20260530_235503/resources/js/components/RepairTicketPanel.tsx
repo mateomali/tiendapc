@@ -9,7 +9,6 @@ import {
     FaEdit,
     FaImage,
     FaImages,
-    FaInfoCircle,
     FaPlus,
     FaReceipt,
     FaSave,
@@ -43,7 +42,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[3.2rem_minmax(6rem,0.5fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(10rem,1fr)_minmax(14rem,1.45fr)_5.5rem_4.6rem_6.5rem_minmax(16rem,0.95fr)]';
+    'grid-cols-[3.4rem_minmax(6.2rem,0.42fr)_4.8rem_5.8rem_5.4rem_5.1rem_4.2rem_minmax(12rem,0.78fr)_minmax(12rem,0.82fr)_5.8rem_5rem_7.4rem_19.5rem]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -64,7 +63,6 @@ interface RepairUpdateFormData {
     modelo: string;
     descripcion: string;
     observaciones: string;
-    info: string;
     monto: string;
     senia: string;
     fecha_estimada: string;
@@ -861,7 +859,6 @@ function RepairEditCard({
         modelo: repair.modelo ?? '',
         descripcion: repair.descripcion ?? '',
         observaciones: repair.observaciones ?? '',
-        info: ticket.info ?? '',
         monto: formatAmountInput(repair.monto),
         senia: formatAmountInput(repair.senia),
         fecha_estimada: repair.fecha_estimada ?? '',
@@ -881,7 +878,6 @@ function RepairEditCard({
         paid_at: todayInputValue(),
     });
     const [editOpen, setEditOpen] = useState(false);
-    const [infoOpen, setInfoOpen] = useState(false);
     const [inlineOpen, setInlineOpen] = useState(false);
     const [deliveryOpen, setDeliveryOpen] = useState(false);
     const [deliveryVia, setDeliveryVia] = useState<DeliveryVia>('dni');
@@ -900,7 +896,6 @@ function RepairEditCard({
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'LISTA'].includes(repair.estado);
     const nextStatus = nextQuickStatus(repair.estado);
     const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni);
-    const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
     const isLastGroupedDesktopRow = isGroupedDesktopRow && rowIndex === rowTotal - 1;
@@ -956,17 +951,6 @@ function RepairEditCard({
                 setEditOpen(false);
                 setInlineOpen(false);
             },
-        });
-    };
-
-    const submitInfo = (event: FormEvent<HTMLFormElement>): void => {
-        event.preventDefault();
-        if (!repair.actions?.update) return;
-
-        form.post(repair.actions.update, {
-            preserveScroll: true,
-            forceFormData: true,
-            onSuccess: () => setInfoOpen(false),
         });
     };
 
@@ -1164,20 +1148,10 @@ function RepairEditCard({
         const iconOnly = true;
         const base = mobile
             ? 'grid h-9 w-9 place-items-center rounded-xl text-[0.78rem] no-underline shadow-sm'
-            : 'grid h-7 w-7 place-items-center rounded-md text-[0.72rem] no-underline shadow-sm transition hover:brightness-95';
+            : 'grid h-8 w-8 place-items-center rounded-lg text-[0.78rem] no-underline shadow-sm transition hover:-translate-y-0.5';
 
         return (
-            <div className={cn(mobile ? 'flex flex-wrap justify-end gap-1.5' : 'flex flex-wrap items-center justify-end gap-1')}>
-                {showGeneralTicketActions ? (
-                    <button
-                        type="button"
-                        className={cn(base, hasInfo ? 'border border-[#0f766e] bg-[#0f766e] text-white' : 'border border-[#cbd5e1] bg-white text-[#334155]')}
-                        onClick={() => setInfoOpen(true)}
-                        title={hasInfo ? 'Info cargada' : 'Agregar info'}
-                    >
-                        <FaInfoCircle aria-hidden="true" />{iconOnly ? null : 'Info'}
-                    </button>
-                ) : null}
+            <div className={cn(mobile ? 'flex flex-wrap justify-end gap-1.5' : 'flex items-center justify-end gap-1')}>
                 {canMarkReady ? (
                     <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
                         <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
@@ -1229,31 +1203,6 @@ function RepairEditCard({
 
     const modals = (
         <>
-            {infoOpen ? (
-                <ModalShell title={`Info interna orden #${ticket.id}`} onClose={() => setInfoOpen(false)}>
-                    <form className="grid gap-3" onSubmit={submitInfo}>
-                        <label className="grid gap-1.5 text-sm font-black text-[#334155]">
-                            Anotacion interna
-                            <textarea
-                                className={changedTextareaClass(form.data.info, ticket.info ?? '')}
-                                value={form.data.info}
-                                onChange={(event) => form.setData('info', event.target.value)}
-                                rows={6}
-                                placeholder="Mensaje, recordatorio o nota personal sobre esta orden"
-                                disabled={readOnly}
-                            />
-                        </label>
-                        <div className="flex flex-wrap justify-end gap-2">
-                            <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setInfoOpen(false)}>Cerrar</button>
-                            {!readOnly ? (
-                                <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>
-                                    <FaSave aria-hidden="true" /> Guardar info
-                                </button>
-                            ) : null}
-                        </div>
-                    </form>
-                </ModalShell>
-            ) : null}
             {editOpen ? (
                 <ModalShell title={`Edición rápida de orden #${repair.id}`} onClose={() => setEditOpen(false)} tone="primary">
                     <form className="grid gap-4" onSubmit={submitEdit}>
@@ -1521,7 +1470,7 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
+                <div className={cn('grid min-h-[64px] w-full min-w-[1320px] items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
                     <div className="grid content-center gap-1 text-center">
                         {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">-</span>}
                     </div>
@@ -1529,6 +1478,13 @@ function RepairEditCard({
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
+                    <div className="grid content-center justify-items-center gap-1 text-center">
+                        {rowTotal > 1 ? (
+                            <span className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[0.68rem] font-black text-[#0f172a]">{rowIndex + 1}/{rowTotal}</span>
+                        ) : (
+                            <span className="text-slate-300">-</span>
+                        )}
+                    </div>
                     <div className="flex items-center justify-center"><Thumb large /></div>
                     <button type="button" className="grid content-center gap-1 text-left" onClick={openInlineEditor} title={repair.modelo || '-'}>
                         {rowTotal > 1 ? <span className="text-[0.62rem] font-black text-[#2563eb]">{desktopWorkLabel}</span> : null}
@@ -1662,7 +1618,7 @@ function RepairEditCard({
                         </details>
                     ) : null}
                     {!readOnly && inlineOpen ? <InlineEditor mobile /> : null}
-                    {!readOnly && !inlineOpen ? <ActionButtons mobile showGeneralTicketActions={rowIndex === 0} /> : null}
+                    {!readOnly && !inlineOpen ? <ActionButtons mobile /> : null}
                 </div>
             </details>
             {modals}
@@ -1754,6 +1710,7 @@ export function RepairTicketPanel({
                         <span>DNI</span>
                         <span>Contacto</span>
                         <span>Ingreso</span>
+                        <span className="text-center">Trabajo</span>
                         <span className="text-center">Imagen</span>
                         <span>Modelo</span>
                         <span>Estimada</span>
@@ -1762,7 +1719,7 @@ export function RepairTicketPanel({
                         <span className="text-center">Acciones</span>
                     </div>
                     <div className="grid bg-white">
-                        {ticket.repairs.map((repair, index) => (
+                        {ticket.repairs.map((repair) => (
                             <RepairEditCard
                                 key={`desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                                 repair={repair}
@@ -1771,8 +1728,6 @@ export function RepairTicketPanel({
                                 readOnly={readOnly}
                                 ticket={ticket}
                                 variant="desktop"
-                                rowIndex={index}
-                                rowTotal={ticket.repairs.length}
                                 onAddRepair={() => setAddOpen(true)}
                             />
                         ))}
@@ -1781,7 +1736,7 @@ export function RepairTicketPanel({
             </div>
 
             <div className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#dbeafe] p-2 xl:hidden">
-                {ticket.repairs.map((repair, index) => (
+                {ticket.repairs.map((repair) => (
                     <RepairEditCard
                         key={`mobile-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                         repair={repair}
@@ -1790,8 +1745,6 @@ export function RepairTicketPanel({
                         readOnly={readOnly}
                         ticket={ticket}
                         variant="mobile"
-                        rowIndex={index}
-                        rowTotal={ticket.repairs.length}
                         onAddRepair={() => setAddOpen(true)}
                     />
                 ))}
