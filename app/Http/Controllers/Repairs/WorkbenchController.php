@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Repairs\RepairOrderRequest;
 use App\Models\RepairEvent;
 use App\Models\RepairOrder;
+use App\Models\RepairPayment;
 use App\Models\RepairPart;
 use App\Models\RepairPartBox;
 use App\Services\RepairService;
@@ -373,6 +374,38 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Nueva reparacion agregada al ticket.');
     }
 
+    public function metrics(RepairService $repairService): Response
+    {
+        return Inertia::render('Repairs/MetricsPage', [
+            'metrics' => $repairService->metrics(),
+        ]);
+    }
+
+    public function addPayment(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'method' => ['nullable', 'string', 'max:40'],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'paid_at' => ['nullable', 'date'],
+        ]);
+
+        $repairService->addPayment($repairOrder, $validated);
+
+        return back()->with('success', 'Seña registrada.');
+    }
+
+    public function deletePayment(RepairOrder $repairOrder, RepairPayment $repairPayment, RepairService $repairService): RedirectResponse
+    {
+        try {
+            $repairService->deletePayment($repairOrder, $repairPayment);
+        } catch (RuntimeException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
+
+        return back()->with('success', 'Seña eliminada.');
+    }
+
     public function update(RepairOrderRequest $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
         try {
@@ -523,6 +556,9 @@ class WorkbenchController extends Controller
                     'id' => $base->id,
                     'nombre_cliente' => $base->nombre_cliente,
                     'dni' => $base->dni,
+                    'trackingVerifier' => $base->trackingVerifier(),
+                    'trackingVerifierLabel' => $base->hasClientDni() ? 'DNI' : 'Codigo',
+                    'hasClientDni' => $base->hasClientDni(),
                     'contacto' => $base->contacto,
                     'fecha' => optional($base->fecha)->format('Y-m-d'),
                     'repairsCount' => $ticketOrders->count(),
@@ -530,7 +566,7 @@ class WorkbenchController extends Controller
                     'totalSenia' => $ticketOrders->sum(fn (RepairOrder $order): float => (float) $order->senia),
                     'trackingUrl' => route('repairs.tracking', [
                         'id_buscado' => $base->id,
-                        'dni_buscado' => $base->trackingDni(),
+                        'dni_buscado' => $base->trackingVerifier(),
                     ]),
                     'ticketUrl' => route('repairs.tickets.show', ['orderId' => $base->id]),
                     'whatsappUrl' => $this->customerWhatsappUrl($base),
@@ -558,6 +594,7 @@ class WorkbenchController extends Controller
             'fecha' => optional($order->fecha)->format('Y-m-d'),
             'nombre_cliente' => $order->nombre_cliente,
             'dni' => $order->dni,
+            'tracking_token' => $order->tracking_token,
             'contacto' => $order->contacto,
             'modelo' => $order->modelo,
             'descripcion' => $order->descripcion,
@@ -585,8 +622,10 @@ class WorkbenchController extends Controller
                 'created_at' => optional($event->created_at)->format('Y-m-d H:i'),
                 'usuario' => $event->usuario,
             ])->all(),
+            'payments' => $this->serializePayments($order),
             'actions' => [
                 'update' => route('repairs.orders.update', $order),
+                'addPayment' => route('repairs.orders.payments.store', $order),
                 'state' => route('repairs.orders.state', $order),
                 'deliver' => route('repairs.orders.deliver', $order),
                 'markReady' => route('repairs.orders.mark_ready', $order),
@@ -618,6 +657,30 @@ class WorkbenchController extends Controller
                     : route('repairs.orders.images.remove', $order),
             ];
         }, $filenames));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function serializePayments(RepairOrder $order): array
+    {
+        return RepairPayment::query()
+            ->where('orden_id', $order->id)
+            ->where('reparacion', $order->reparacion)
+            ->orderByDesc('paid_at')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (RepairPayment $payment): array => [
+                'id' => $payment->id,
+                'amount' => $payment->amount,
+                'payment_type' => $payment->payment_type,
+                'method' => $payment->method,
+                'notes' => $payment->notes,
+                'paid_at' => optional($payment->paid_at)->format('Y-m-d'),
+                'created_at' => optional($payment->created_at)->format('Y-m-d H:i'),
+                'deleteAction' => route('repairs.orders.payments.delete', [$order, $payment]),
+            ])
+            ->all();
     }
 
     /**

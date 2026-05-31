@@ -24,7 +24,7 @@ import { cn } from '../../utils';
 interface PublicTrackingPageProps {
     filters: {
         id_buscado?: number | null;
-        dni_buscado?: number | null;
+        dni_buscado?: string | number | null;
         auto?: number | null;
     };
     searched: boolean;

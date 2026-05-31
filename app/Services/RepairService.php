@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\RepairEvent;
 use App\Models\RepairOrder;
+use App\Models\RepairPayment;
 use App\Models\RepairPart;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -94,13 +96,24 @@ class RepairService
             ->get();
     }
 
-    public function track(int $orderId, int $dni): Collection
+    public function track(int $orderId, int|string $verifier): Collection
     {
-        return RepairOrder::query()
+        $orders = RepairOrder::query()
             ->where('id', $orderId)
-            ->where('dni', $dni)
             ->orderBy('reparacion')
             ->get();
+
+        if ($orders->isEmpty()) {
+            return $orders;
+        }
+
+        /** @var RepairOrder $base */
+        $base = $orders->first();
+        $expected = $base->hasClientDni()
+            ? (string) $base->dni
+            : (trim((string) $base->tracking_token) !== '' ? $base->trackingVerifier() : (string) config('tienda.repair_default_dni'));
+
+        return hash_equals($expected, trim((string) $verifier)) ? $orders : collect();
     }
 
     public function lookupClientByDni(int $dni): ?array
@@ -146,6 +159,8 @@ class RepairService
             $jobFiles = is_array($files['jobs'] ?? null) ? $files['jobs'] : [];
             $sharedImages = is_array($files['images'] ?? null) ? $files['images'] : [];
             $firstOrder = null;
+            $dni = (int) ($payload['dni'] ?? config('tienda.repair_default_dni'));
+            $trackingToken = $this->trackingTokenForDni($dni);
 
             foreach ($jobs as $index => $job) {
                 $repairNumber = $index + 1;
@@ -166,13 +181,14 @@ class RepairService
                     'reparacion' => $repairNumber,
                     'fecha' => now()->toDateString(),
                     'nombre_cliente' => $payload['nombre_cliente'],
-                    'dni' => $payload['dni'] ?? config('tienda.repair_default_dni'),
+                    'dni' => $dni,
+                    'tracking_token' => $trackingToken,
                     'contacto' => $payload['contacto'] ?? null,
                     'modelo' => $job['modelo'],
                     'descripcion' => $job['descripcion'],
                     'observaciones' => $job['observaciones'],
                     'monto' => $job['monto'],
-                    'senia' => min((float) $job['senia'], (float) $job['monto']),
+                    'senia' => 0,
                     'fecha_estimada' => $job['fecha_estimada'],
                     'estado' => $job['estado'],
                     'entregado' => 'no',
@@ -191,6 +207,7 @@ class RepairService
                     $this->consumeInventoryReservation($order);
                 }
 
+                $this->addInitialPayment($order, $job['senia']);
                 $this->recordEvent($order, 'CREADA', null, $order->estado);
                 $firstOrder ??= $order;
             }
@@ -220,12 +237,13 @@ class RepairService
                 'fecha' => now()->toDateString(),
                 'nombre_cliente' => $order->nombre_cliente,
                 'dni' => $order->dni,
+                'tracking_token' => $order->tracking_token,
                 'contacto' => $order->contacto,
                 'modelo' => $payload['modelo'] ?? null,
                 'descripcion' => $payload['descripcion'],
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,
-                'senia' => min((float) ($payload['senia'] ?? 0), (float) ($payload['monto'] ?? 0)),
+                'senia' => 0,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => 'PENDIENTE',
                 'entregado' => 'no',
@@ -240,6 +258,7 @@ class RepairService
                 'imagen' => implode('|', $storedImages),
             ]);
 
+            $this->addInitialPayment($repair, $payload['senia'] ?? 0);
             $this->recordEvent($repair, 'CREADA', null, $repair->estado);
 
             return $repair;
@@ -382,14 +401,19 @@ class RepairService
 
                 RepairOrder::query()->where('id', $oldOrderId)->update(['id' => $newOrderId]);
                 RepairEvent::query()->where('orden_id', $oldOrderId)->update(['orden_id' => $newOrderId]);
+                RepairPayment::query()->where('orden_id', $oldOrderId)->update(['orden_id' => $newOrderId]);
                 $order->id = $newOrderId;
             }
+
+            $dni = (int) ($payload['dni'] ?? config('tienda.repair_default_dni'));
+            $trackingToken = $this->trackingTokenForDni($dni, $order->tracking_token);
 
             RepairOrder::query()
                 ->where('id', $newOrderId)
                 ->update([
                     'nombre_cliente' => $payload['nombre_cliente'],
-                    'dni' => $payload['dni'] ?? config('tienda.repair_default_dni'),
+                    'dni' => $dni,
+                    'tracking_token' => $trackingToken,
                     'contacto' => $payload['contacto'] ?? null,
                     'fecha' => $payload['fecha'] ?? $order->fecha,
                 ]);
@@ -432,14 +456,15 @@ class RepairService
             $order->fill([
                 'id' => $newOrderId,
                 'nombre_cliente' => $payload['nombre_cliente'],
-                'dni' => $payload['dni'] ?? config('tienda.repair_default_dni'),
+                'dni' => $dni,
+                'tracking_token' => $trackingToken,
                 'contacto' => $payload['contacto'] ?? null,
                 'fecha' => $payload['fecha'] ?? $order->fecha,
                 'modelo' => $payload['modelo'] ?? null,
                 'descripcion' => $payload['descripcion'] ?? null,
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,
-                'senia' => min((float) ($payload['senia'] ?? 0), (float) ($payload['monto'] ?? 0)),
+                'senia' => $this->paymentTotal($order),
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => $payload['estado'] ?? $order->estado,
                 'fecha_entregado' => $payload['fecha_entregado'] ?? $order->fecha_entregado,
@@ -575,7 +600,100 @@ class RepairService
             $this->deleteImage($image);
         }
 
+        RepairPayment::query()
+            ->where('orden_id', $order->id)
+            ->where('reparacion', $order->reparacion)
+            ->delete();
+
         $order->delete();
+    }
+
+    public function addPayment(RepairOrder $order, array $payload): RepairOrder
+    {
+        return DB::transaction(function () use ($order, $payload): RepairOrder {
+            RepairPayment::query()->create([
+                'orden_id' => $order->id,
+                'reparacion' => $order->reparacion,
+                'amount' => (float) $payload['amount'],
+                'payment_type' => 'senia',
+                'method' => $payload['method'] ?? null,
+                'notes' => $payload['notes'] ?? null,
+                'paid_at' => $payload['paid_at'] ?? now()->toDateString(),
+            ]);
+
+            $this->syncPaymentTotal($order);
+            $this->recordEvent($order, 'PAGO_REGISTRADO', $order->estado, $order->estado);
+
+            return $order->refresh();
+        });
+    }
+
+    public function deletePayment(RepairOrder $order, RepairPayment $payment): RepairOrder
+    {
+        if ((int) $payment->orden_id !== (int) $order->id || (int) $payment->reparacion !== (int) $order->reparacion) {
+            throw new \RuntimeException('La seña no pertenece a esta reparacion.');
+        }
+
+        return DB::transaction(function () use ($order, $payment): RepairOrder {
+            $payment->delete();
+            $this->syncPaymentTotal($order);
+            $this->recordEvent($order, 'SENA_ELIMINADA', $order->estado, $order->estado);
+
+            return $order->refresh();
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function metrics(): array
+    {
+        $now = CarbonImmutable::now();
+        $yearStart = $now->startOfYear();
+        $quarterStart = $now->startOfQuarter();
+        $monthStart = $now->startOfMonth();
+
+        $billableQuery = fn () => RepairOrder::query()
+            ->whereNotIn('estado', ['CANCELADA'])
+            ->where('monto', '>', 0);
+
+        $paymentsQuery = fn () => RepairPayment::query();
+
+        $orders = RepairOrder::query()->get();
+        $billableOrders = $orders->filter(fn (RepairOrder $order): bool => $order->estado !== 'CANCELADA' && (float) $order->monto > 0);
+        $totalBilled = (float) $billableOrders->sum(fn (RepairOrder $order): float => (float) $order->monto);
+        $totalPaid = (float) RepairPayment::query()->sum('amount');
+
+        return [
+            'totals' => [
+                'yearBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $yearStart->toDateString())->sum('monto'),
+                'quarterBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $quarterStart->toDateString())->sum('monto'),
+                'monthBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $monthStart->toDateString())->sum('monto'),
+                'yearPaid' => (float) $paymentsQuery()->whereDate('paid_at', '>=', $yearStart->toDateString())->sum('amount'),
+                'quarterPaid' => (float) $paymentsQuery()->whereDate('paid_at', '>=', $quarterStart->toDateString())->sum('amount'),
+                'monthPaid' => (float) $paymentsQuery()->whereDate('paid_at', '>=', $monthStart->toDateString())->sum('amount'),
+                'openBalance' => (float) $orders
+                    ->filter(fn (RepairOrder $order): bool => $order->entregado !== 'si' && $order->estado !== 'CANCELADA')
+                    ->sum(fn (RepairOrder $order): float => max(0, (float) $order->monto - (float) $order->senia)),
+                'averageTicket' => $billableOrders->count() > 0 ? round($totalBilled / $billableOrders->count(), 2) : 0,
+                'collectionRate' => $totalBilled > 0 ? round(($totalPaid / $totalBilled) * 100, 1) : 0,
+            ],
+            'counts' => [
+                'active' => $orders->where('entregado', 'no')->count(),
+                'delivered' => $orders->where('entregado', 'si')->count(),
+                'cancelled' => $orders->where('estado', 'CANCELADA')->count(),
+                'ready' => $orders->where('estado', 'LISTA')->where('entregado', 'no')->count(),
+            ],
+            'topModels' => $this->topTextMetric($billableOrders, 'modelo'),
+            'topWorkTypes' => $this->topWorkTypes($billableOrders),
+            'statusBreakdown' => $orders
+                ->groupBy(fn (RepairOrder $order): string => (string) ($order->estado ?: 'SIN ESTADO'))
+                ->map(fn (Collection $items, string $label): array => ['label' => $label, 'count' => $items->count()])
+                ->sortByDesc('count')
+                ->values()
+                ->all(),
+            'monthlyBilled' => $this->monthlyBilled($yearStart),
+        ];
     }
 
     private function setState(RepairOrder $order, string $state, string $event): RepairOrder
@@ -920,6 +1038,137 @@ class RepairService
         if ($categoryFilter > 0) {
             $query->where('categorias_reparacion', $categoryFilter);
         }
+    }
+
+    private function trackingTokenForDni(int $dni, ?string $existing = null): ?string
+    {
+        if ($dni > 0 && $dni !== (int) config('tienda.repair_default_dni')) {
+            return null;
+        }
+
+        $existing = trim((string) $existing);
+
+        return preg_match('/^\d{5}$/', $existing) === 1 ? $existing : $this->generateTrackingToken();
+    }
+
+    private function generateTrackingToken(): string
+    {
+        return str_pad((string) random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+    }
+
+    private function addInitialPayment(RepairOrder $order, mixed $amount): void
+    {
+        $amount = min((float) $amount, (float) $order->monto);
+
+        if ($amount <= 0) {
+            return;
+        }
+
+        RepairPayment::query()->create([
+            'orden_id' => $order->id,
+            'reparacion' => $order->reparacion,
+            'amount' => $amount,
+            'payment_type' => 'senia',
+            'method' => null,
+            'notes' => 'Sena inicial',
+            'paid_at' => now()->toDateString(),
+        ]);
+
+        $this->syncPaymentTotal($order);
+    }
+
+    private function paymentTotal(RepairOrder $order): float
+    {
+        return (float) RepairPayment::query()
+            ->where('orden_id', $order->id)
+            ->where('reparacion', $order->reparacion)
+            ->sum('amount');
+    }
+
+    private function syncPaymentTotal(RepairOrder $order): void
+    {
+        $order->forceFill(['senia' => $this->paymentTotal($order)])->save();
+    }
+
+    /**
+     * @param Collection<int, RepairOrder> $orders
+     * @return array<int, array{label:string,count:int,total:float}>
+     */
+    private function topTextMetric(Collection $orders, string $field): array
+    {
+        return $orders
+            ->map(function (RepairOrder $order) use ($field): array {
+                $label = trim((string) ($order->{$field} ?? ''));
+
+                return [
+                    'label' => $label !== '' ? Str::upper($label) : 'SIN DATO',
+                    'total' => (float) $order->monto,
+                ];
+            })
+            ->groupBy('label')
+            ->map(fn (Collection $items, string $label): array => [
+                'label' => $label,
+                'count' => $items->count(),
+                'total' => (float) $items->sum('total'),
+            ])
+            ->sortByDesc('count')
+            ->take(8)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, RepairOrder> $orders
+     * @return array<int, array{label:string,count:int,total:float}>
+     */
+    private function topWorkTypes(Collection $orders): array
+    {
+        return $orders
+            ->map(function (RepairOrder $order): array {
+                $text = Str::lower((string) $order->descripcion . ' ' . (string) $order->repuesto);
+                $label = match (true) {
+                    str_contains($text, 'modulo'), str_contains($text, 'pantalla'), str_contains($text, 'display') => 'Cambio de modulo/pantalla',
+                    str_contains($text, 'bateria') => 'Cambio de bateria',
+                    str_contains($text, 'pin'), str_contains($text, 'carga') => 'Pin o carga',
+                    str_contains($text, 'placa') => 'Trabajo en placa',
+                    str_contains($text, 'sistema'), str_contains($text, 'software') => 'Software / sistema',
+                    str_contains($text, 'desbloqueo') => 'Desbloqueo',
+                    str_contains($text, 'revision'), str_contains($text, 'diagnostico') => 'Revision / diagnostico',
+                    default => 'Otros trabajos',
+                };
+
+                return ['label' => $label, 'total' => (float) $order->monto];
+            })
+            ->groupBy('label')
+            ->map(fn (Collection $items, string $label): array => [
+                'label' => $label,
+                'count' => $items->count(),
+                'total' => (float) $items->sum('total'),
+            ])
+            ->sortByDesc('count')
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{label:string,total:float}>
+     */
+    private function monthlyBilled(CarbonImmutable $yearStart): array
+    {
+        $rows = RepairOrder::query()
+            ->whereNotIn('estado', ['CANCELADA'])
+            ->whereDate('fecha', '>=', $yearStart->toDateString())
+            ->where('monto', '>', 0)
+            ->get()
+            ->groupBy(fn (RepairOrder $order): string => optional($order->fecha)->format('m') ?: '00')
+            ->map(fn (Collection $items): float => (float) $items->sum(fn (RepairOrder $order): float => (float) $order->monto));
+
+        return collect(range(1, 12))
+            ->map(fn (int $month): array => [
+                'label' => CarbonImmutable::create($yearStart->year, $month, 1)->locale('es')->isoFormat('MMM'),
+                'total' => (float) ($rows->get(str_pad((string) $month, 2, '0', STR_PAD_LEFT), 0)),
+            ])
+            ->all();
     }
 
     /**

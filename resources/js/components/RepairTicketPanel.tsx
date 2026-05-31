@@ -92,6 +92,13 @@ interface AddRepairFormData {
     images: File[] | null;
 }
 
+interface PaymentFormData {
+    amount: string;
+    method: string;
+    notes: string;
+    paid_at: string;
+}
+
 type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
 
 const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'TCL', 'LG', 'OTRAS'] as const;
@@ -340,6 +347,44 @@ function EditSection({ title, children }: { title: string; children: ReactNode }
             <h4 className="border-b border-[#bfdbfe] pb-2 text-sm font-black text-[#0d6efd]">{title}</h4>
             {children}
         </section>
+    );
+}
+
+function normalizeFieldValue(value: unknown): string {
+    return String(value ?? '').trim();
+}
+
+function hasRegisteredValue(value: unknown): boolean {
+    const normalized = normalizeFieldValue(value);
+
+    return normalized !== '' && normalized !== '0' && normalized !== '$ 0';
+}
+
+function hasChangedValue(current: unknown, original: unknown): boolean {
+    return normalizeFieldValue(current) !== normalizeFieldValue(original);
+}
+
+function changedInputClass(current: unknown, original: unknown, extra?: string, markRegistered = true): string {
+    const changed = hasChangedValue(current, original);
+    const registered = markRegistered && hasRegisteredValue(current);
+
+    return cn(
+        ui.repairDenseInput,
+        registered && !changed && 'border-2 border-[#0ea5e9] bg-[#f0f9ff]',
+        changed && 'border-2 border-[#2563eb] bg-[#dbeafe] ring-2 ring-[#60a5fa]',
+        extra,
+    );
+}
+
+function changedTextareaClass(current: unknown, original: unknown, extra?: string, markRegistered = true): string {
+    const changed = hasChangedValue(current, original);
+    const registered = markRegistered && hasRegisteredValue(current);
+
+    return cn(
+        ui.repairDenseTextarea,
+        registered && !changed && 'border-2 border-[#0ea5e9] bg-[#f0f9ff]',
+        changed && 'border-2 border-[#2563eb] bg-[#dbeafe] ring-2 ring-[#60a5fa]',
+        extra,
     );
 }
 
@@ -826,6 +871,12 @@ function RepairEditCard({
         images: null,
         final_images: null,
     });
+    const paymentForm = useForm<PaymentFormData>({
+        amount: '',
+        method: '',
+        notes: '',
+        paid_at: todayInputValue(),
+    });
     const [editOpen, setEditOpen] = useState(false);
     const [inlineOpen, setInlineOpen] = useState(false);
     const [deliveryOpen, setDeliveryOpen] = useState(false);
@@ -859,6 +910,7 @@ function RepairEditCard({
     const selectedInventoryPart = form.data.inventory_part_id !== ''
         ? partInventory.find((part) => String(part.id) === form.data.inventory_part_id) ?? null
         : null;
+    const payments = repair.payments ?? [];
     const assignedInventoryModel = form.data.inventory_part_id !== ''
         ? selectedInventoryPart?.model ?? repair.inventory_part_model ?? null
         : null;
@@ -900,6 +952,22 @@ function RepairEditCard({
                 setInlineOpen(false);
             },
         });
+    };
+
+    const submitPayment = (): void => {
+        if (!repair.actions?.addPayment) return;
+
+        paymentForm.post(repair.actions.addPayment, {
+            preserveScroll: true,
+            onSuccess: () => paymentForm.reset('amount', 'method', 'notes'),
+        });
+    };
+
+    const deletePayment = (action?: string): void => {
+        if (!action) return;
+        if (window.confirm('Eliminar esta seña del historial?')) {
+            router.post(action, {}, { preserveScroll: true });
+        }
     };
 
     const cycleDesktopStatus = (): void => {
@@ -1141,45 +1209,107 @@ function RepairEditCard({
                         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
                             <EditSection title="Datos Editables">
                                 <EditField label="ID de la orden" note="Si lo cambias, se renumeran todos los trabajos de esta orden.">
-                                    <input className={ui.repairDenseInput} type="number" min="1" value={form.data.id_nuevo} onChange={(event) => form.setData('id_nuevo', event.target.value)} disabled={readOnly} />
+                                    <input className={changedInputClass(form.data.id_nuevo, String(repair.id))} type="number" min="1" value={form.data.id_nuevo} onChange={(event) => form.setData('id_nuevo', event.target.value)} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Cliente">
-                                    <input className={ui.repairDenseInput} value={form.data.nombre_cliente} onChange={(event) => form.setData('nombre_cliente', event.target.value)} disabled={readOnly} />
+                                    <input className={changedInputClass(form.data.nombre_cliente, repair.nombre_cliente)} value={form.data.nombre_cliente} onChange={(event) => form.setData('nombre_cliente', event.target.value)} disabled={readOnly} />
                                 </EditField>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="DNI">
-                                        <input className={ui.repairDenseInput} value={form.data.dni} onChange={(event) => form.setData('dni', event.target.value)} disabled={readOnly} />
+                                        <input className={changedInputClass(form.data.dni, String(repair.dni ?? ''))} value={form.data.dni} onChange={(event) => form.setData('dni', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                     <EditField label="Contacto">
-                                        <input className={ui.repairDenseInput} value={form.data.contacto} onChange={(event) => form.setData('contacto', event.target.value)} disabled={readOnly} />
+                                        <input className={changedInputClass(form.data.contacto, repair.contacto ?? '')} value={form.data.contacto} onChange={(event) => form.setData('contacto', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                 </div>
                                 <EditField label="Modelo">
-                                    <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} disabled={readOnly} />
+                                    <input className={changedInputClass(form.data.modelo, repair.modelo ?? '')} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Categoria">
-                                    <select className={ui.repairDenseInput} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)} disabled={readOnly}>
+                                    <select className={changedInputClass(form.data.categorias_reparacion, String(repair.categorias_reparacion ?? 4))} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)} disabled={readOnly}>
                                         {serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
                                     </select>
                                 </EditField>
                                 <div className="grid gap-3 sm:grid-cols-2">
-                                    <EditField label="Monto ($)">
-                                        <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
-                                    </EditField>
-                                    <EditField label="Senia ($)">
-                                        <input className={ui.repairDenseInput} value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} disabled={readOnly} />
-                                    </EditField>
+                                    <div className="grid gap-2">
+                                        <EditField label="Monto ($)">
+                                            <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
+                                        </EditField>
+                                        {!readOnly ? (
+                                            <EditField label="Importe de seña">
+                                                <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
+                                            </EditField>
+                                        ) : null}
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <EditField label="Pagado ($)">
+                                            <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
+                                        </EditField>
+                                        {!readOnly ? (
+                                            <EditField label="Fecha de seña">
+                                                <input className={changedInputClass(paymentForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={paymentForm.data.paid_at} onChange={(event) => paymentForm.setData('paid_at', event.target.value)} />
+                                            </EditField>
+                                        ) : null}
+                                    </div>
                                 </div>
+                                <details className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
+                                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
+                                        <span className="font-black text-[#0f172a]">Historial de pagos ({payments.length})</span>
+                                        <span className="flex items-center gap-2 font-black text-[#0f172a]">
+                                            {formatCurrency(senia)}
+                                            <FaChevronDown className="text-xs text-[#64748b]" aria-hidden="true" />
+                                        </span>
+                                    </summary>
+                                    <div className="grid gap-3 border-t border-[#e2e8f0] p-3">
+                                        {payments.length > 0 ? (
+                                            <div className="grid gap-1">
+                                                {payments.map((payment) => (
+                                                    <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
+                                                        <div className="min-w-0">
+                                                            <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - seña</strong>
+                                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{[payment.method, payment.notes].filter(Boolean).join(' - ') || 'Sin detalle'}</span>
+                                                        </div>
+                                                        <span className="font-black text-[#0f172a]">{formatCurrency(payment.amount)}</span>
+                                                        {!readOnly ? (
+                                                            <button
+                                                                type="button"
+                                                                className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md text-xs font-black text-[#dc2626] transition hover:bg-[#fee2e2]"
+                                                                onClick={() => deletePayment(payment.deleteAction)}
+                                                                title="Eliminar seña"
+                                                                aria-label="Eliminar seña"
+                                                            >
+                                                                <FaTimes aria-hidden="true" />
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="rounded-md border border-dashed border-[#cbd5e1] bg-white px-3 py-3 text-center text-sm font-semibold text-[#64748b]">Sin pagos registrados.</span>
+                                        )}
+                                    </div>
+                                </details>
+                                {!readOnly ? (
+                                    <div className="grid gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                                        <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
+                                            <input className={changedInputClass(paymentForm.data.method, '', undefined, false)} placeholder="Metodo" value={paymentForm.data.method} onChange={(event) => paymentForm.setData('method', event.target.value)} />
+                                            <input className={changedInputClass(paymentForm.data.notes, '', undefined, false)} placeholder="Nota" value={paymentForm.data.notes} onChange={(event) => paymentForm.setData('notes', event.target.value)} />
+                                            <button type="button" className={buttonClass('primary', 'sm')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
+                                                Registrar seña
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Fecha de ingreso">
-                                        <input className={ui.repairDenseInput} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} disabled={readOnly} />
+                                        <input className={changedInputClass(form.data.fecha, repair.fecha ?? '')} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                     <EditField label="Fecha estimada">
-                                        <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} disabled={readOnly} />
+                                        <input className={changedInputClass(form.data.fecha_estimada, repair.fecha_estimada ?? '')} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                 </div>
                                 <EditField label="Estado">
-                                    <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)} disabled={readOnly}>
+                                    <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado), hasChangedValue(form.data.estado, repair.estado) && 'ring-2 ring-[#2563eb]')} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)} disabled={readOnly}>
                                         {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
                                     </select>
                                 </EditField>
@@ -1187,10 +1317,10 @@ function RepairEditCard({
 
                             <EditSection title="Descripción y Contexto">
                                 <EditField label="Descripción">
-                                    <textarea className={ui.repairDenseTextarea} value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} rows={3} disabled={readOnly} />
+                                    <textarea className={changedTextareaClass(form.data.descripcion, repair.descripcion ?? '')} value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} rows={3} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Observaciones del Técnico">
-                                    <textarea className={ui.repairDenseTextarea} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} rows={3} disabled={readOnly} />
+                                    <textarea className={changedTextareaClass(form.data.observaciones, repair.observaciones ?? '')} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} rows={3} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Repuesto a usar / pedir">
                                     <div className="grid gap-2">
@@ -1201,7 +1331,7 @@ function RepairEditCard({
                                             onClear={returnCurrentInventoryPart}
                                         />
                                         <input
-                                            className={ui.repairDenseInput}
+                                            className={changedInputClass(partSearch, repair.repuesto ?? '')}
                                             value={partSearch}
                                             onChange={(event) => {
                                                 setPartSearch(event.target.value);
@@ -1231,7 +1361,7 @@ function RepairEditCard({
                                                 ))}
                                             </div>
                                         ) : null}
-                                        <textarea className={ui.repairDenseTextarea} value={form.data.repuesto} onChange={(event) => form.setData((current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))} rows={2} disabled={readOnly} />
+                                        <textarea className={changedTextareaClass(form.data.repuesto, repair.repuesto ?? '')} value={form.data.repuesto} onChange={(event) => form.setData((current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))} rows={2} disabled={readOnly} />
                                     </div>
                                 </EditField>
                                 <label className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#f59e0b33] bg-[#fff8ed] px-3 py-2 text-sm font-black text-[#92400e]">

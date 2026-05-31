@@ -204,8 +204,10 @@ export interface RepairOrderView {
     imagenes: RepairImageView[];
     imagenes_finales: RepairImageView[];
     events?: RepairEventView[];
+    payments?: RepairPaymentView[];
     actions?: {
         update: string;
+        addPayment: string;
         state: string;
         deliver: string;
         markReady: string;
@@ -218,6 +220,17 @@ export interface RepairOrderView {
         removeFinalImage: string;
     };
     availableStates?: string[];
+}
+
+export interface RepairPaymentView {
+    id: number;
+    amount: number | string;
+    payment_type: string;
+    method?: string | null;
+    notes?: string | null;
+    paid_at?: string | null;
+    created_at?: string | null;
+    deleteAction?: string;
 }
 
 export interface RepairImageView {
@@ -240,6 +253,9 @@ export interface RepairTicketView {
     id: number;
     nombre_cliente: string;
     dni: number;
+    trackingVerifier?: string;
+    trackingVerifierLabel?: string;
+    hasClientDni?: boolean;
     contacto?: string | null;
     fecha?: string | null;
     repairsCount: number;

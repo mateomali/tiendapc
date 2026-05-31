@@ -19,9 +19,9 @@ class PublicTrackingController extends Controller
     {
         $validated = $request->validate([
             'id_buscado' => ['nullable', 'integer'],
-            'dni_buscado' => ['nullable', 'integer'],
+            'dni_buscado' => ['nullable', 'string', 'regex:/^\d{1,10}$/'],
             'orden' => ['nullable', 'integer'],
-            'dni' => ['nullable', 'integer'],
+            'dni' => ['nullable', 'string', 'regex:/^\d{1,10}$/'],
             'auto' => ['nullable', 'integer'],
         ]);
 
@@ -35,17 +35,15 @@ class PublicTrackingController extends Controller
 
         if ($searched) {
             $tickets = $this->groupPublicTickets(
-                $repairService->track((int) $validated['id_buscado'], (int) $validated['dni_buscado']),
+                $repairService->track((int) $validated['id_buscado'], (string) $validated['dni_buscado']),
             );
         }
-
-        $showDniField = ! ($tickets !== [] && (int) ($validated['dni_buscado'] ?? 0) === (int) config('tienda.repair_default_dni'));
 
         return Inertia::render('Repairs/PublicTrackingPage', [
             'filters' => $filters,
             'searched' => $searched,
             'tickets' => $tickets,
-            'publicView' => $this->publicView($validated, $showDniField),
+            'publicView' => $this->publicView($validated),
             'feedback' => $this->feedback($searched, $tickets),
             'results' => $this->serializePublicResults($tickets),
         ]);
@@ -165,7 +163,7 @@ class PublicTrackingController extends Controller
     }
 
     /**
-     * @param array{id_buscado?: int|null, dni_buscado?: int|null, auto?: int|null} $filters
+     * @param array{id_buscado?: int|null, dni_buscado?: string|null, auto?: int|null} $filters
      * @return array<string, string|bool>
      */
     private function publicView(array $filters, bool $showDniField = true): array
@@ -184,8 +182,8 @@ class PublicTrackingController extends Controller
             'subtitle' => 'Usá los datos de tu comprobante para saber si tu equipo sigue en revisión, espera repuesto o ya está listo para retirar.',
             'orderLabel' => 'Número de orden',
             'orderPlaceholder' => 'Ej: 827',
-            'dniLabel' => 'DNI del titular',
-            'dniPlaceholder' => 'Ingrese su DNI',
+            'dniLabel' => 'DNI o codigo del ticket',
+            'dniPlaceholder' => 'Ingrese DNI o codigo',
             'showDniField' => $showDniField,
             'submitLabel' => 'Consultar',
             'resetLabel' => 'Consultar otra orden',
@@ -210,7 +208,7 @@ class PublicTrackingController extends Controller
 
         return [
             'variant' => 'secondary',
-            'message' => 'No se encontró ninguna orden con el ID y DNI ingresados.',
+            'message' => 'No se encontro ninguna orden con el ID y verificador ingresados.',
         ];
     }
 

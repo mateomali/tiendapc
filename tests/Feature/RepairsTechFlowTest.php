@@ -2,6 +2,7 @@
 
 use App\Models\RepairEvent;
 use App\Models\RepairOrder;
+use App\Models\RepairPayment;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('authenticates repair tech users and renders workbench', function (): void {
@@ -99,6 +100,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
     $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $orderId]));
 
     expect(RepairOrder::query()->where('id', $orderId)->count())->toBe(2);
+    expect(RepairPayment::query()->where('orden_id', $orderId)->count())->toBe(2);
     expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('descripcion')->all())
         ->toBe([
             'Cambio de modulo Moto G54',
@@ -112,6 +114,124 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
             ->component('Repairs/TicketPage')
             ->where('ticket.nombre_cliente', 'Lucia Gomez')
             ->has('ticket.repairs', 2));
+});
+
+it('stores successive repair payments as history and updates paid total', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 801,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Pagos',
+        'dni' => 33444111,
+        'modelo' => 'Notebook',
+        'descripcion' => 'Cambio de teclado',
+        'monto' => 50000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.payments.store', $order), [
+            'amount' => 10000,
+            'payment_type' => 'senia',
+            'method' => 'efectivo',
+            'notes' => 'Primer pago',
+            'paid_at' => '2026-05-30',
+        ])
+        ->assertRedirect();
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.payments.store', $order), [
+            'amount' => 15000,
+            'payment_type' => 'pago',
+            'paid_at' => '2026-05-31',
+        ])
+        ->assertRedirect();
+
+    expect(RepairPayment::query()->where('orden_id', 801)->where('reparacion', 1)->count())->toBe(2);
+    expect((float) $order->fresh()?->senia)->toBe(25000.0);
+
+    $payment = RepairPayment::query()->where('orden_id', 801)->where('amount', 10000)->firstOrFail();
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.payments.delete', [$order, $payment]))
+        ->assertRedirect();
+
+    expect(RepairPayment::query()->where('orden_id', 801)->where('reparacion', 1)->count())->toBe(1);
+    expect((float) $order->fresh()?->senia)->toBe(15000.0);
+});
+
+it('generates a verifier token for tickets without dni and uses it for public tracking', function (): void {
+    $response = $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.store'), [
+            'nombre_cliente' => 'Sin DNI',
+            'dni' => config('tienda.repair_default_dni'),
+            'contacto' => '',
+            'jobs' => [[
+                'modelo' => 'Moto E',
+                'descripcion' => 'Revision',
+                'observaciones' => '',
+                'monto' => 12000,
+                'senia' => 0,
+                'fecha_estimada' => now()->addDay()->toDateString(),
+                'estado' => 'PENDIENTE',
+                'repuesto' => '',
+                'categorias_reparacion' => 1,
+            ]],
+        ]);
+
+    $order = RepairOrder::query()->latest('id')->firstOrFail();
+    $token = (string) $order->tracking_token;
+
+    $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $order->id]));
+    expect($token)->toMatch('/^\d{5}$/');
+
+    $this->get(route('repairs.tracking', ['id_buscado' => $order->id, 'dni_buscado' => $token]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/PublicTrackingPage')
+            ->where('searched', true)
+            ->has('results', 1));
+
+    $this->get(route('repairs.tracking', ['id_buscado' => $order->id, 'dni_buscado' => config('tienda.repair_default_dni')]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/PublicTrackingPage')
+            ->where('searched', true)
+            ->has('results', 0));
+});
+
+it('renders repair business metrics', function (): void {
+    RepairOrder::query()->create([
+        'id' => 811,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Metricas',
+        'dni' => 30111222,
+        'modelo' => 'Samsung A52',
+        'descripcion' => 'Cambio de modulo',
+        'monto' => 80000,
+        'senia' => 20000,
+        'estado' => 'LISTA',
+        'entregado' => 'no',
+    ]);
+
+    RepairPayment::query()->create([
+        'orden_id' => 811,
+        'reparacion' => 1,
+        'amount' => 20000,
+        'payment_type' => 'senia',
+        'paid_at' => now()->toDateString(),
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.metrics'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/MetricsPage')
+            ->where('metrics.totals.monthBilled', 80000)
+            ->where('metrics.topWorkTypes.0.label', 'Cambio de modulo/pantalla'));
 });
 
 it('allows delivering repairs with explicit date and delivery channel', function (): void {

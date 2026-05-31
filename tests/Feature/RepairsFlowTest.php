@@ -35,7 +35,7 @@ it('filters repair tracking by id and dni', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/PublicTrackingPage')
             ->where('searched', true)
-            ->where('publicView.showDniField', false)
+            ->where('publicView.showDniField', true)
             ->has('results', 1)
             ->where('results.0.repairs.0.model', 'PlayStation 4')
             ->has('results.0.repairs.0.entryImages', 1)
@@ -48,5 +48,5 @@ it('shows a public feedback message when no repair is found', function (): void 
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/PublicTrackingPage')
             ->where('searched', true)
-            ->where('feedback.message', 'No se encontró ninguna orden con el ID y DNI ingresados.'));
+            ->where('feedback.message', 'No se encontro ninguna orden con el ID y verificador ingresados.'));
 });

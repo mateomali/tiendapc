@@ -31,6 +31,7 @@ class RepairOrder extends Model
         'fecha',
         'nombre_cliente',
         'dni',
+        'tracking_token',
         'contacto',
         'modelo',
         'descripcion',
@@ -83,6 +84,22 @@ class RepairOrder extends Model
     public function trackingDni(): int
     {
         return $this->dni > 0 ? (int) $this->dni : (int) config('tienda.repair_default_dni');
+    }
+
+    public function hasClientDni(): bool
+    {
+        return (int) $this->dni > 0 && (int) $this->dni !== (int) config('tienda.repair_default_dni');
+    }
+
+    public function trackingVerifier(): string
+    {
+        if ($this->hasClientDni()) {
+            return (string) $this->dni;
+        }
+
+        $token = trim((string) ($this->tracking_token ?? ''));
+
+        return $token !== '' ? str_pad($token, 5, '0', STR_PAD_LEFT) : (string) config('tienda.repair_default_dni');
     }
 
     public function getRegistroIdAttribute(mixed $value): int
