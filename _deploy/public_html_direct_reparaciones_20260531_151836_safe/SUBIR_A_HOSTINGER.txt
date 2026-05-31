@@ -1,0 +1,33 @@
+Bundle seguro para Hostinger - solo public_html
+===========================
+
+Estructura del paquete:
+- contenido directo para public_html/
+
+Subida recomendada:
+1. Entra al gestor de archivos de Hostinger.
+2. Abri domains/tudominio.com/public_html.
+3. Sube y extrae este ZIP directamente dentro de public_html.
+4. Deben quedar index.php, .htaccess, assets/, build/, uploads/ y laravel_app/ dentro de public_html.
+
+Seguridad:
+- public_html/.htaccess bloquea acceso web a /laravel_app.
+- public_html/laravel_app/.htaccess tambien deniega acceso directo.
+
+Permisos recomendados:
+- laravel_app/storage
+- laravel_app/bootstrap/cache
+
+Archivos sensibles:
+- Este bundle NO incluye .env por seguridad.
+- Crea laravel_app/.env manualmente a partir de laravel_app/.env.example.
+
+Datos y base:
+- El bundle incluye vendor y build de produccion.
+- No incluye backups ni logs locales.
+- La base de datos se importa por separado desde tu dump/backup.
+
+Chequeos utiles:
+- public_html/index.php debe apuntar correctamente a laravel_app/vendor/autoload.php
+- public_html/.htaccess ya viene preparado
+- elimina cualquier archivo public/hot si existiera en el hosting

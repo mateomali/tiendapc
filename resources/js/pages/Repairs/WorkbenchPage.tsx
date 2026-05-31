@@ -448,20 +448,6 @@ export default function WorkbenchPage({
         return category?.label.trim().toLowerCase() === 'celulares';
     };
 
-    const modelWithBrand = (brand: string, currentModel: string): string => {
-        const trimmedBrand = brand.trim().toUpperCase();
-        const trimmedModel = currentModel.trimStart();
-
-        if (trimmedBrand === '') {
-            return currentModel;
-        }
-
-        const brandPattern = new RegExp(`^(${phoneBrandOptions.join('|')})\\b\\s*`, 'i');
-        const modelWithoutBrand = trimmedModel.replace(brandPattern, '');
-
-        return modelWithoutBrand === '' ? `${trimmedBrand} ` : `${trimmedBrand} ${modelWithoutBrand}`;
-    };
-
     const partSearchFromModel = (model: string): string => {
         const trimmedModel = model.trimStart();
         const brandPattern = new RegExp(`^(${phoneBrandOptions.join('|')})\\b\\s*`, 'i');
@@ -489,9 +475,9 @@ export default function WorkbenchPage({
         updateJob(index, (current) => ({
             ...current,
             marca: value,
-            modelo: modelWithBrand(value, current.modelo),
+            modelo: partSearchFromModel(current.modelo),
         }));
-        setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(modelWithBrand(value, createForm.data.jobs[index]?.modelo ?? '')) }));
+        setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(createForm.data.jobs[index]?.modelo ?? '') }));
     };
 
     const matchingDeviceModels = (index: number): DeviceModelOption[] => {
@@ -551,7 +537,7 @@ export default function WorkbenchPage({
         updateJob(index, (current) => ({
             ...current,
             marca: isPhoneCategory(current.categorias_reparacion) && deviceModel.brand ? deviceModel.brand : current.marca,
-            modelo: deviceModel.model,
+            modelo: partSearchFromModel(deviceModel.model),
         }));
         setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(deviceModel.model) }));
     };
@@ -774,7 +760,7 @@ export default function WorkbenchPage({
             ...job,
             tipo_servicio: serviceType,
             descripcion: description !== ''
-                ? [...job.descripcion.split('\n').map((line) => line.trim()).filter(Boolean), job.modelo.trim() !== '' ? `${description} ${job.modelo}`.trim() : description]
+                ? [...job.descripcion.split('\n').map((line) => line.trim()).filter(Boolean), description]
                     .filter((line, lineIndex, lines) => lines.indexOf(line) === lineIndex)
                     .join('\n')
                 : job.descripcion,
@@ -785,7 +771,7 @@ export default function WorkbenchPage({
     const applyFailureTemplate = (index: number, template: string): void => {
         updateJob(index, (job) => ({
             ...job,
-            descripcion: [...job.descripcion.split('\n').map((line) => line.trim()).filter(Boolean), job.modelo.trim() !== '' ? `${template} ${job.modelo}`.trim() : template]
+            descripcion: [...job.descripcion.split('\n').map((line) => line.trim()).filter(Boolean), template]
                 .filter((line, lineIndex, lines) => lines.indexOf(line) === lineIndex)
                 .join('\n'),
         }));

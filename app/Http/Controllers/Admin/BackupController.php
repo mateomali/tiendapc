@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\BackupService;
-use Illuminate\Http\BinaryFileResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Throwable;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BackupController extends Controller
 {
@@ -36,6 +36,28 @@ class BackupController extends Controller
         }
 
         return back()->with('success', 'Backup creado: ' . $fileName);
+    }
+
+    public function createRepairs(BackupService $backupService): RedirectResponse
+    {
+        try {
+            $fileName = $backupService->createRepairs();
+        } catch (Throwable $exception) {
+            return back()->with('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'No se pudo crear el backup de reparaciones.');
+        }
+
+        return back()->with('success', 'Backup de reparaciones creado: ' . $fileName);
+    }
+
+    public function createRepairsDownload(BackupService $backupService): BinaryFileResponse|RedirectResponse
+    {
+        try {
+            $fileName = $backupService->createRepairs();
+        } catch (Throwable $exception) {
+            return back()->with('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'No se pudo crear el backup de reparaciones.');
+        }
+
+        return response()->download(public_path(config('tienda.uploads.backups') . DIRECTORY_SEPARATOR . basename($fileName)));
     }
 
     public function restore(Request $request, BackupService $backupService): RedirectResponse
@@ -66,6 +88,36 @@ class BackupController extends Controller
         }
 
         return back()->with('success', 'Backup restaurado correctamente.');
+    }
+
+    public function restoreRepairs(Request $request, BackupService $backupService): RedirectResponse
+    {
+        $validated = $request->validate([
+            'file' => ['nullable', 'string'],
+            'backup_zip' => ['nullable', 'file', 'max:307200', 'mimes:zip'],
+        ]);
+
+        $selectedFile = trim((string) ($validated['file'] ?? ''));
+        $uploadedBackup = $request->file('backup_zip');
+
+        if ($selectedFile === '' && $uploadedBackup === null) {
+            return back()->with('error', 'Debes seleccionar o subir un backup ZIP de reparaciones.');
+        }
+
+        try {
+            if ($uploadedBackup !== null) {
+                $fileName = $backupService->storeUploadedBackup($uploadedBackup);
+                $backupService->restoreRepairs($fileName);
+
+                return back()->with('success', 'Backup de reparaciones subido y restaurado: ' . basename($fileName));
+            }
+
+            $backupService->restoreRepairs($selectedFile);
+        } catch (Throwable $exception) {
+            return back()->with('error', $exception->getMessage() !== '' ? $exception->getMessage() : 'No se pudo restaurar el backup de reparaciones.');
+        }
+
+        return back()->with('success', 'Backup de reparaciones restaurado correctamente.');
     }
 
     public function delete(string $file, BackupService $backupService): RedirectResponse

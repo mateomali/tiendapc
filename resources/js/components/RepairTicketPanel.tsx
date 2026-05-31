@@ -240,6 +240,46 @@ function overdueLabel(repair: RepairOrderView): string | null {
     return `Vencida hace ${days} ${days === 1 ? 'dia' : 'dias'}`;
 }
 
+function normalizeRepairText(value?: string | null): string {
+    return (value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function descriptionWithoutRepeatedModel(description?: string | null, model?: string | null): string {
+    const rawDescription = (description ?? '').trim();
+    const rawModel = (model ?? '').trim();
+    const normalizedModel = normalizeRepairText(rawModel);
+
+    if (rawDescription === '' || normalizedModel === '') {
+        return rawDescription;
+    }
+
+    return rawDescription
+        .split('\n')
+        .map((line) => {
+            const trimmedLine = line.trim();
+            const normalizedLine = normalizeRepairText(trimmedLine);
+
+            if (normalizedLine === normalizedModel) {
+                return '';
+            }
+
+            if (!normalizedLine.endsWith(` ${normalizedModel}`)) {
+                return trimmedLine;
+            }
+
+            return trimmedLine.slice(0, Math.max(0, trimmedLine.length - rawModel.length)).trim();
+        })
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+}
+
 function ModalShell({
     title,
     children,
@@ -615,7 +655,7 @@ function AddRepairModal({
             return {
                 ...current,
                 marca: value,
-                modelo: value !== '' ? `${value} ${cleanModel}`.trim() : cleanModel,
+                modelo: cleanModel,
             };
         });
     };
@@ -627,9 +667,8 @@ function AddRepairModal({
         if (!option) return;
 
         form.setData((current) => {
-            const model = current.modelo.trim();
             const description = option.description.trim();
-            const nextDescription = [current.descripcion.trim(), model !== '' && description !== '' ? `${description} ${model}` : description]
+            const nextDescription = [current.descripcion.trim(), description]
                 .filter(Boolean)
                 .join('\n');
 
@@ -907,6 +946,7 @@ function RepairEditCard({
     const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
     const overdueText = overdueLabel(repair);
     const desktopWorkLabel = rowTotal > 1 ? `Trabajo ${rowIndex + 1} de ${rowTotal}` : `Trabajo ${repair.reparacion}`;
+    const cleanDescription = descriptionWithoutRepeatedModel(repair.descripcion, repair.modelo);
     const partMatches = partSearch.trim().length >= 2
         ? partInventory
             .filter((part) => part.quantity > 0 && part.model.toLowerCase().includes(partSearch.trim().toLowerCase()))
@@ -1534,8 +1574,8 @@ function RepairEditCard({
                         {rowTotal > 1 ? <span className="text-[0.62rem] font-black text-[#2563eb]">{desktopWorkLabel}</span> : null}
                         <span className="font-bold text-[#0f172a]">{repair.modelo || '-'}</span>
                     </button>
-                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.descripcion || '-'}>
-                        <span className="line-clamp-2">{repair.descripcion || '-'}</span>
+                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={cleanDescription || repair.descripcion || '-'}>
+                        <span className="line-clamp-2">{cleanDescription || repair.descripcion || '-'}</span>
                     </button>
                     <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
                         <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>
@@ -1599,7 +1639,7 @@ function RepairEditCard({
                                 <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.62rem] font-bold text-[#0f172a]">{compactStatus(repair.estado)}</span>
                             </div>
                             <h4 className="truncate text-[0.96rem] font-black leading-tight">{repair.modelo || 'Sin modelo'}</h4>
-                            <p className="truncate text-[0.78rem] font-bold opacity-90">{repair.descripcion || 'Sin descripcion'}</p>
+                            <p className="truncate text-[0.78rem] font-bold opacity-90">{cleanDescription || repair.descripcion || 'Sin descripcion'}</p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="rounded-md bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
                                 {isToday(repair.fecha_estimada) ? <span className="rounded-md bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}

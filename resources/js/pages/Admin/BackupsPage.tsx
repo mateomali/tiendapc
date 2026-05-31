@@ -19,7 +19,13 @@ interface BackupsPageProps {
 
 export default function BackupsPage({ backups, stats }: BackupsPageProps): JSX.Element {
     const createForm = useForm<Record<string, never>>({});
+    const createRepairsForm = useForm<Record<string, never>>({});
+    const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
     const restoreForm = useForm<{ file: string; backup_zip: File | null }>({
+        file: '',
+        backup_zip: null,
+    });
+    const restoreRepairsForm = useForm<{ file: string; backup_zip: File | null }>({
         file: '',
         backup_zip: null,
     });
@@ -30,6 +36,14 @@ export default function BackupsPage({ backups, stats }: BackupsPageProps): JSX.E
         }
 
         router.post(route('admin.backups.restore'), { file: fileName });
+    }
+
+    function restoreRepairExisting(fileName: string): void {
+        if (!window.confirm(`Se restauraran solo las tablas de reparaciones desde ${fileName}.`)) {
+            return;
+        }
+
+        router.post(route('admin.backups.repairs.restore'), { file: fileName });
     }
 
     return (
@@ -92,6 +106,34 @@ export default function BackupsPage({ backups, stats }: BackupsPageProps): JSX.E
                 <article className={ui.backupCard}>
                     <div className={ui.cardHeading}>
                         <div className={ui.cardTitleWrap}>
+                            <p className={ui.eyebrow}>Backup reparaciones</p>
+                            <h3 className={ui.cardTitle}>Exportar ordenes y reparaciones</h3>
+                        </div>
+                    </div>
+                    <p className={ui.inlineCaption}>
+                        Genera un ZIP solo con ordenes, pagos, eventos, repuestos, modelos y listas de carga.
+                    </p>
+                    <div className={ui.inlineActions}>
+                        <button
+                            type="button"
+                            className={buttonClass('primary')}
+                            onClick={() => createRepairsForm.post(route('admin.backups.repairs.create'))}
+                            disabled={createRepairsForm.processing}
+                        >
+                            {createRepairsForm.processing ? 'Creando...' : 'Crear backup reparaciones'}
+                        </button>
+                        <form action={route('admin.backups.repairs.create_download')} method="post">
+                            <input type="hidden" name="_token" value={csrfToken} />
+                            <button type="submit" className={buttonClass('soft')}>
+                                Crear y descargar
+                            </button>
+                        </form>
+                    </div>
+                </article>
+
+                <article className={ui.backupCard}>
+                    <div className={ui.cardHeading}>
+                        <div className={ui.cardTitleWrap}>
                             <p className={ui.eyebrow}>Restore desde archivo</p>
                             <h3 className={ui.cardTitle}>Subir un backup ZIP</h3>
                         </div>
@@ -136,6 +178,53 @@ export default function BackupsPage({ backups, stats }: BackupsPageProps): JSX.E
                         </div>
                     </form>
                 </article>
+
+                <article className={ui.backupCard}>
+                    <div className={ui.cardHeading}>
+                        <div className={ui.cardTitleWrap}>
+                            <p className={ui.eyebrow}>Importar reparaciones</p>
+                            <h3 className={ui.cardTitle}>Subir ZIP de reparaciones</h3>
+                        </div>
+                    </div>
+                    <p className={ui.inlineCaption}>
+                        Restaura solamente las tablas del modulo de reparaciones. No toca productos, ventas ni configuracion general.
+                    </p>
+                    <form
+                        className="grid gap-4"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+
+                            if (!window.confirm('Se reemplazaran solo las tablas actuales de reparaciones.')) {
+                                return;
+                            }
+
+                            restoreRepairsForm.post(route('admin.backups.repairs.restore'), {
+                                forceFormData: true,
+                                preserveScroll: true,
+                                onSuccess: () => restoreRepairsForm.reset(),
+                            });
+                        }}
+                    >
+                        <div className={ui.backupUploadGrid}>
+                            <div className={ui.field}>
+                                <label htmlFor="repair_backup_zip" className={ui.fieldLabel}>Archivo ZIP</label>
+                                <input
+                                    id="repair_backup_zip"
+                                    type="file"
+                                    accept=".zip,application/zip"
+                                    className={ui.input}
+                                    onChange={(event) => restoreRepairsForm.setData('backup_zip', event.target.files?.[0] ?? null)}
+                                />
+                                <p className={ui.inlineCaption}>
+                                    Acepta ZIP de reparaciones o un backup completo; solo se restauran las tablas de reparaciones.
+                                </p>
+                            </div>
+                            <button type="submit" className={buttonClass('soft')} disabled={restoreRepairsForm.processing}>
+                                {restoreRepairsForm.processing ? 'Restaurando...' : 'Subir y restaurar reparaciones'}
+                            </button>
+                        </div>
+                    </form>
+                </article>
             </section>
 
             <section className={ui.backupCard}>
@@ -159,6 +248,9 @@ export default function BackupsPage({ backups, stats }: BackupsPageProps): JSX.E
                                 </a>
                                 <button type="button" className={buttonClass('primary', 'sm')} onClick={() => restoreExisting(backup.file_name)}>
                                     Restaurar
+                                </button>
+                                <button type="button" className={buttonClass('soft', 'sm')} onClick={() => restoreRepairExisting(backup.file_name)}>
+                                    Restaurar reparaciones
                                 </button>
                                 <Link
                                     href={route('admin.backups.delete', backup.file_name)}

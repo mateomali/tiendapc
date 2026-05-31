@@ -379,6 +379,26 @@ class WorkbenchController extends Controller
         return null;
     }
 
+    private function stripBrandFromDeviceModel(string $model, string $brand = ''): string
+    {
+        $knownBrands = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'];
+        $brands = $brand !== '' && $brand !== 'OTRAS'
+            ? array_values(array_unique([$brand, ...$knownBrands]))
+            : $knownBrands;
+
+        foreach ($brands as $knownBrand) {
+            if ($model === $knownBrand) {
+                return '';
+            }
+
+            if (str_starts_with($model, $knownBrand . ' ')) {
+                return trim(substr($model, strlen($knownBrand) + 1));
+            }
+        }
+
+        return $model;
+    }
+
     public function lookupByDni(Request $request, RepairService $repairService): JsonResponse
     {
         $validated = $request->validate([
@@ -405,6 +425,7 @@ class WorkbenchController extends Controller
     {
         $validated = $request->validate([
             'modelo' => ['nullable', 'string', 'max:255'],
+            'marca' => ['nullable', 'string', 'max:80'],
             'descripcion' => ['required', 'string'],
             'observaciones' => ['nullable', 'string'],
             'monto' => ['nullable', 'numeric', 'min:0'],
@@ -501,7 +522,8 @@ class WorkbenchController extends Controller
     public function storeDeviceModel(Request $request): RedirectResponse
     {
         $validated = $this->validateDeviceModel($request);
-        $model = $this->canonicalDeviceModel((string) $validated['model']);
+        $brand = $this->canonicalDeviceModel((string) ($validated['brand'] ?? ''));
+        $model = $this->stripBrandFromDeviceModel($this->canonicalDeviceModel((string) $validated['model']), $brand);
 
         RepairDeviceModel::query()->updateOrCreate(
             [
@@ -509,7 +531,7 @@ class WorkbenchController extends Controller
                 'normalized_model' => $model,
             ],
             [
-                'brand' => $this->brandForDeviceModel($model, $validated['brand'] ?? null),
+                'brand' => $this->brandForDeviceModel($model, $brand),
                 'model' => $model,
             ],
         );
@@ -520,11 +542,12 @@ class WorkbenchController extends Controller
     public function updateDeviceModel(Request $request, RepairDeviceModel $repairDeviceModel): RedirectResponse
     {
         $validated = $this->validateDeviceModel($request);
-        $model = $this->canonicalDeviceModel((string) $validated['model']);
+        $brand = $this->canonicalDeviceModel((string) ($validated['brand'] ?? ''));
+        $model = $this->stripBrandFromDeviceModel($this->canonicalDeviceModel((string) $validated['model']), $brand);
 
         $repairDeviceModel->update([
             'category_id' => (int) $validated['category_id'],
-            'brand' => $this->brandForDeviceModel($model, $validated['brand'] ?? null),
+            'brand' => $this->brandForDeviceModel($model, $brand),
             'model' => $model,
             'normalized_model' => $model,
         ]);

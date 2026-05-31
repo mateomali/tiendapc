@@ -147,15 +147,15 @@ it('uses the device model catalog to keep repair model names unified', function 
     $order = RepairOrder::query()->latest('id')->firstOrFail();
 
     $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $order->id]));
-    expect($order->modelo)->toBe('SAMSUNG A52');
-    expect(RepairDeviceModel::query()->where('model', 'SAMSUNG A52')->value('usage_count'))->toBe(4);
+    expect($order->modelo)->toBe('A52');
+    expect(RepairDeviceModel::query()->where('model', 'A52')->where('brand', 'SAMSUNG')->value('usage_count'))->toBe(4);
 
     $this->withSession(['repair_tech_authenticated' => true])
         ->get(route('repairs.ingress'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/WorkbenchPage')
-            ->where('deviceModels.0.model', 'SAMSUNG A52')
+            ->where('deviceModels.0.model', 'A52')
             ->where('serviceOptionUsage.service:modulo', 1));
 });
 
@@ -186,7 +186,7 @@ it('allows managing repair intake lists', function (): void {
         ])
         ->assertRedirect();
 
-    expect(RepairDeviceModel::query()->where('model', 'ALCATEL 1SE')->where('brand', 'ALCATEL')->exists())->toBeTrue();
+    expect(RepairDeviceModel::query()->where('model', '1SE')->where('brand', 'ALCATEL')->exists())->toBeTrue();
 });
 
 it('stores successive repair payments as history and updates paid total', function (): void {

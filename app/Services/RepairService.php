@@ -217,7 +217,7 @@ class RepairService
 
             foreach ($jobs as $index => $job) {
                 $repairNumber = $index + 1;
-                $model = $this->rememberDeviceModel($job['modelo'], $job['categorias_reparacion']);
+                $model = $this->rememberDeviceModel($job['modelo'], $job['categorias_reparacion'], $job['marca'] ?? null);
                 $images = is_array($jobFiles[$index]['images'] ?? null)
                     ? $jobFiles[$index]['images']
                     : ($repairNumber === 1 ? $sharedImages : []);
@@ -281,7 +281,7 @@ class RepairService
             $part = trim((string) ($payload['repuesto'] ?? ''));
             $requestedInventoryPartId = (int) ($payload['inventory_part_id'] ?? 0);
             $allocation = $this->reserveInventoryPart($requestedInventoryPartId, $order->id, $repairNumber);
-            $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4));
+            $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4), $payload['marca'] ?? null);
 
             if ($requestedInventoryPartId > 0 && $allocation === null) {
                 throw new \RuntimeException('El repuesto seleccionado ya no esta disponible.');
@@ -512,7 +512,7 @@ class RepairService
                 ];
             }
 
-            $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4));
+            $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4), $payload['marca'] ?? null);
 
             $order->fill([
                 'id' => $newOrderId,
@@ -1475,10 +1475,12 @@ class RepairService
         return $beforeValue !== $afterValue && !in_array($afterValue, ['', 'sin observaciones', 'sin observacion'], true);
     }
 
-    private function rememberDeviceModel(mixed $model, int $categoryId): ?string
+    private function rememberDeviceModel(mixed $model, int $categoryId, mixed $brand = null): ?string
     {
         $model = trim((string) $model);
-        $normalized = $this->normalizeDeviceModel($model);
+        $normalizedBrand = $this->normalizeDeviceModel((string) $brand);
+        $originalNormalized = $this->normalizeDeviceModel($model);
+        $normalized = $this->stripBrandFromModel($originalNormalized, $normalizedBrand);
 
         if ($model === '' || $normalized === '' || ! Schema::hasTable('repair_device_models')) {
             return $normalized !== '' ? $normalized : null;
@@ -1499,9 +1501,27 @@ class RepairService
             return $deviceModel->model;
         }
 
+        /** @var RepairDeviceModel|null $legacyDeviceModel */
+        $legacyDeviceModel = RepairDeviceModel::query()
+            ->where('category_id', $categoryId)
+            ->where('normalized_model', $originalNormalized)
+            ->lockForUpdate()
+            ->first();
+
+        if ($legacyDeviceModel !== null) {
+            $legacyDeviceModel->update([
+                'brand' => $this->detectDeviceBrand($originalNormalized, $normalizedBrand),
+                'model' => $normalized,
+                'normalized_model' => $normalized,
+                'usage_count' => $legacyDeviceModel->usage_count + 1,
+            ]);
+
+            return $normalized;
+        }
+
         RepairDeviceModel::query()->create([
             'category_id' => $categoryId,
-            'brand' => $this->detectDeviceBrand($normalized),
+            'brand' => $this->detectDeviceBrand($model, $normalizedBrand),
             'model' => $normalized,
             'normalized_model' => $normalized,
             'usage_count' => 1,
@@ -1518,8 +1538,32 @@ class RepairService
         return trim(preg_replace('/\s+/', ' ', $value) ?? '');
     }
 
-    private function detectDeviceBrand(string $model): ?string
+    private function stripBrandFromModel(string $model, string $brand = ''): string
     {
+        $knownBrands = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'];
+        $brands = $brand !== '' && $brand !== 'OTRAS'
+            ? array_values(array_unique([$brand, ...$knownBrands]))
+            : $knownBrands;
+
+        foreach ($brands as $knownBrand) {
+            if ($model === $knownBrand) {
+                return '';
+            }
+
+            if (str_starts_with($model, $knownBrand . ' ')) {
+                return trim(substr($model, strlen($knownBrand) + 1));
+            }
+        }
+
+        return $model;
+    }
+
+    private function detectDeviceBrand(string $model, string $brand = ''): ?string
+    {
+        if ($brand !== '' && $brand !== 'OTRAS') {
+            return $brand;
+        }
+
         $normalized = $this->normalizeDeviceModel($model);
 
         foreach (['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'] as $brand) {
@@ -1542,6 +1586,7 @@ class RepairService
     /**
      * @return array<int, array{
      *     modelo:?string,
+     *     marca:?string,
      *     descripcion:string,
      *     observaciones:string,
      *     monto:float|int,
@@ -1573,6 +1618,7 @@ class RepairService
             ->map(function (array $job): array {
                 $serviceType = trim((string) ($job['tipo_servicio'] ?? ''));
                 $template = $this->serviceTemplateByValue($serviceType);
+                $brand = $this->normalizeDeviceModel((string) ($job['marca'] ?? ''));
                 $model = trim((string) ($job['modelo'] ?? ''));
                 $description = trim((string) ($job['descripcion'] ?? ''));
                 $fallbackDescription = trim((string) ($template['description'] ?? ''));
@@ -1591,6 +1637,7 @@ class RepairService
 
                 return [
                     'modelo' => $model !== '' ? $model : null,
+                    'marca' => $brand !== '' ? $brand : null,
                     'descripcion' => $description,
                     'observaciones' => trim((string) ($job['observaciones'] ?? '')) !== '' ? trim((string) ($job['observaciones'] ?? '')) : 'sin observaciones',
                     'monto' => $job['monto'] ?? 0,
@@ -1620,6 +1667,7 @@ class RepairService
 
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
+                'marca' => $this->normalizeDeviceModel((string) ($payload['marca'] ?? '')) ?: null,
                 'descripcion' => $description,
                 'observaciones' => trim((string) ($payload['observaciones'] ?? '')) !== '' ? trim((string) $payload['observaciones']) : 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,

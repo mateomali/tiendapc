@@ -35,10 +35,20 @@ class BackupService
 
     public function create(): string
     {
+        return $this->createArchive('backup_tienda_', $this->backupTableOrder(), true);
+    }
+
+    public function createRepairs(): string
+    {
+        return $this->createArchive('backup_reparaciones_', $this->repairBackupTableOrder(), false);
+    }
+
+    private function createArchive(string $prefix, array $tables, bool $includeUploads): string
+    {
         $directory = public_path(config('tienda.uploads.backups'));
         File::ensureDirectoryExists($directory);
 
-        $fileName = 'backup_tienda_' . now()->format('Ymd_His') . '.zip';
+        $fileName = $prefix . now()->format('Ymd_His') . '.zip';
         $archivePath = $directory . DIRECTORY_SEPARATOR . $fileName;
         $tmpDir = storage_path('app/tmp/backup_' . uniqid('', true));
 
@@ -46,19 +56,22 @@ class BackupService
 
         $payload = [
             'created_at' => now()->toDateTimeString(),
-            'tables' => $this->dumpTables(),
+            'type' => $includeUploads ? 'full' : 'repairs',
+            'tables' => $this->dumpTables($tables),
         ];
 
         File::put($tmpDir . DIRECTORY_SEPARATOR . 'backup.json', json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        foreach (config('tienda.uploads') as $key => $relativePath) {
-            if ($key === 'backups') {
-                continue;
-            }
+        if ($includeUploads) {
+            foreach (config('tienda.uploads') as $key => $relativePath) {
+                if ($key === 'backups') {
+                    continue;
+                }
 
-            $source = public_path($relativePath);
-            if (File::isDirectory($source)) {
-                File::copyDirectory($source, $tmpDir . DIRECTORY_SEPARATOR . $relativePath);
+                $source = public_path($relativePath);
+                if (File::isDirectory($source)) {
+                    File::copyDirectory($source, $tmpDir . DIRECTORY_SEPARATOR . $relativePath);
+                }
             }
         }
 
@@ -66,7 +79,7 @@ class BackupService
         $zip->open($archivePath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
         foreach (File::allFiles($tmpDir) as $file) {
-            $zip->addFile($file->getRealPath(), str_replace($tmpDir . DIRECTORY_SEPARATOR, '', $file->getRealPath()));
+            $zip->addFile($file->getRealPath(), $file->getRelativePathname());
         }
 
         $zip->close();
@@ -134,7 +147,7 @@ class BackupService
 
         try {
             DB::transaction(function () use ($payload, $tables): void {
-                DB::statement('SET FOREIGN_KEY_CHECKS=0');
+                $this->setForeignKeyChecks(false);
 
                 try {
                     foreach (array_reverse($tables) as $table) {
@@ -156,7 +169,7 @@ class BackupService
                         }
                     }
                 } finally {
-                    DB::statement('SET FOREIGN_KEY_CHECKS=1');
+                    $this->setForeignKeyChecks(true);
                 }
             });
 
@@ -181,32 +194,60 @@ class BackupService
         }
     }
 
-    private function dumpTables(): array
+    public function restoreRepairs(string $fileName): void
     {
-        $tables = [
-            'categories',
-            'products',
-            'users',
-            'site_announcements',
-            'site_announcement_config',
-            'site_contact_config',
-            'site_services',
-            'site_services_config',
-            'site_global_config',
-            'media_library',
-            'auth_login_rate_limits',
-            'sales',
-            'sale_items',
-            'orders',
-            'order_items',
-            'pages',
-            'posts',
-            'repair_device_models',
-            'repair_service_options',
-            'ordenes',
-            'orden_eventos',
-        ];
+        $archivePath = public_path(config('tienda.uploads.backups') . DIRECTORY_SEPARATOR . basename($fileName));
+        if (! File::exists($archivePath)) {
+            throw new RuntimeException('Backup no encontrado.');
+        }
 
+        $tmpDir = $this->extractArchive($archivePath);
+        $backupFile = $tmpDir . DIRECTORY_SEPARATOR . 'backup.json';
+        $payload = json_decode((string) File::get($backupFile), true);
+        $repairTables = $this->repairBackupTableOrder();
+        $tables = array_values(array_intersect($repairTables, array_keys($payload['tables'] ?? [])));
+
+        if ($tables === []) {
+            File::deleteDirectory($tmpDir);
+            throw new RuntimeException('El backup no contiene tablas de reparaciones.');
+        }
+
+        try {
+            DB::transaction(function () use ($payload, $tables): void {
+                $this->setForeignKeyChecks(false);
+
+                try {
+                    foreach (array_reverse($tables) as $table) {
+                        if (DB::getSchemaBuilder()->hasTable($table)) {
+                            DB::table($table)->delete();
+                        }
+                    }
+
+                    foreach ($tables as $table) {
+                        $rows = $payload['tables'][$table] ?? [];
+
+                        if (! DB::getSchemaBuilder()->hasTable($table) || ! is_array($rows) || $rows === []) {
+                            continue;
+                        }
+
+                        foreach (array_chunk($rows, 250) as $chunk) {
+                            DB::table($table)->insert(array_map(
+                                fn ($row): array => is_array($row) ? $row : Arr::wrap($row),
+                                $chunk,
+                            ));
+                        }
+                    }
+                } finally {
+                    $this->setForeignKeyChecks(true);
+                }
+            });
+        } finally {
+            File::deleteDirectory($tmpDir);
+        }
+    }
+
+    private function dumpTables(array $tables): array
+    {
         $dump = [];
 
         foreach ($tables as $table) {
@@ -218,6 +259,21 @@ class BackupService
         }
 
         return $dump;
+    }
+
+    private function setForeignKeyChecks(bool $enabled): void
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'mysql') {
+            DB::statement('SET FOREIGN_KEY_CHECKS=' . ($enabled ? '1' : '0'));
+
+            return;
+        }
+
+        if ($driver === 'sqlite') {
+            DB::statement('PRAGMA foreign_keys = ' . ($enabled ? 'ON' : 'OFF'));
+        }
     }
 
     private function extractArchive(string $archivePath): string
@@ -310,8 +366,24 @@ class BackupService
             'order_items',
             'pages',
             'posts',
+            'repair_part_boxes',
+            'repair_parts',
             'repair_device_models',
             'repair_service_options',
+            'repair_payments',
+            'ordenes',
+            'orden_eventos',
+        ];
+    }
+
+    private function repairBackupTableOrder(): array
+    {
+        return [
+            'repair_part_boxes',
+            'repair_parts',
+            'repair_device_models',
+            'repair_service_options',
+            'repair_payments',
             'ordenes',
             'orden_eventos',
         ];

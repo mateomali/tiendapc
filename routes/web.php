@@ -149,7 +149,10 @@ Route::middleware(['auth', 'role:admin,editor'])->group(function (): void {
 
     Route::get('/admin/backups', [BackupController::class, 'index'])->name('admin.backups.index');
     Route::post('/admin/backups/crear', [BackupController::class, 'create'])->name('admin.backups.create');
+    Route::post('/admin/backups/reparaciones/crear', [BackupController::class, 'createRepairs'])->name('admin.backups.repairs.create');
+    Route::post('/admin/backups/reparaciones/crear-descargar', [BackupController::class, 'createRepairsDownload'])->name('admin.backups.repairs.create_download');
     Route::post('/admin/backups/restaurar', [BackupController::class, 'restore'])->name('admin.backups.restore');
+    Route::post('/admin/backups/reparaciones/restaurar', [BackupController::class, 'restoreRepairs'])->name('admin.backups.repairs.restore');
     Route::post('/admin/backups/eliminar/{file}', [BackupController::class, 'delete'])->name('admin.backups.delete');
     Route::get('/admin/backups/descargar/{file}', [BackupController::class, 'download'])->name('admin.backups.download');
 
