@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toDataURL } from 'qrcode';
-import type { RepairTicketView } from '../../types';
+import type { RepairOrderView, RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass } from '../../repairUi';
 import { formatCurrency } from '../../utils';
 
@@ -88,14 +88,16 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                             const saldo = Math.max(0, monto - senia);
                             const saldoLabel = monto > 0 && senia >= monto ? 'PAGADO' : formatCurrency(saldo);
                             const deliveredLabel = repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null;
+                            const modelLabel = ticketRepairModel(repair);
+                            const failureLabel = ticketRepairFailure(repair, modelLabel);
 
                             return (
                                 <div key={`${repair.registro_id}-${repair.reparacion}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
                                     <div className="mb-[3px] text-[12px]">{ticket.repairs.length === 1 ? 'REPARACION' : `REPARACION ${index + 1}`}</div>
-                                    <TicketLine label="MODELO:" value={repair.modelo || 'SIN MODELO'} />
+                                    <TicketLine label="MODELO:" value={modelLabel} />
                                     <div className="mb-px block">
                                         <span className="block">FALLA:</span>
-                                        <strong className="mt-px block break-words text-left">{repair.descripcion || 'SIN DESCRIPCION'}</strong>
+                                        <strong className="mt-px block break-words text-left">{failureLabel}</strong>
                                     </div>
                                     {deliveredLabel !== null ? (
                                         <TicketLine label="TOTAL:" value={deliveredLabel} />
@@ -138,6 +140,71 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
             </div>
         </>
     );
+}
+
+function normalizeTicketText(value?: string | null): string {
+    return (value ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+const ticketKnownBrands = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'];
+
+function ticketRepairBrand(repair: RepairOrderView): string {
+    const storedBrand = normalizeTicketText(repair.marca);
+    if (storedBrand !== '') return storedBrand;
+
+    const normalizedModel = normalizeTicketText(repair.modelo);
+    const normalizedFailure = normalizeTicketText(repair.descripcion);
+
+    return ticketKnownBrands.find((brand) => {
+        if (normalizedFailure === brand || normalizedFailure.endsWith(` ${brand}`)) return true;
+        return normalizedModel !== '' && normalizedFailure.endsWith(` ${brand} ${normalizedModel}`);
+    }) ?? '';
+}
+
+function ticketRepairModel(repair: RepairOrderView): string {
+    const model = (repair.modelo ?? '').trim();
+    const brand = ticketRepairBrand(repair);
+
+    if (model === '') return brand || 'SIN MODELO';
+
+    const normalizedModel = normalizeTicketText(model);
+    if (brand === '' || normalizedModel === brand || normalizedModel.startsWith(`${brand} `)) {
+        return model;
+    }
+
+    return `${brand} ${model}`;
+}
+
+function ticketRepairFailure(repair: RepairOrderView, displayModel: string): string {
+    let failure = (repair.descripcion ?? '').trim();
+    const brand = ticketRepairBrand(repair);
+    const model = (repair.modelo ?? '').trim();
+    const tokens = [displayModel, brand && model ? `${brand} ${model}` : '', model, brand]
+        .map((token) => token.trim())
+        .filter((token, index, tokensList) => token !== '' && tokensList.indexOf(token) === index)
+        .sort((left, right) => right.length - left.length);
+
+    tokens.forEach((token) => {
+        const normalizedToken = normalizeTicketText(token);
+        const normalizedFailure = normalizeTicketText(failure);
+
+        if (normalizedFailure === normalizedToken) {
+            failure = '';
+            return;
+        }
+
+        if (normalizedFailure.endsWith(` ${normalizedToken}`)) {
+            failure = failure.slice(0, Math.max(0, failure.length - token.length)).trim();
+        }
+    });
+
+    return failure || 'SIN DESCRIPCION';
 }
 
 function formatDeliveredTicketDate(value?: string | null): string {

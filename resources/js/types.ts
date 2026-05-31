@@ -185,6 +185,7 @@ export interface RepairOrderView {
     nombre_cliente: string;
     dni: number;
     contacto?: string | null;
+    marca?: string | null;
     modelo?: string | null;
     descripcion?: string | null;
     observaciones?: string | null;

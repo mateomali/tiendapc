@@ -238,8 +238,9 @@ class RepairService
                     'dni' => $dni,
                     'tracking_token' => $trackingToken,
                     'contacto' => $payload['contacto'] ?? null,
+                    'marca' => $this->detectDeviceBrandFromRepairText((string) ($job['modelo'] ?? ''), (string) $job['descripcion'], (string) ($job['marca'] ?? '')),
                     'modelo' => $model,
-                    'descripcion' => $job['descripcion'],
+                    'descripcion' => $this->uppercaseFailure((string) $job['descripcion']),
                     'observaciones' => $job['observaciones'],
                     'info' => $info !== '' ? $info : null,
                     'monto' => $job['monto'],
@@ -295,8 +296,9 @@ class RepairService
                 'dni' => $order->dni,
                 'tracking_token' => $order->tracking_token,
                 'contacto' => $order->contacto,
+                'marca' => $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? '')),
                 'modelo' => $model,
-                'descripcion' => $payload['descripcion'],
+                'descripcion' => $this->uppercaseFailure((string) $payload['descripcion']),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $order->info,
                 'monto' => $payload['monto'] ?? 0,
@@ -513,6 +515,7 @@ class RepairService
             }
 
             $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4), $payload['marca'] ?? null);
+            $brand = $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? ''));
 
             $order->fill([
                 'id' => $newOrderId,
@@ -521,8 +524,9 @@ class RepairService
                 'tracking_token' => $trackingToken,
                 'contacto' => $payload['contacto'] ?? null,
                 'fecha' => $payload['fecha'] ?? $order->fecha,
+                'marca' => $brand,
                 'modelo' => $model,
-                'descripcion' => $payload['descripcion'] ?? null,
+                'descripcion' => $this->uppercaseFailure((string) ($payload['descripcion'] ?? '')),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $info !== '' ? $info : null,
                 'monto' => $payload['monto'] ?? 0,
@@ -1575,12 +1579,42 @@ class RepairService
         return null;
     }
 
+    private function detectDeviceBrandFromRepairText(string $model, string $description = '', string $brand = ''): ?string
+    {
+        $normalizedBrand = $this->normalizeDeviceModel($brand);
+        $detected = $this->detectDeviceBrand($model, $normalizedBrand);
+
+        if ($detected !== null) {
+            return $detected;
+        }
+
+        $normalizedDescription = $this->normalizeDeviceModel($description);
+        $normalizedModel = $this->normalizeDeviceModel($model);
+
+        foreach (['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'] as $knownBrand) {
+            if ($normalizedDescription === $knownBrand || str_ends_with($normalizedDescription, ' ' . $knownBrand)) {
+                return $knownBrand;
+            }
+
+            if ($normalizedModel !== '' && str_ends_with($normalizedDescription, ' ' . $knownBrand . ' ' . $normalizedModel)) {
+                return $knownBrand;
+            }
+        }
+
+        return null;
+    }
+
     private function normalizeUsageText(string $value): string
     {
         $value = Str::ascii(Str::lower($value));
         $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?? '';
 
         return trim(preg_replace('/\s+/', ' ', $value) ?? '');
+    }
+
+    private function uppercaseFailure(string $value): string
+    {
+        return trim(preg_replace('/\s+/', ' ', Str::upper($value)) ?? '');
     }
 
     /**
@@ -1627,7 +1661,7 @@ class RepairService
                 $inventoryPartId = max(0, (int) ($job['inventory_part_id'] ?? 0));
 
                 if ($description === '' && $fallbackDescription !== '') {
-                    $description = $model !== '' ? trim($fallbackDescription . ' ' . $model) : $fallbackDescription;
+                    $description = $fallbackDescription;
                 }
 
                 $state = (string) ($job['estado'] ?? 'PENDIENTE');
@@ -1638,7 +1672,7 @@ class RepairService
                 return [
                     'modelo' => $model !== '' ? $model : null,
                     'marca' => $brand !== '' ? $brand : null,
-                    'descripcion' => $description,
+                    'descripcion' => $this->uppercaseFailure($description),
                     'observaciones' => trim((string) ($job['observaciones'] ?? '')) !== '' ? trim((string) ($job['observaciones'] ?? '')) : 'sin observaciones',
                     'monto' => $job['monto'] ?? 0,
                     'senia' => $job['senia'] ?? 0,
@@ -1668,7 +1702,7 @@ class RepairService
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
                 'marca' => $this->normalizeDeviceModel((string) ($payload['marca'] ?? '')) ?: null,
-                'descripcion' => $description,
+                'descripcion' => $this->uppercaseFailure($description),
                 'observaciones' => trim((string) ($payload['observaciones'] ?? '')) !== '' ? trim((string) $payload['observaciones']) : 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => $payload['senia'] ?? 0,

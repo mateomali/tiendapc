@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Cambio de placas de carga">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e5ecf"/>
+      <stop offset="100%" stop-color="#0b9ed5"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" rx="28" fill="url(#bg3)"/>
+  <rect x="86" y="78" width="628" height="344" rx="24" fill="#12377c" opacity="0.3"/>
+  <rect x="172" y="132" width="250" height="236" rx="18" fill="#eef5ff"/>
+  <rect x="224" y="188" width="146" height="124" rx="12" fill="#d8e8ff"/>
+  <rect x="248" y="158" width="22" height="30" rx="8" fill="#1f56b3"/>
+  <rect x="324" y="158" width="22" height="30" rx="8" fill="#1f56b3"/>
+  <path d="M452 248h118m-44-36 44 36-44 36" stroke="#ffffff" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M614 138l-56 92h42l-58 124 106-142h-44l38-74z" fill="#ffe56b" stroke="#f7c118" stroke-width="6" stroke-linejoin="round"/>
+  <text x="400" y="64" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="34" font-weight="800" fill="#ffffff">CAMBIO DE PLACAS DE CARGA</text>
+</svg>

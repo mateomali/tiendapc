@@ -1,4 +1,5 @@
 import { useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
@@ -44,7 +45,15 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
         { value: 3, label: 'Accesorios' },
         { value: 4, label: 'Varios' },
     ];
+    const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
+
+    const toggleDesktopTicket = (ticketId: number): void => {
+        setExpandedDesktopTickets((current) => ({
+            ...current,
+            [ticketId]: !current[ticketId],
+        }));
+    };
 
     const goToPage = (page: number): void => {
         form.transform((data) => ({
@@ -145,8 +154,11 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                         </div>
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (
-                                tickets.flatMap((ticket) =>
-                                    ticket.repairs.map((repair, repairIndex) => (
+                                tickets.flatMap((ticket) => {
+                                    const expanded = expandedDesktopTickets[ticket.id] ?? false;
+                                    const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+                                    return desktopRepairs.map((repair, repairIndex) => (
                                         <RepairDesktopRow
                                             key={`delivered-desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                                             ticket={ticket}
@@ -154,10 +166,12 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                                             serviceCategories={deliveredCategories}
                                             rowIndex={repairIndex}
                                             rowTotal={ticket.repairs.length}
+                                            desktopGroupExpanded={expanded}
+                                            onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
                                             readOnly
                                         />
-                                    )),
-                                )
+                                    ));
+                                })
                             ) : (
                                 <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets entregados para los filtros actuales.</div>
                             )}

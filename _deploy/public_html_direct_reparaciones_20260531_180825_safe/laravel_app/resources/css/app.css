@@ -1,0 +1,295 @@
+@import 'tailwindcss';
+
+@layer base {
+    @font-face {
+        font-family: 'Catalog Roboto';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/roboto-500.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Roboto';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/roboto-700.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Dancing Script';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/dancing-script-700.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-400.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-500.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-700.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Jost';
+        font-style: normal;
+        font-weight: 800;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/jost-800.ttf') format('truetype');
+    }
+
+    @font-face {
+        font-family: 'Catalog Viga';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/assets/fonts/catalog/viga-400.ttf') format('truetype');
+    }
+
+    *,
+    ::before,
+    ::after {
+        box-sizing: border-box;
+    }
+
+    html {
+        min-width: 320px;
+        overflow-x: hidden;
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+
+    body {
+        min-width: 320px;
+        overflow-x: hidden;
+        overscroll-behavior-y: none;
+        background: #dce9ff;
+        text-rendering: optimizeLegibility;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+        font: inherit;
+    }
+
+    .number-input-no-spinners {
+        appearance: textfield;
+        -moz-appearance: textfield;
+    }
+
+    .number-input-no-spinners::-webkit-inner-spin-button,
+    .number-input-no-spinners::-webkit-outer-spin-button {
+        margin: 0;
+        -webkit-appearance: none;
+    }
+
+    button,
+    a,
+    input,
+    select,
+    textarea {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    img,
+    svg,
+    video,
+    canvas {
+        max-width: 100%;
+    }
+
+    .catalog-font-scope {
+        --font-sans: 'Catalog Jost', 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
+        --font-catalog-accent: 'Catalog Dancing Script', cursive;
+        --font-catalog-title-preview: 'Catalog Jost', 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
+        --font-catalog-price-preview: 'Catalog Viga', 'Catalog Roboto', ui-sans-serif, system-ui, sans-serif;
+        font-family: var(--font-sans);
+    }
+
+    .catalog-preview-title-font {
+        font-family: var(--font-catalog-title-preview) !important;
+    }
+
+    .catalog-preview-price-font {
+        font-family: var(--font-catalog-price-preview) !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            scroll-behavior: auto !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+}
+
+@media print {
+    @page {
+        size: 80mm auto;
+        margin: 0;
+    }
+}
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.ts';
+@source '../**/*.tsx';
+@source '../../src-tauri/src/**/*.rs';
+
+@theme {
+    --font-sans: 'Trebuchet MS', 'Verdana', ui-sans-serif, system-ui, sans-serif;
+
+    --color-brand-50: #eff6ff;
+    --color-brand-100: #dbeafe;
+    --color-brand-200: #bfd8ff;
+    --color-brand-300: #93c5fd;
+    --color-brand-400: #60a5fa;
+    --color-brand-500: #3575ec;
+    --color-brand-600: #2456b4;
+    --color-brand-700: #1f4e9c;
+    --color-brand-800: #1d417d;
+    --color-brand-900: #17376f;
+    --color-brand-950: #102146;
+
+    --color-ink-50: #f7fbff;
+    --color-ink-100: #eaf2ff;
+    --color-ink-200: #d6e4ff;
+    --color-ink-300: #a9c5ef;
+    --color-ink-400: #6f87af;
+    --color-ink-500: #49648e;
+    --color-ink-600: #35517f;
+    --color-ink-700: #20365d;
+    --color-ink-800: #1d2f57;
+    --color-ink-900: #102146;
+    --color-ink-950: #071a38;
+
+    --animate-marquee: marquee 28s linear infinite;
+
+    @keyframes marquee {
+        0% {
+            transform: translateX(100%);
+        }
+
+        100% {
+            transform: translateX(-100%);
+        }
+    }
+
+    @keyframes siteAnnouncementAuraPulse {
+        0% {
+            opacity: 0.58;
+            transform: scale(0.985);
+        }
+
+        100% {
+            opacity: 0.96;
+            transform: scale(1.03);
+        }
+    }
+
+    @keyframes siteAnnouncementSheen {
+        0%,
+        58%,
+        100% {
+            transform: translateX(-62%);
+            opacity: 0;
+        }
+
+        18%,
+        34% {
+            transform: translateX(68%);
+            opacity: 0.42;
+        }
+    }
+
+    @keyframes cart-nudge {
+        0%,
+        100% {
+            filter: brightness(1);
+            transform: translateX(0) rotate(0deg) scale(1);
+        }
+
+        14% {
+            filter: brightness(1.18);
+            transform: translateX(-9px) rotate(-8deg) scale(1.08);
+        }
+
+        28% {
+            filter: brightness(1.24);
+            transform: translateX(8px) rotate(8deg) scale(1.15);
+        }
+
+        42% {
+            transform: translateX(-7px) rotate(-6deg) scale(1.1);
+        }
+
+        58% {
+            transform: translateX(6px) rotate(6deg) scale(1.08);
+        }
+
+        74% {
+            transform: translateX(-3px) rotate(-3deg) scale(1.04);
+        }
+
+        88% {
+            transform: translateX(2px) rotate(2deg) scale(1.02);
+        }
+    }
+
+    @keyframes cart-badge-pop {
+        0%,
+        100% {
+            transform: scale(1);
+        }
+
+        28% {
+            transform: scale(1.72);
+        }
+
+        58% {
+            transform: scale(0.88);
+        }
+    }
+}
+
+@layer utilities {
+    .cart-nudge-active {
+        animation: cart-nudge 1.18s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+        box-shadow:
+            0 0 0 4px rgba(56, 189, 248, 0.22),
+            0 10px 22px rgba(8, 47, 110, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.24);
+        transform-origin: center;
+    }
+
+    .cart-nudge-active [data-cart-badge] {
+        animation: cart-badge-pop 1.18s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
+        transform-origin: center;
+    }
+}

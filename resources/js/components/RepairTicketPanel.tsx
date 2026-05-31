@@ -43,7 +43,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[3.2rem_minmax(6rem,0.5fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(10rem,1fr)_minmax(14rem,1.45fr)_5.5rem_4.6rem_6.5rem_minmax(16rem,0.95fr)]';
+    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(11rem,1.14fr)_minmax(11rem,1.15fr)_5.5rem_4.6rem_6.5rem_minmax(16rem,0.95fr)]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -61,6 +61,7 @@ interface RepairUpdateFormData {
     nombre_cliente: string;
     dni: string;
     contacto: string;
+    marca: string;
     modelo: string;
     descripcion: string;
     observaciones: string;
@@ -104,6 +105,12 @@ interface PaymentFormData {
 type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
 
 const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
+
+function isPhoneCategoryValue(serviceCategories: ServiceCategoryOption[], value: string | number | null | undefined): boolean {
+    const category = serviceCategories.find((item) => String(item.value) === String(value));
+
+    return category?.label.toLowerCase().includes('celular') ?? false;
+}
 
 function normalizeStatus(status: string): string {
     return status.toUpperCase();
@@ -250,30 +257,78 @@ function normalizeRepairText(value?: string | null): string {
         .trim();
 }
 
-function descriptionWithoutRepeatedModel(description?: string | null, model?: string | null): string {
+const knownDeviceBrands = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'];
+
+function inferredRepairBrand(repair: RepairOrderView): string {
+    const storedBrand = normalizeRepairText(repair.marca);
+    if (storedBrand !== '') return storedBrand;
+
+    const normalizedDescription = normalizeRepairText(repair.descripcion);
+    const normalizedModel = normalizeRepairText(repair.modelo);
+
+    const modelBrand = knownDeviceBrands.find((brand) => normalizedModel === brand || normalizedModel.startsWith(`${brand} `));
+    if (modelBrand !== undefined) return modelBrand;
+
+    return knownDeviceBrands.find((brand) => {
+        if (normalizedDescription === brand || normalizedDescription.endsWith(` ${brand}`)) return true;
+        return normalizedModel !== '' && normalizedDescription.endsWith(` ${brand} ${normalizedModel}`);
+    }) ?? '';
+}
+
+function modelWithoutKnownBrand(model: string): string {
+    const trimmedModel = model.trim();
+    const normalizedModel = normalizeRepairText(trimmedModel);
+    const brand = knownDeviceBrands.find((knownBrand) => normalizedModel.startsWith(`${knownBrand} `));
+
+    return brand ? trimmedModel.slice(brand.length).trimStart() : trimmedModel;
+}
+
+function displayRepairModel(repair: RepairOrderView): string {
+    const model = (repair.modelo ?? '').trim();
+    const brand = inferredRepairBrand(repair);
+
+    if (model === '') return brand || '-';
+
+    const normalizedModel = normalizeRepairText(model);
+    if (brand === '' || normalizedModel === brand || normalizedModel.startsWith(`${brand} `)) {
+        return model;
+    }
+
+    return `${brand} ${model}`.trim();
+}
+
+function descriptionWithoutRepeatedModel(description?: string | null, model?: string | null, brand?: string | null): string {
     const rawDescription = (description ?? '').trim();
     const rawModel = (model ?? '').trim();
-    const normalizedModel = normalizeRepairText(rawModel);
+    const rawBrand = (brand ?? '').trim();
+    const trailingTokens = [rawBrand && rawModel ? `${rawBrand} ${rawModel}` : '', rawModel, rawBrand]
+        .map((token) => token.trim())
+        .filter((token, index, tokens) => token !== '' && tokens.indexOf(token) === index);
 
-    if (rawDescription === '' || normalizedModel === '') {
+    if (rawDescription === '' || trailingTokens.length === 0) {
         return rawDescription;
     }
 
     return rawDescription
         .split('\n')
         .map((line) => {
-            const trimmedLine = line.trim();
-            const normalizedLine = normalizeRepairText(trimmedLine);
+            let trimmedLine = line.trim();
 
-            if (normalizedLine === normalizedModel) {
-                return '';
-            }
+            trailingTokens.forEach((token) => {
+                const normalizedToken = normalizeRepairText(token);
+                const normalizedLine = normalizeRepairText(trimmedLine);
 
-            if (!normalizedLine.endsWith(` ${normalizedModel}`)) {
-                return trimmedLine;
-            }
+                if (normalizedLine === normalizedToken) {
+                    trimmedLine = '';
+                    return;
+                }
 
-            return trimmedLine.slice(0, Math.max(0, trimmedLine.length - rawModel.length)).trim();
+                if (normalizedLine.endsWith(` ${normalizedToken}`)) {
+                    trimmedLine = trimmedLine.slice(0, Math.max(0, trimmedLine.length - token.length)).trim();
+                }
+            });
+
+            return trimmedLine;
         })
         .filter(Boolean)
         .join('\n')
@@ -632,30 +687,20 @@ function AddRepairModal({
         }
     };
 
-    const isPhoneCategory = (value: string): boolean => {
-        const category = serviceCategories.find((item) => String(item.value) === String(value));
-
-        return category?.label.toLowerCase().includes('celular') ?? false;
-    };
-
     const changeCategory = (value: string): void => {
         form.setData((current) => ({
             ...current,
             categorias_reparacion: value,
-            marca: isPhoneCategory(value) ? current.marca : '',
+            marca: isPhoneCategoryValue(serviceCategories, value) ? current.marca : '',
         }));
     };
 
     const changeBrand = (value: string): void => {
         form.setData((current) => {
-            const currentModel = current.modelo.trim();
-            const previousBrand = phoneBrandOptions.find((brand) => currentModel.toUpperCase().startsWith(`${brand} `));
-            const cleanModel = previousBrand ? currentModel.slice(previousBrand.length).trimStart() : currentModel;
-
             return {
                 ...current,
                 marca: value,
-                modelo: cleanModel,
+                modelo: modelWithoutKnownBrand(current.modelo),
             };
         });
     };
@@ -735,7 +780,7 @@ function AddRepairModal({
                                 ))}
                             </select>
                         </EditField>
-                        {isPhoneCategory(form.data.categorias_reparacion) ? (
+                        {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
                             <EditField label="Marca">
                                 <select className={ui.input} value={form.data.marca} onChange={(event) => changeBrand(event.target.value)}>
                                     <option value="">Elegir marca...</option>
@@ -880,6 +925,8 @@ function RepairEditCard({
     rowTotal = 1,
     onAddRepair,
     partInventory,
+    desktopGroupExpanded = true,
+    onToggleDesktopGroup,
 }: {
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
@@ -890,13 +937,17 @@ function RepairEditCard({
     rowIndex?: number;
     rowTotal?: number;
     onAddRepair: () => void;
+    desktopGroupExpanded?: boolean;
+    onToggleDesktopGroup?: () => void;
 }): JSX.Element {
+    const initialBrand = inferredRepairBrand(repair);
     const form = useForm<RepairUpdateFormData>({
         id_nuevo: String(repair.id),
         fecha: repair.fecha ?? '',
         nombre_cliente: repair.nombre_cliente,
         dni: String(repair.dni ?? ''),
         contacto: repair.contacto ?? '',
+        marca: initialBrand,
         modelo: repair.modelo ?? '',
         descripcion: repair.descripcion ?? '',
         observaciones: repair.observaciones ?? '',
@@ -942,11 +993,14 @@ function RepairEditCard({
     const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
-    const isLastGroupedDesktopRow = isGroupedDesktopRow && rowIndex === rowTotal - 1;
+    const isLastGroupedDesktopRow = isGroupedDesktopRow && (rowIndex === rowTotal - 1 || (rowIndex === 0 && !desktopGroupExpanded));
     const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
     const overdueText = overdueLabel(repair);
     const desktopWorkLabel = rowTotal > 1 ? `Trabajo ${rowIndex + 1} de ${rowTotal}` : `Trabajo ${repair.reparacion}`;
-    const cleanDescription = descriptionWithoutRepeatedModel(repair.descripcion, repair.modelo);
+    const repairBrand = inferredRepairBrand(repair);
+    const repairDisplayModel = displayRepairModel(repair);
+    const cleanDescription = descriptionWithoutRepeatedModel(repair.descripcion, repair.modelo, repairBrand);
+    const displayDescription = (cleanDescription || repair.descripcion || '-').toUpperCase();
     const partMatches = partSearch.trim().length >= 2
         ? partInventory
             .filter((part) => part.quantity > 0 && part.model.toLowerCase().includes(partSearch.trim().toLowerCase()))
@@ -962,6 +1016,7 @@ function RepairEditCard({
     const assignedInventoryBox = form.data.inventory_part_id !== ''
         ? selectedInventoryPart?.box ?? repair.inventory_part_box ?? null
         : null;
+    const inlinePhoneCategory = isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion);
 
     const selectInventoryPart = (part: RepairPartInventoryOption): void => {
         form.setData((current) => ({
@@ -1083,6 +1138,22 @@ function RepairEditCard({
         setInlineOpen(false);
     };
 
+    const changeInlineCategory = (value: string): void => {
+        form.setData((current) => ({
+            ...current,
+            categorias_reparacion: value,
+            marca: isPhoneCategoryValue(serviceCategories, value) ? current.marca : '',
+        }));
+    };
+
+    const changeInlineBrand = (value: string): void => {
+        form.setData((current) => ({
+            ...current,
+            marca: value,
+            modelo: modelWithoutKnownBrand(current.modelo),
+        }));
+    };
+
     const clearAmountForTyping = (field: 'monto' | 'senia'): void => {
         const value = form.data[field] ?? '';
 
@@ -1151,7 +1222,7 @@ function RepairEditCard({
         <form
             className={cn(
                 'grid gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3',
-                mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(170px,1fr)_96px_128px_136px_minmax(180px,1.2fr)_138px_112px_142px]',
+                mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(150px,1fr)_96px_128px_126px_124px_124px_minmax(160px,1.05fr)_138px_112px_142px]',
             )}
             onSubmit={submitEdit}
         >
@@ -1160,6 +1231,21 @@ function RepairEditCard({
             <input className={ui.repairDenseInput} value={form.data.dni} onChange={(event) => form.setData('dni', event.target.value)} placeholder="DNI" />
             <input className={ui.repairDenseInput} value={form.data.contacto} onChange={(event) => form.setData('contacto', event.target.value)} placeholder="Contacto" />
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} />
+            <select className={ui.repairDenseInput} value={form.data.categorias_reparacion} onChange={(event) => changeInlineCategory(event.target.value)} aria-label="Categoria">
+                {serviceCategories.map((category) => (
+                    <option key={category.value} value={category.value}>{category.label}</option>
+                ))}
+            </select>
+            {inlinePhoneCategory ? (
+                <select className={ui.repairDenseInput} value={form.data.marca} onChange={(event) => changeInlineBrand(event.target.value)} aria-label="Marca">
+                    <option value="">Marca...</option>
+                    {phoneBrandOptions.map((brand) => (
+                        <option key={brand} value={brand}>{brand}</option>
+                    ))}
+                </select>
+            ) : (
+                <input className={ui.repairDenseInput} value={form.data.marca} onChange={(event) => form.setData('marca', event.target.value.toUpperCase())} placeholder="Marca" />
+            )}
             <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} placeholder="Modelo" />
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
             <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
@@ -1313,6 +1399,9 @@ function RepairEditCard({
                                         <input className={changedInputClass(form.data.contacto, repair.contacto ?? '')} value={form.data.contacto} onChange={(event) => form.setData('contacto', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                 </div>
+                                <EditField label="Marca">
+                                    <input className={changedInputClass(form.data.marca, repair.marca ?? '')} value={form.data.marca} onChange={(event) => form.setData('marca', event.target.value.toUpperCase())} disabled={readOnly} />
+                                </EditField>
                                 <EditField label="Modelo">
                                     <input className={changedInputClass(form.data.modelo, repair.modelo ?? '')} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} disabled={readOnly} />
                                 </EditField>
@@ -1544,7 +1633,7 @@ function RepairEditCard({
                 </ModalShell>
             ) : null}
             {galleryIndex !== null && galleryImages[galleryIndex] ? (
-                <ModalShell title={`Orden #${repair.id} - Trabajo ${repair.reparacion} - ${repair.modelo || ''}`} onClose={() => setGalleryIndex(null)}>
+                <ModalShell title={`Orden #${repair.id} - Trabajo ${repair.reparacion} - ${repairDisplayModel || ''}`} onClose={() => setGalleryIndex(null)}>
                     <div className="grid gap-3">
                         <img src={galleryImages[galleryIndex].url} alt={galleryImages[galleryIndex].filename} className="max-h-[70vh] w-full rounded-xl object-contain" />
                         <div className="flex items-center justify-between gap-2">
@@ -1562,20 +1651,39 @@ function RepairEditCard({
         return (
             <>
                 <div className={cn('grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
-                    <div className="grid content-center gap-1 text-center">
+                    <div className="grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 text-center">
                         {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">-</span>}
+                        {showDesktopTicketData && rowTotal > 1 && onToggleDesktopGroup ? (
+                            <button
+                                type="button"
+                                className="inline-flex h-6 w-[2.35rem] shrink-0 items-center justify-center gap-1 rounded-md border border-[#bfdbfe] bg-[#eff6ff] text-[0.58rem] font-black text-[#1d4ed8] transition hover:border-[#93c5fd] hover:bg-[#dbeafe]"
+                                onClick={onToggleDesktopGroup}
+                                title={desktopGroupExpanded ? 'Ocultar trabajos de esta orden' : 'Mostrar todos los trabajos de esta orden'}
+                            >
+                                <FaChevronDown className={cn('text-[0.52rem] transition', desktopGroupExpanded && 'rotate-180')} aria-hidden="true" />
+                                {desktopGroupExpanded ? 'Ocultar' : rowTotal}
+                            </button>
+                        ) : <span className="block h-6 w-[2.35rem]" aria-hidden="true" />}
                     </div>
                     <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{showDesktopTicketData ? repair.nombre_cliente : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
                     <div className="flex items-center justify-center"><Thumb large /></div>
-                    <button type="button" className="grid content-center gap-1 text-left" onClick={openInlineEditor} title={repair.modelo || '-'}>
-                        {rowTotal > 1 ? <span className="text-[0.62rem] font-black text-[#2563eb]">{desktopWorkLabel}</span> : null}
-                        <span className="font-bold text-[#0f172a]">{repair.modelo || '-'}</span>
-                    </button>
-                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={cleanDescription || repair.descripcion || '-'}>
-                        <span className="line-clamp-2">{cleanDescription || repair.descripcion || '-'}</span>
+                    <div className="grid content-center gap-1 text-left">
+                        {rowTotal > 1 ? (
+                            <div className="flex min-w-0 items-center gap-2">
+                                <button type="button" className="min-w-0 text-left text-[0.62rem] font-black text-[#2563eb]" onClick={openInlineEditor} title={desktopWorkLabel}>
+                                    {desktopWorkLabel}
+                                </button>
+                            </div>
+                        ) : null}
+                        <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repairDisplayModel || '-'}>
+                            {repairDisplayModel || '-'}
+                        </button>
+                    </div>
+                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={displayDescription}>
+                        <span className="line-clamp-2">{displayDescription}</span>
                     </button>
                     <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
                         <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>
@@ -1638,8 +1746,8 @@ function RepairEditCard({
                                 <span className="rounded-md bg-white/80 px-1.5 py-0.5 text-[0.66rem] font-bold text-[#1d4ed8]">{rowIndex + 1}/{rowTotal}</span>
                                 <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.62rem] font-bold text-[#0f172a]">{compactStatus(repair.estado)}</span>
                             </div>
-                            <h4 className="truncate text-[0.96rem] font-black leading-tight">{repair.modelo || 'Sin modelo'}</h4>
-                            <p className="truncate text-[0.78rem] font-bold opacity-90">{cleanDescription || repair.descripcion || 'Sin descripcion'}</p>
+                            <h4 className="truncate text-[0.96rem] font-black leading-tight">{repairDisplayModel || 'Sin modelo'}</h4>
+                            <p className="truncate text-[0.78rem] font-bold opacity-90">{displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription}</p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="rounded-md bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
                                 {isToday(repair.fecha_estimada) ? <span className="rounded-md bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
@@ -1719,6 +1827,8 @@ export function RepairDesktopRow({
     readOnly = false,
     rowIndex = 0,
     rowTotal = ticket.repairs.length,
+    desktopGroupExpanded = true,
+    onToggleDesktopGroup,
 }: {
     ticket: RepairTicketView;
     repair: RepairOrderView;
@@ -1728,12 +1838,26 @@ export function RepairDesktopRow({
     readOnly?: boolean;
     rowIndex?: number;
     rowTotal?: number;
+    desktopGroupExpanded?: boolean;
+    onToggleDesktopGroup?: () => void;
 }): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
 
     return (
         <>
-            <RepairEditCard repair={repair} serviceCategories={serviceCategories} partInventory={partInventory} readOnly={readOnly} ticket={ticket} variant="desktop" rowIndex={rowIndex} rowTotal={rowTotal} onAddRepair={() => setAddOpen(true)} />
+            <RepairEditCard
+                repair={repair}
+                serviceCategories={serviceCategories}
+                partInventory={partInventory}
+                readOnly={readOnly}
+                ticket={ticket}
+                variant="desktop"
+                rowIndex={rowIndex}
+                rowTotal={rowTotal}
+                desktopGroupExpanded={desktopGroupExpanded}
+                onToggleDesktopGroup={onToggleDesktopGroup}
+                onAddRepair={() => setAddOpen(true)}
+            />
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
         </>
     );
@@ -1749,6 +1873,8 @@ export function RepairTicketPanel({
     readOnly = false,
 }: RepairTicketPanelProps): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
+    const [desktopGroupExpanded, setDesktopGroupExpanded] = useState(false);
+    const desktopRepairs = desktopGroupExpanded ? ticket.repairs : ticket.repairs.slice(0, 1);
 
     return (
         <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-xl max-xl:border-2 max-xl:border-[#94a3b8] max-xl:bg-[#eef4fb] max-xl:p-2 max-xl:shadow-[0_2px_8px_rgba(15,23,42,0.12)]')}>
@@ -1802,7 +1928,7 @@ export function RepairTicketPanel({
                         <span className="text-center">Acciones</span>
                     </div>
                     <div className="grid bg-white">
-                        {ticket.repairs.map((repair, index) => (
+                        {desktopRepairs.map((repair, index) => (
                             <RepairEditCard
                                 key={`desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                                 repair={repair}
@@ -1813,6 +1939,8 @@ export function RepairTicketPanel({
                                 variant="desktop"
                                 rowIndex={index}
                                 rowTotal={ticket.repairs.length}
+                                desktopGroupExpanded={desktopGroupExpanded}
+                                onToggleDesktopGroup={index === 0 && ticket.repairs.length > 1 ? () => setDesktopGroupExpanded((expanded) => !expanded) : undefined}
                                 onAddRepair={() => setAddOpen(true)}
                             />
                         ))}

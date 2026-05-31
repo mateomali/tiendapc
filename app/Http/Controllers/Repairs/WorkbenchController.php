@@ -797,6 +797,7 @@ class WorkbenchController extends Controller
             'dni' => $order->dni,
             'tracking_token' => $order->tracking_token,
             'contacto' => $order->contacto,
+            'marca' => $order->marca,
             'modelo' => $order->modelo,
             'descripcion' => $order->descripcion,
             'observaciones' => $order->observaciones,

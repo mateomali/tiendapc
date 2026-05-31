@@ -33,6 +33,7 @@ class RepairOrder extends Model
         'dni',
         'tracking_token',
         'contacto',
+        'marca',
         'modelo',
         'descripcion',
         'observaciones',

@@ -343,7 +343,15 @@ export default function WorkbenchPage({
     const [duplicateNotice, setDuplicateNotice] = useState('');
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
+    const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
+
+    const toggleDesktopTicket = (ticketId: number): void => {
+        setExpandedDesktopTickets((current) => ({
+            ...current,
+            [ticketId]: !current[ticketId],
+        }));
+    };
     const summaryRange = filters.summary_range ?? 'month';
     const categoryFilter = String(filters.categoria_filter ?? '');
     const periodOptions = [
@@ -1720,8 +1728,11 @@ export default function WorkbenchPage({
                         </form>
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (
-                                tickets.flatMap((ticket) =>
-                                    ticket.repairs.map((repair, repairIndex) => (
+                                tickets.flatMap((ticket) => {
+                                    const expanded = expandedDesktopTickets[ticket.id] ?? false;
+                                    const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+                                    return desktopRepairs.map((repair, repairIndex) => (
                                         <RepairDesktopRow
                                             key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
                                             ticket={ticket}
@@ -1731,9 +1742,11 @@ export default function WorkbenchPage({
                                             partInventory={partInventory}
                                             rowIndex={repairIndex}
                                             rowTotal={ticket.repairs.length}
+                                            desktopGroupExpanded={expanded}
+                                            onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
                                         />
-                                    )),
-                                )
+                                    ));
+                                })
                             ) : (
                                 <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets activos para los filtros actuales.</div>
                             )}

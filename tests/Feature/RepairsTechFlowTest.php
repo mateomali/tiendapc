@@ -71,6 +71,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
             'contacto' => '1133445566',
             'jobs' => [
                 [
+                    'marca' => 'MOTOROLA',
                     'modelo' => 'Moto G54',
                     'tipo_servicio' => 'modulo',
                     'descripcion' => '',
@@ -83,6 +84,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
                     'categorias_reparacion' => 1,
                 ],
                 [
+                    'marca' => 'MOTOROLA',
                     'modelo' => 'Moto G54',
                     'tipo_servicio' => 'bateria',
                     'descripcion' => '',
@@ -105,9 +107,11 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
     expect(RepairPayment::query()->where('orden_id', $orderId)->count())->toBe(2);
     expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('descripcion')->all())
         ->toBe([
-            'Cambio de modulo Moto G54',
-            'Cambio de bateria Moto G54',
+            'CAMBIO DE MODULO',
+            'CAMBIO DE BATERIA',
         ]);
+    expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('marca')->all())
+        ->toBe(['MOTOROLA', 'MOTOROLA']);
     expect(RepairDeviceModel::query()->where('model', 'MOTO G54')->value('usage_count'))->toBe(2);
 
     $this->withSession(['repair_tech_authenticated' => true])
@@ -540,7 +544,7 @@ it('updates only the selected job details in a multi-job ticket', function (): v
     expect($first->fresh()?->descripcion)->toBe('No enciende');
     expect($first->fresh()?->estado)->toBe('PENDIENTE');
     expect($second->fresh()?->modelo)->toBe('JOYSTICK PS4 V2');
-    expect($second->fresh()?->descripcion)->toBe('Cambio de pin de carga');
+    expect($second->fresh()?->descripcion)->toBe('CAMBIO DE PIN DE CARGA');
     expect($second->fresh()?->estado)->toBe('EN REPARACION');
 });
 
