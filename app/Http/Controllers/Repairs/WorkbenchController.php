@@ -81,7 +81,9 @@ class WorkbenchController extends Controller
             'states' => $repairService->availableStates(false),
             'serviceCategories' => $this->serviceCategories(),
             'serviceTemplates' => $repairService->serviceTemplates(),
+            'serviceOptionUsage' => $repairService->serviceOptionUsage(),
             'partInventory' => $this->partInventoryOptions(),
+            'deviceModels' => $repairService->deviceModelOptions(),
             'nextOrderId' => $repairService->nextOrderId(),
             'pageMode' => $pageMode,
         ]);
@@ -422,6 +424,21 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Orden actualizada.');
     }
 
+    public function updateInfo(Request $request, RepairOrder $repairOrder): RedirectResponse
+    {
+        $validated = $request->validate([
+            'info' => ['nullable', 'string'],
+        ]);
+
+        $info = trim((string) ($validated['info'] ?? ''));
+
+        RepairOrder::query()
+            ->where('id', $repairOrder->id)
+            ->update(['info' => $info !== '' ? $info : null]);
+
+        return back()->with('success', 'Info interna actualizada.');
+    }
+
     public function updateState(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
         $validated = $request->validate([
@@ -551,6 +568,10 @@ class WorkbenchController extends Controller
             ->map(function (Collection $ticketOrders) use ($delivered): array {
                 /** @var RepairOrder $base */
                 $base = $ticketOrders->sortBy('reparacion')->first();
+                $ticketInfo = $ticketOrders
+                    ->pluck('info')
+                    ->map(fn ($info): string => trim((string) $info))
+                    ->first(fn (string $info): bool => $info !== '') ?: null;
 
                 return [
                     'id' => $base->id,
@@ -560,7 +581,7 @@ class WorkbenchController extends Controller
                     'trackingVerifierLabel' => $base->hasClientDni() ? 'DNI' : 'Codigo',
                     'hasClientDni' => $base->hasClientDni(),
                     'contacto' => $base->contacto,
-                    'info' => $base->info,
+                    'info' => $ticketInfo,
                     'fecha' => optional($base->fecha)->format('Y-m-d'),
                     'repairsCount' => $ticketOrders->count(),
                     'totalMonto' => $ticketOrders->sum(fn (RepairOrder $order): float => (float) $order->monto),
@@ -627,6 +648,7 @@ class WorkbenchController extends Controller
             'payments' => $this->serializePayments($order),
             'actions' => [
                 'update' => route('repairs.orders.update', $order),
+                'info' => route('repairs.orders.info', $order),
                 'addPayment' => route('repairs.orders.payments.store', $order),
                 'state' => route('repairs.orders.state', $order),
                 'deliver' => route('repairs.orders.deliver', $order),

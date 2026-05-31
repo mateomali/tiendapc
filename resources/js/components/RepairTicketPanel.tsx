@@ -961,11 +961,11 @@ function RepairEditCard({
 
     const submitInfo = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
-        if (!repair.actions?.update) return;
+        const action = repair.actions?.info ?? repair.actions?.update;
+        if (!action) return;
 
-        form.post(repair.actions.update, {
+        router.post(action, { info: form.data.info }, {
             preserveScroll: true,
-            forceFormData: true,
             onSuccess: () => setInfoOpen(false),
         });
     };

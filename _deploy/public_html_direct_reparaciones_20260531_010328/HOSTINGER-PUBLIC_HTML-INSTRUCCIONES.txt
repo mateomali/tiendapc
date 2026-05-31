@@ -1,0 +1,35 @@
+HOSTINGER - Bundle directo para public_html
+
+Este ZIP esta armado para descomprimir/copiar directamente dentro de public_html.
+
+Contenido importante:
+- build/: assets compilados que sirven en https://sudokumerlo.com/build/...
+- public/build/: copia de respaldo por si el proyecto tambien usa public/build internamente.
+- app/, routes/, database/migrations/: cambios backend Laravel.
+- resources/js/: fuente React actualizada.
+- sql/hostinger_reparaciones_update.sql: script para phpMyAdmin.
+- sql/hostinger_sync_order_info.sql: sincroniza info interna entre trabajos de la misma orden.
+
+No incluye:
+- .env
+- .git
+- vendor
+- node_modules
+- storage/logs
+- backups ni datos locales
+
+Pasos:
+1. Hacer backup de archivos y base de datos.
+2. Descomprimir este ZIP dentro de public_html, aceptando reemplazar archivos.
+3. Confirmar que exista public_html/build/manifest.json.
+4. En phpMyAdmin, ejecutar sql/hostinger_reparaciones_update.sql si no podes usar SSH.
+5. Si tenes SSH, preferible ejecutar: php artisan migrate --force
+6. Si /consulta muestra rutas viejas de Ziggy, limpiar cache con: php artisan optimize:clear
+7. Abrir https://sudokumerlo.com/build/manifest.json y verificar que aparezca RepairTicketPanel-COHkWew8.js.
+8. Probar https://sudokumerlo.com/consulta con Ctrl + F5.
+9. Si alguna info se guardo en un trabajo pero no aparece en el ticket, ejecutar sql/hostinger_sync_order_info.sql.
+
+Nota:
+- Este build evita que /consulta falle si Ziggy todavia no tiene repairs.metrics cargada.
+
+Commit base incluido: 02be4f1 Improve repair order info and metrics charts

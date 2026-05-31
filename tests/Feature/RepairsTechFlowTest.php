@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\RepairEvent;
+use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -106,6 +107,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
             'Cambio de modulo Moto G54',
             'Cambio de bateria Moto G54',
         ]);
+    expect(RepairDeviceModel::query()->where('model', 'MOTO G54')->value('usage_count'))->toBe(2);
 
     $this->withSession(['repair_tech_authenticated' => true])
         ->get(route('repairs.tickets.show', ['orderId' => $orderId]))
@@ -114,6 +116,46 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
             ->component('Repairs/TicketPage')
             ->where('ticket.nombre_cliente', 'Lucia Gomez')
             ->has('ticket.repairs', 2));
+});
+
+it('uses the device model catalog to keep repair model names unified', function (): void {
+    RepairDeviceModel::query()->create([
+        'category_id' => 1,
+        'brand' => 'SAMSUNG',
+        'model' => 'SAMSUNG A52',
+        'normalized_model' => 'SAMSUNG A52',
+        'usage_count' => 3,
+    ]);
+
+    $response = $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.store'), [
+            'nombre_cliente' => 'Modelo Canonico',
+            'dni' => 30999111,
+            'jobs' => [[
+                'modelo' => 'samsung a52',
+                'descripcion' => 'Cambio de modulo',
+                'observaciones' => '',
+                'monto' => 1000,
+                'senia' => 0,
+                'estado' => 'PENDIENTE',
+                'repuesto' => '',
+                'categorias_reparacion' => 1,
+            ]],
+        ]);
+
+    $order = RepairOrder::query()->latest('id')->firstOrFail();
+
+    $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $order->id]));
+    expect($order->modelo)->toBe('SAMSUNG A52');
+    expect(RepairDeviceModel::query()->where('model', 'SAMSUNG A52')->value('usage_count'))->toBe(4);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.ingress'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('deviceModels.0.model', 'SAMSUNG A52')
+            ->where('serviceOptionUsage.service:modulo', 1));
 });
 
 it('stores successive repair payments as history and updates paid total', function (): void {
@@ -466,7 +508,7 @@ it('updates only the selected job details in a multi-job ticket', function (): v
     expect($first->fresh()?->modelo)->toBe('Notebook');
     expect($first->fresh()?->descripcion)->toBe('No enciende');
     expect($first->fresh()?->estado)->toBe('PENDIENTE');
-    expect($second->fresh()?->modelo)->toBe('Joystick PS4 V2');
+    expect($second->fresh()?->modelo)->toBe('JOYSTICK PS4 V2');
     expect($second->fresh()?->descripcion)->toBe('Cambio de pin de carga');
     expect($second->fresh()?->estado)->toBe('EN REPARACION');
 });
@@ -503,24 +545,8 @@ it('stores internal info notes for the whole repair order', function (): void {
     ]);
 
     $this->withSession(['repair_tech_authenticated' => true])
-        ->post(route('repairs.orders.update', $first), [
-            'id_nuevo' => 930,
-            'fecha' => now()->toDateString(),
-            'nombre_cliente' => 'Cliente Info',
-            'dni' => 30111222,
-            'contacto' => '',
-            'modelo' => 'Moto G',
-            'descripcion' => 'No carga',
-            'observaciones' => 'sin observaciones',
+        ->post(route('repairs.orders.info', $first), [
             'info' => 'Avisar antes de cambiar pin.',
-            'monto' => 18000,
-            'senia' => 0,
-            'fecha_estimada' => null,
-            'estado' => 'PENDIENTE',
-            'repuesto' => '',
-            'repuesto_pedido' => false,
-            'inventory_part_id' => '',
-            'categorias_reparacion' => 4,
         ])
         ->assertRedirect();
 
@@ -533,4 +559,45 @@ it('stores internal info notes for the whole repair order', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/WorkbenchPage')
             ->where('tickets.0.info', 'Avisar antes de cambiar pin.'));
+});
+
+it('reads internal order info from any job in the ticket', function (): void {
+    RepairOrder::query()->create([
+        'id' => 931,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Info Base',
+        'dni' => 30111225,
+        'modelo' => 'Moto G',
+        'descripcion' => 'No carga',
+        'observaciones' => 'sin observaciones',
+        'monto' => 18000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+        'info' => null,
+    ]);
+
+    RepairOrder::query()->create([
+        'id' => 931,
+        'reparacion' => 2,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Info Base',
+        'dni' => 30111225,
+        'modelo' => 'Joystick',
+        'descripcion' => 'Cambio de pin',
+        'observaciones' => 'sin observaciones',
+        'monto' => 9000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+        'info' => 'Nota guardada en otro trabajo.',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => '931']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('tickets.0.info', 'Nota guardada en otro trabajo.'));
 });

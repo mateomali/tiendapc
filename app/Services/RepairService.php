@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\RepairEvent;
+use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
 use App\Models\RepairPart;
@@ -67,6 +68,15 @@ class RepairService
             'description' => '',
             'repuesto' => '',
         ],
+    ];
+
+    private const FAILURE_TEMPLATES = [
+        'No enciende' => 'No enciende.',
+        'Modulo' => 'Cambio de modulo.',
+        'Pin de carga' => 'Falla en pin de carga.',
+        'Bateria' => 'Cambio de bateria.',
+        'Software' => 'Revision de software.',
+        'Humedad' => 'Equipo con posible dano por humedad.',
     ];
 
     private const SUMMARY_RANGE_DAYS = [
@@ -142,6 +152,25 @@ class RepairService
         return ((int) RepairOrder::query()->max('id')) + 1;
     }
 
+    public function deviceModelOptions(): array
+    {
+        return RepairDeviceModel::query()
+            ->orderByDesc('usage_count')
+            ->orderBy('brand')
+            ->orderBy('model')
+            ->limit(600)
+            ->get()
+            ->map(fn (RepairDeviceModel $deviceModel): array => [
+                'id' => $deviceModel->id,
+                'category_id' => $deviceModel->category_id,
+                'brand' => $deviceModel->brand,
+                'model' => $deviceModel->model,
+                'normalized_model' => $deviceModel->normalized_model,
+                'usage_count' => $deviceModel->usage_count,
+            ])
+            ->all();
+    }
+
     public function create(array $payload, array $files = []): RepairOrder
     {
         return DB::transaction(function () use ($payload, $files): RepairOrder {
@@ -165,6 +194,7 @@ class RepairService
 
             foreach ($jobs as $index => $job) {
                 $repairNumber = $index + 1;
+                $model = $this->rememberDeviceModel($job['modelo'], $job['categorias_reparacion']);
                 $images = is_array($jobFiles[$index]['images'] ?? null)
                     ? $jobFiles[$index]['images']
                     : ($repairNumber === 1 ? $sharedImages : []);
@@ -185,7 +215,7 @@ class RepairService
                     'dni' => $dni,
                     'tracking_token' => $trackingToken,
                     'contacto' => $payload['contacto'] ?? null,
-                    'modelo' => $job['modelo'],
+                    'modelo' => $model,
                     'descripcion' => $job['descripcion'],
                     'observaciones' => $job['observaciones'],
                     'info' => $info !== '' ? $info : null,
@@ -228,6 +258,7 @@ class RepairService
             $part = trim((string) ($payload['repuesto'] ?? ''));
             $requestedInventoryPartId = (int) ($payload['inventory_part_id'] ?? 0);
             $allocation = $this->reserveInventoryPart($requestedInventoryPartId, $order->id, $repairNumber);
+            $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4));
 
             if ($requestedInventoryPartId > 0 && $allocation === null) {
                 throw new \RuntimeException('El repuesto seleccionado ya no esta disponible.');
@@ -241,7 +272,7 @@ class RepairService
                 'dni' => $order->dni,
                 'tracking_token' => $order->tracking_token,
                 'contacto' => $order->contacto,
-                'modelo' => $payload['modelo'] ?? null,
+                'modelo' => $model,
                 'descripcion' => $payload['descripcion'],
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $order->info,
@@ -458,6 +489,8 @@ class RepairService
                 ];
             }
 
+            $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4));
+
             $order->fill([
                 'id' => $newOrderId,
                 'nombre_cliente' => $payload['nombre_cliente'],
@@ -465,7 +498,7 @@ class RepairService
                 'tracking_token' => $trackingToken,
                 'contacto' => $payload['contacto'] ?? null,
                 'fecha' => $payload['fecha'] ?? $order->fecha,
-                'modelo' => $payload['modelo'] ?? null,
+                'modelo' => $model,
                 'descripcion' => $payload['descripcion'] ?? null,
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $info !== '' ? $info : null,
@@ -870,6 +903,55 @@ class RepairService
             ])
             ->values()
             ->all();
+    }
+
+    public function serviceOptionUsage(): array
+    {
+        $usage = [];
+
+        foreach (array_keys(self::SERVICE_TEMPLATES) as $value) {
+            $usage['service:' . $value] = 0;
+        }
+
+        foreach (array_keys(self::FAILURE_TEMPLATES) as $label) {
+            $usage['failure:' . $label] = 0;
+        }
+
+        RepairOrder::query()
+            ->select(['descripcion', 'repuesto'])
+            ->where(function ($query): void {
+                $query
+                    ->whereNotNull('descripcion')
+                    ->orWhereNotNull('repuesto');
+            })
+            ->chunk(500, function (Collection $orders) use (&$usage): void {
+                foreach ($orders as $order) {
+                    $description = $this->normalizeUsageText((string) $order->descripcion);
+                    $part = $this->normalizeUsageText((string) $order->repuesto);
+
+                    foreach (self::SERVICE_TEMPLATES as $value => $template) {
+                        $templateDescription = $this->normalizeUsageText((string) $template['description']);
+                        $templatePart = $this->normalizeUsageText((string) $template['repuesto']);
+
+                        if (
+                            ($templateDescription !== '' && str_contains($description, $templateDescription))
+                            || ($templatePart !== '' && str_contains($part, $templatePart))
+                        ) {
+                            $usage['service:' . $value]++;
+                        }
+                    }
+
+                    foreach (self::FAILURE_TEMPLATES as $label => $template) {
+                        $templateText = $this->normalizeUsageText($template);
+
+                        if ($templateText !== '' && str_contains($description, $templateText)) {
+                            $usage['failure:' . $label]++;
+                        }
+                    }
+                }
+            });
+
+        return $usage;
     }
 
     public function recordEvent(RepairOrder $order, string $event, ?string $previousState, ?string $nextState): void
@@ -1282,6 +1364,70 @@ class RepairService
         $afterValue = $normalize($after);
 
         return $beforeValue !== $afterValue && !in_array($afterValue, ['', 'sin observaciones', 'sin observacion'], true);
+    }
+
+    private function rememberDeviceModel(mixed $model, int $categoryId): ?string
+    {
+        $model = trim((string) $model);
+        $normalized = $this->normalizeDeviceModel($model);
+
+        if ($model === '' || $normalized === '' || ! Schema::hasTable('repair_device_models')) {
+            return $normalized !== '' ? $normalized : null;
+        }
+
+        $categoryId = max(1, $categoryId);
+
+        /** @var RepairDeviceModel|null $deviceModel */
+        $deviceModel = RepairDeviceModel::query()
+            ->where('category_id', $categoryId)
+            ->where('normalized_model', $normalized)
+            ->lockForUpdate()
+            ->first();
+
+        if ($deviceModel !== null) {
+            $deviceModel->increment('usage_count');
+
+            return $deviceModel->model;
+        }
+
+        RepairDeviceModel::query()->create([
+            'category_id' => $categoryId,
+            'brand' => $this->detectDeviceBrand($normalized),
+            'model' => $normalized,
+            'normalized_model' => $normalized,
+            'usage_count' => 1,
+        ]);
+
+        return $normalized;
+    }
+
+    private function normalizeDeviceModel(string $model): string
+    {
+        $value = Str::ascii(Str::upper($model));
+        $value = preg_replace('/[^A-Z0-9]+/', ' ', $value) ?? '';
+
+        return trim(preg_replace('/\s+/', ' ', $value) ?? '');
+    }
+
+    private function detectDeviceBrand(string $model): ?string
+    {
+        $normalized = $this->normalizeDeviceModel($model);
+
+        foreach (['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'TCL', 'LG'] as $brand) {
+            if ($normalized === $brand || str_starts_with($normalized, $brand . ' ')) {
+                return $brand;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeUsageText(string $value): string
+    {
+        $value = Str::ascii(Str::lower($value));
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value) ?? '';
+
+        return trim(preg_replace('/\s+/', ' ', $value) ?? '');
     }
 
     /**

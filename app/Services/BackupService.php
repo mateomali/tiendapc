@@ -201,6 +201,7 @@ class BackupService
             'order_items',
             'pages',
             'posts',
+            'repair_device_models',
             'ordenes',
             'orden_eventos',
         ];
@@ -308,6 +309,7 @@ class BackupService
             'order_items',
             'pages',
             'posts',
+            'repair_device_models',
             'ordenes',
             'orden_eventos',
         ];

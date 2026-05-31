@@ -208,6 +208,7 @@ export interface RepairOrderView {
     payments?: RepairPaymentView[];
     actions?: {
         update: string;
+        info?: string;
         addPayment: string;
         state: string;
         deliver: string;
