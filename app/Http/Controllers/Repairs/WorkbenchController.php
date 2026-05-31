@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Repairs;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Repairs\RepairOrderRequest;
 use App\Models\RepairEvent;
+use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
 use App\Models\RepairPart;
 use App\Models\RepairPartBox;
+use App\Models\RepairServiceOption;
 use App\Services\RepairService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -81,6 +83,7 @@ class WorkbenchController extends Controller
             'states' => $repairService->availableStates(false),
             'serviceCategories' => $this->serviceCategories(),
             'serviceTemplates' => $repairService->serviceTemplates(),
+            'failureTemplates' => $repairService->failureTemplates(),
             'serviceOptionUsage' => $repairService->serviceOptionUsage(),
             'partInventory' => $this->partInventoryOptions(),
             'deviceModels' => $repairService->deviceModelOptions(),
@@ -329,6 +332,53 @@ class WorkbenchController extends Controller
             ->all();
     }
 
+    private function uniqueServiceOptionValue(string $type, string $label): string
+    {
+        $base = Str::slug($label, '_') ?: $type;
+        $value = $base;
+        $suffix = 2;
+
+        while (RepairServiceOption::query()->where('type', $type)->where('value', $value)->exists()) {
+            $value = $base . '_' . $suffix++;
+        }
+
+        return $value;
+    }
+
+    private function validateDeviceModel(Request $request): array
+    {
+        return $request->validate([
+            'category_id' => ['required', 'integer', 'min:1'],
+            'brand' => ['nullable', 'string', 'max:80'],
+            'model' => ['required', 'string', 'max:255'],
+        ]);
+    }
+
+    private function canonicalDeviceModel(string $model): string
+    {
+        $value = Str::ascii(Str::upper($model));
+        $value = preg_replace('/[^A-Z0-9]+/', ' ', $value) ?? '';
+
+        return trim(preg_replace('/\s+/', ' ', $value) ?? '');
+    }
+
+    private function brandForDeviceModel(string $model, mixed $brand): ?string
+    {
+        $brand = $this->canonicalDeviceModel((string) $brand);
+
+        if ($brand !== '' && $brand !== 'OTRAS') {
+            return $brand;
+        }
+
+        foreach (['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'] as $knownBrand) {
+            if ($model === $knownBrand || str_starts_with($model, $knownBrand . ' ')) {
+                return $knownBrand;
+            }
+        }
+
+        return null;
+    }
+
     public function lookupByDni(Request $request, RepairService $repairService): JsonResponse
     {
         $validated = $request->validate([
@@ -381,6 +431,112 @@ class WorkbenchController extends Controller
         return Inertia::render('Repairs/MetricsPage', [
             'metrics' => $repairService->metrics(),
         ]);
+    }
+
+    public function lists(RepairService $repairService): Response
+    {
+        return Inertia::render('Repairs/ListsPage', [
+            'serviceCategories' => $this->serviceCategories(),
+            'serviceOptions' => $repairService->serviceOptionRows(),
+            'deviceModels' => $repairService->deviceModelOptions(),
+            'actions' => [
+                'storeServiceOption' => route('repairs.lists.service_options.store'),
+                'storeDeviceModel' => route('repairs.lists.device_models.store'),
+            ],
+        ]);
+    }
+
+    public function storeServiceOption(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'string', 'in:service,failure'],
+            'label' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'repuesto' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $type = (string) $validated['type'];
+        $label = trim((string) $validated['label']);
+
+        RepairServiceOption::query()->create([
+            'type' => $type,
+            'value' => $this->uniqueServiceOptionValue($type, $label),
+            'label' => $label,
+            'description' => trim((string) ($validated['description'] ?? '')),
+            'repuesto' => $type === 'service' ? trim((string) ($validated['repuesto'] ?? '')) : null,
+            'usage_count' => 0,
+            'sort_order' => ((int) RepairServiceOption::query()->where('type', $type)->max('sort_order')) + 1,
+            'active' => true,
+        ]);
+
+        return back()->with('success', 'Opcion agregada.');
+    }
+
+    public function updateServiceOption(Request $request, RepairServiceOption $repairServiceOption): RedirectResponse
+    {
+        $validated = $request->validate([
+            'label' => ['required', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:1000'],
+            'repuesto' => ['nullable', 'string', 'max:120'],
+            'active' => ['nullable', 'boolean'],
+        ]);
+
+        $repairServiceOption->update([
+            'label' => trim((string) $validated['label']),
+            'description' => trim((string) ($validated['description'] ?? '')),
+            'repuesto' => $repairServiceOption->type === 'service' ? trim((string) ($validated['repuesto'] ?? '')) : null,
+            'active' => filter_var($validated['active'] ?? true, FILTER_VALIDATE_BOOL),
+        ]);
+
+        return back()->with('success', 'Opcion actualizada.');
+    }
+
+    public function destroyServiceOption(RepairServiceOption $repairServiceOption): RedirectResponse
+    {
+        $repairServiceOption->delete();
+
+        return back()->with('success', 'Opcion eliminada.');
+    }
+
+    public function storeDeviceModel(Request $request): RedirectResponse
+    {
+        $validated = $this->validateDeviceModel($request);
+        $model = $this->canonicalDeviceModel((string) $validated['model']);
+
+        RepairDeviceModel::query()->updateOrCreate(
+            [
+                'category_id' => (int) $validated['category_id'],
+                'normalized_model' => $model,
+            ],
+            [
+                'brand' => $this->brandForDeviceModel($model, $validated['brand'] ?? null),
+                'model' => $model,
+            ],
+        );
+
+        return back()->with('success', 'Modelo agregado.');
+    }
+
+    public function updateDeviceModel(Request $request, RepairDeviceModel $repairDeviceModel): RedirectResponse
+    {
+        $validated = $this->validateDeviceModel($request);
+        $model = $this->canonicalDeviceModel((string) $validated['model']);
+
+        $repairDeviceModel->update([
+            'category_id' => (int) $validated['category_id'],
+            'brand' => $this->brandForDeviceModel($model, $validated['brand'] ?? null),
+            'model' => $model,
+            'normalized_model' => $model,
+        ]);
+
+        return back()->with('success', 'Modelo actualizado.');
+    }
+
+    public function destroyDeviceModel(RepairDeviceModel $repairDeviceModel): RedirectResponse
+    {
+        $repairDeviceModel->delete();
+
+        return back()->with('success', 'Modelo eliminado.');
     }
 
     public function addPayment(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse

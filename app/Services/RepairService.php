@@ -7,6 +7,7 @@ use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
 use App\Models\RepairPart;
+use App\Models\RepairServiceOption;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -70,7 +71,7 @@ class RepairService
         ],
     ];
 
-    private const FAILURE_TEMPLATES = [
+    public const FAILURE_TEMPLATES = [
         'No enciende' => 'No enciende.',
         'Modulo' => 'Cambio de modulo.',
         'Pin de carga' => 'Falla en pin de carga.',
@@ -167,6 +168,28 @@ class RepairService
                 'model' => $deviceModel->model,
                 'normalized_model' => $deviceModel->normalized_model,
                 'usage_count' => $deviceModel->usage_count,
+            ])
+            ->all();
+    }
+
+    public function serviceOptionRows(): array
+    {
+        return RepairServiceOption::query()
+            ->orderBy('type')
+            ->orderByDesc('usage_count')
+            ->orderBy('sort_order')
+            ->orderBy('label')
+            ->get()
+            ->map(fn (RepairServiceOption $option): array => [
+                'id' => $option->id,
+                'type' => $option->type,
+                'value' => $option->value,
+                'label' => $option->label,
+                'description' => $option->description ?? '',
+                'repuesto' => $option->repuesto ?? '',
+                'usage_count' => $option->usage_count,
+                'sort_order' => $option->sort_order,
+                'active' => $option->active,
             ])
             ->all();
     }
@@ -894,6 +917,24 @@ class RepairService
      */
     public function serviceTemplates(): array
     {
+        if (Schema::hasTable('repair_service_options')) {
+            return RepairServiceOption::query()
+                ->where('type', 'service')
+                ->where('active', true)
+                ->orderByDesc('usage_count')
+                ->orderBy('sort_order')
+                ->orderBy('label')
+                ->get()
+                ->map(fn (RepairServiceOption $option): array => [
+                    'value' => $option->value,
+                    'label' => $option->label,
+                    'description' => $option->description ?? '',
+                    'repuesto' => $option->repuesto ?? '',
+                ])
+                ->values()
+                ->all();
+        }
+
         return collect(self::SERVICE_TEMPLATES)
             ->map(fn (array $template, string $value): array => [
                 'value' => $value,
@@ -905,16 +946,74 @@ class RepairService
             ->all();
     }
 
+    public function failureTemplates(): array
+    {
+        if (Schema::hasTable('repair_service_options')) {
+            return RepairServiceOption::query()
+                ->where('type', 'failure')
+                ->where('active', true)
+                ->orderByDesc('usage_count')
+                ->orderBy('sort_order')
+                ->orderBy('label')
+                ->get()
+                ->map(fn (RepairServiceOption $option): array => [
+                    'value' => $option->value,
+                    'label' => $option->label,
+                    'description' => $option->description ?? '',
+                ])
+                ->values()
+                ->all();
+        }
+
+        return collect(self::FAILURE_TEMPLATES)
+            ->map(fn (string $description, string $label): array => [
+                'value' => Str::slug($label, '_'),
+                'label' => $label,
+                'description' => $description,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function serviceTemplateByValue(string $value): ?array
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        if (Schema::hasTable('repair_service_options')) {
+            /** @var RepairServiceOption|null $option */
+            $option = RepairServiceOption::query()
+                ->where('type', 'service')
+                ->where('value', $value)
+                ->where('active', true)
+                ->first();
+
+            if ($option !== null) {
+                return [
+                    'label' => $option->label,
+                    'description' => $option->description ?? '',
+                    'repuesto' => $option->repuesto ?? '',
+                ];
+            }
+        }
+
+        return self::SERVICE_TEMPLATES[$value] ?? null;
+    }
+
     public function serviceOptionUsage(): array
     {
         $usage = [];
 
-        foreach (array_keys(self::SERVICE_TEMPLATES) as $value) {
-            $usage['service:' . $value] = 0;
+        $serviceTemplates = $this->serviceTemplates();
+        $failureTemplates = $this->failureTemplates();
+
+        foreach ($serviceTemplates as $template) {
+            $usage['service:' . $template['value']] = 0;
         }
 
-        foreach (array_keys(self::FAILURE_TEMPLATES) as $label) {
-            $usage['failure:' . $label] = 0;
+        foreach ($failureTemplates as $template) {
+            $usage['failure:' . $template['value']] = 0;
         }
 
         RepairOrder::query()
@@ -924,12 +1023,12 @@ class RepairService
                     ->whereNotNull('descripcion')
                     ->orWhereNotNull('repuesto');
             })
-            ->chunk(500, function (Collection $orders) use (&$usage): void {
+            ->chunk(500, function (Collection $orders) use (&$usage, $serviceTemplates, $failureTemplates): void {
                 foreach ($orders as $order) {
                     $description = $this->normalizeUsageText((string) $order->descripcion);
                     $part = $this->normalizeUsageText((string) $order->repuesto);
 
-                    foreach (self::SERVICE_TEMPLATES as $value => $template) {
+                    foreach ($serviceTemplates as $template) {
                         $templateDescription = $this->normalizeUsageText((string) $template['description']);
                         $templatePart = $this->normalizeUsageText((string) $template['repuesto']);
 
@@ -937,19 +1036,29 @@ class RepairService
                             ($templateDescription !== '' && str_contains($description, $templateDescription))
                             || ($templatePart !== '' && str_contains($part, $templatePart))
                         ) {
-                            $usage['service:' . $value]++;
+                            $usage['service:' . $template['value']]++;
                         }
                     }
 
-                    foreach (self::FAILURE_TEMPLATES as $label => $template) {
-                        $templateText = $this->normalizeUsageText($template);
+                    foreach ($failureTemplates as $template) {
+                        $templateText = $this->normalizeUsageText((string) $template['description']);
 
                         if ($templateText !== '' && str_contains($description, $templateText)) {
-                            $usage['failure:' . $label]++;
+                            $usage['failure:' . $template['value']]++;
                         }
                     }
                 }
             });
+
+        if (Schema::hasTable('repair_service_options')) {
+            foreach ($usage as $key => $count) {
+                [$type, $value] = explode(':', $key, 2);
+                RepairServiceOption::query()
+                    ->where('type', $type)
+                    ->where('value', $value)
+                    ->update(['usage_count' => $count]);
+            }
+        }
 
         return $usage;
     }
@@ -1413,7 +1522,7 @@ class RepairService
     {
         $normalized = $this->normalizeDeviceModel($model);
 
-        foreach (['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'TCL', 'LG'] as $brand) {
+        foreach (['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'] as $brand) {
             if ($normalized === $brand || str_starts_with($normalized, $brand . ' ')) {
                 return $brand;
             }
@@ -1463,7 +1572,7 @@ class RepairService
             ->filter(fn ($job): bool => is_array($job))
             ->map(function (array $job): array {
                 $serviceType = trim((string) ($job['tipo_servicio'] ?? ''));
-                $template = self::SERVICE_TEMPLATES[$serviceType] ?? null;
+                $template = $this->serviceTemplateByValue($serviceType);
                 $model = trim((string) ($job['modelo'] ?? ''));
                 $description = trim((string) ($job['descripcion'] ?? ''));
                 $fallbackDescription = trim((string) ($template['description'] ?? ''));

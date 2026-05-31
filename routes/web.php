@@ -57,6 +57,13 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/entregados', [WorkbenchController::class, 'delivered'])->name('repairs.delivered');
     Route::get('/entregados.php', [WorkbenchController::class, 'delivered']);
     Route::get('/metricas', [WorkbenchController::class, 'metrics'])->name('repairs.metrics');
+    Route::get('/listas-reparacion', [WorkbenchController::class, 'lists'])->name('repairs.lists');
+    Route::post('/listas-reparacion/opciones', [WorkbenchController::class, 'storeServiceOption'])->name('repairs.lists.service_options.store');
+    Route::post('/listas-reparacion/opciones/{repairServiceOption}', [WorkbenchController::class, 'updateServiceOption'])->name('repairs.lists.service_options.update');
+    Route::post('/listas-reparacion/opciones/{repairServiceOption}/eliminar', [WorkbenchController::class, 'destroyServiceOption'])->name('repairs.lists.service_options.delete');
+    Route::post('/listas-reparacion/modelos', [WorkbenchController::class, 'storeDeviceModel'])->name('repairs.lists.device_models.store');
+    Route::post('/listas-reparacion/modelos/{repairDeviceModel}', [WorkbenchController::class, 'updateDeviceModel'])->name('repairs.lists.device_models.update');
+    Route::post('/listas-reparacion/modelos/{repairDeviceModel}/eliminar', [WorkbenchController::class, 'destroyDeviceModel'])->name('repairs.lists.device_models.delete');
     Route::get('/repuestos', [WorkbenchController::class, 'parts'])->name('repairs.parts');
     Route::get('/repuestos.php', [WorkbenchController::class, 'parts']);
     Route::post('/repairs/parts/inventory', [WorkbenchController::class, 'storePartInventory'])->name('repairs.parts.inventory.store');

@@ -4,6 +4,7 @@ use App\Models\RepairEvent;
 use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
+use App\Models\RepairServiceOption;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('authenticates repair tech users and renders workbench', function (): void {
@@ -156,6 +157,36 @@ it('uses the device model catalog to keep repair model names unified', function 
             ->component('Repairs/WorkbenchPage')
             ->where('deviceModels.0.model', 'SAMSUNG A52')
             ->where('serviceOptionUsage.service:modulo', 1));
+});
+
+it('allows managing repair intake lists', function (): void {
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.lists'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/ListsPage')
+            ->has('serviceOptions')
+            ->has('deviceModels'));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.lists.service_options.store'), [
+            'type' => 'failure',
+            'label' => 'Microfono',
+            'description' => 'Falla de microfono.',
+        ])
+        ->assertRedirect();
+
+    expect(RepairServiceOption::query()->where('type', 'failure')->where('label', 'Microfono')->exists())->toBeTrue();
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.lists.device_models.store'), [
+            'category_id' => 1,
+            'brand' => 'ALCATEL',
+            'model' => 'alcatel 1se',
+        ])
+        ->assertRedirect();
+
+    expect(RepairDeviceModel::query()->where('model', 'ALCATEL 1SE')->where('brand', 'ALCATEL')->exists())->toBeTrue();
 });
 
 it('stores successive repair payments as history and updates paid total', function (): void {

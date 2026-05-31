@@ -19,6 +19,12 @@ interface ServiceTemplateOption {
     repuesto: string;
 }
 
+interface FailureTemplateOption {
+    value: string;
+    label: string;
+    description: string;
+}
+
 interface RepairPartInventoryOption {
     id: number;
     quantity: number;
@@ -74,6 +80,7 @@ interface WorkbenchPageProps {
     states: string[];
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates: ServiceTemplateOption[];
+    failureTemplates: FailureTemplateOption[];
     serviceOptionUsage: Record<string, number>;
     partInventory: RepairPartInventoryOption[];
     deviceModels: DeviceModelOption[];
@@ -129,7 +136,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
     };
 }
 
-const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'TCL', 'LG', 'OTRAS'] as const;
+const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
 
 function normalizeDeviceSearch(value: string): string {
     return value
@@ -292,6 +299,7 @@ export default function WorkbenchPage({
     states,
     serviceCategories,
     serviceTemplates,
+    failureTemplates,
     serviceOptionUsage,
     partInventory,
     deviceModels,
@@ -726,14 +734,6 @@ export default function WorkbenchPage({
     const guidedInputClass = (field: CreateFlowField, baseClass = compactInputClass): string => cn(baseClass, isGuidedField(field) && 'border-[#2563eb] bg-[#eff6ff] ring-2 ring-[#2563eb24]');
     const guidedInlineLabelClass = (field: CreateFlowField): string => cn(repairLabelClass, isGuidedField(field) && guidedLabelClass);
 
-    const failureTemplates = [
-        { label: 'No enciende', value: 'No enciende.' },
-        { label: 'Modulo', value: 'Cambio de modulo.' },
-        { label: 'Pin de carga', value: 'Falla en pin de carga.' },
-        { label: 'Bateria', value: 'Cambio de bateria.' },
-        { label: 'Software', value: 'Revision de software.' },
-        { label: 'Humedad', value: 'Equipo con posible dano por humedad.' },
-    ];
     const descriptionOptions = [
         ...serviceTemplates.map((template) => ({
             key: `service:${template.value}`,
@@ -743,11 +743,11 @@ export default function WorkbenchPage({
             usage: serviceOptionUsage[`service:${template.value}`] ?? 0,
         })),
         ...failureTemplates.map((template) => ({
-            key: `failure:${template.label}`,
+            key: `failure:${template.value}`,
             label: template.label,
             type: 'failure' as const,
-            value: template.value,
-            usage: serviceOptionUsage[`failure:${template.label}`] ?? 0,
+            value: template.description,
+            usage: serviceOptionUsage[`failure:${template.value}`] ?? 0,
         })),
     ].sort((left, right) => right.usage - left.usage || left.label.localeCompare(right.label, 'es', { sensitivity: 'base' }));
 

@@ -1,0 +1,27 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+    RewriteRule ^(?:laravel_app)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:composer\.(?:json|lock)|package(?:-lock)?\.json|vite\.config\.(?:js|ts)|tsconfig\.json)$ - [F,L,NC]
+    RewriteRule ^reparacion/?$ reparacion.php [L,QSA,NC]
+    RewriteRule ^reparaciones/?$ reparaciones.php [L,QSA,NC]
+
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>

@@ -1,6 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { FaChartBar, FaExternalLinkAlt, FaHome, FaInbox, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
+import { FaChartBar, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
 import { FlashMessages } from '../components/FlashMessages';
 import type { SharedPageProps } from '../types';
 import { cn } from '../utils';
@@ -38,6 +38,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
         { href: route('repairs.workbench'), label: 'Consultas', shortLabel: 'Cons.', match: '/consulta', icon: <FaSearch aria-hidden="true" /> },
         { href: route('repairs.ingress'), label: 'Nueva Orden', shortLabel: 'Ingreso', match: '/ingreso', icon: <FaInbox aria-hidden="true" /> },
         { href: route('repairs.parts'), label: 'Repuestos', shortLabel: 'Rep.', match: '/repuestos', icon: <FaTools aria-hidden="true" /> },
+        { href: route('repairs.lists'), label: 'Listas', shortLabel: 'Listas', match: '/listas-reparacion', icon: <FaList aria-hidden="true" /> },
         ...(hasZiggyRoute('repairs.metrics') ? [{ href: route('repairs.metrics'), label: 'Metricas', shortLabel: 'Met.', match: '/metricas', icon: <FaChartBar aria-hidden="true" /> }] : []),
         { href: route('repairs.delivered'), label: 'Entregados', shortLabel: 'Entreg.', match: '/entregados', icon: <FaTools aria-hidden="true" /> },
         { href: route('repairs.tracking'), label: 'Consulta publica', shortLabel: 'Publica', match: '/reparacion', icon: <FaSearch aria-hidden="true" /> },
