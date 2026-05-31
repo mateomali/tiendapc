@@ -141,6 +141,40 @@ it('allows delivering repairs with explicit date and delivery channel', function
     expect(RepairEvent::query()->where('orden_id', 777)->where('evento', 'ENTREGA_VIA_TICKET')->exists())->toBeTrue();
 });
 
+it('allows moving cancelled repairs to delivered while preserving cancelled state', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 778,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Cancelado',
+        'dni' => 33444556,
+        'modelo' => 'Moto G',
+        'descripcion' => 'No continua reparacion',
+        'estado' => 'CANCELADA',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.deliver', $order), [
+            'fecha_entregado' => '2026-04-24',
+            'entrega_via' => 'persona',
+        ])
+        ->assertRedirect();
+
+    $updated = $order->fresh();
+
+    expect($updated?->entregado)->toBe('si');
+    expect($updated?->estado)->toBe('CANCELADA');
+    expect(optional($updated?->fecha_entregado)->format('Y-m-d'))->toBe('2026-04-24');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.delivered', ['q' => 'Cliente Cancelado']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/DeliveredPage')
+            ->where('tickets.0.repairs.0.estado', 'CANCELADA'));
+});
+
 it('marks only the selected job as ready in a multi-job ticket', function (): void {
     $first = RepairOrder::query()->create([
         'id' => 913,

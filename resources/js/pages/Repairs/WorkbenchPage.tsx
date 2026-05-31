@@ -718,11 +718,41 @@ export default function WorkbenchPage({
                     </button>
                 </form>
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-bold text-[#334155]">
-                    <span className="rounded-md bg-[#eff6ff] px-2 py-1">Todas {summary.active}</span>
-                    <span className="rounded-md bg-[#fff7ed] px-2 py-1">Pend. {summary.pending}</span>
-                    <span className="rounded-md bg-[#ecfdf5] px-2 py-1">Listas {summary.ready}</span>
-                    <span className="rounded-md bg-[#fff1f2] px-2 py-1">Venc. {summary.overdue}</span>
-                    <span className="rounded-md bg-[#fefce8] px-2 py-1">Hoy {summary.today}</span>
+                    <Link
+                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: undefined }))}
+                        preserveScroll
+                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', !filters.estado && !filters.prioridad ? 'bg-white text-[#1d4ed8] ring-2 ring-[#bfdbfe]' : 'bg-[#eff6ff] text-[#334155]')}
+                    >
+                        Todas {summary.active}
+                    </Link>
+                    <Link
+                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'PENDIENTE', prioridad: undefined }))}
+                        preserveScroll
+                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'PENDIENTE' ? 'bg-white text-[#d97706] ring-2 ring-[#fed7aa]' : 'bg-[#fff7ed] text-[#334155]')}
+                    >
+                        Pend. {summary.pending}
+                    </Link>
+                    <Link
+                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'LISTA', prioridad: undefined }))}
+                        preserveScroll
+                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'LISTA' ? 'bg-white text-[#15803d] ring-2 ring-[#bbf7d0]' : 'bg-[#ecfdf5] text-[#334155]')}
+                    >
+                        Listas {summary.ready}
+                    </Link>
+                    <Link
+                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'vencidas' }))}
+                        preserveScroll
+                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
+                    >
+                        Venc. {summary.overdue}
+                    </Link>
+                    <Link
+                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'hoy' }))}
+                        preserveScroll
+                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'hoy' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
+                    >
+                        Hoy {summary.today}
+                    </Link>
                 </div>
             </section>
             ) : null}
@@ -1120,10 +1150,10 @@ export default function WorkbenchPage({
                                             <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={cn(compactInputClass, 'number-input-no-spinners')} type="number" step="100" min="0" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={compactInputClass} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Sena ($)<input className={cn(compactInputClass, 'number-input-no-spinners')} type="number" step="100" min="0" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
+                                            <label className={repairLabelClass}>Sena ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
                                         </div>
                                         <div className={fieldPanelAmber}>
                                             <label className={repairLabelClass}>Fecha estimada<input className={compactInputClass} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>

@@ -682,10 +682,10 @@ function AddRepairModal({
                             <input className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                         </EditField>
                         <EditField label="Monto">
-                            <input className={cn(ui.input, 'number-input-no-spinners')} type="number" step="100" min="0" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                            <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
                         </EditField>
                         <EditField label="Senia">
-                            <input className={cn(ui.input, 'number-input-no-spinners')} type="number" step="100" min="0" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
+                            <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
                         </EditField>
                     </div>
                 </EditSection>
@@ -840,7 +840,7 @@ function RepairEditCard({
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'].includes(repair.estado);
-    const canDeliver = repair.estado === 'LISTA' && repair.entregado !== 'si';
+    const canDeliver = ['LISTA', 'CANCELADA'].includes(repair.estado) && repair.entregado !== 'si';
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'LISTA'].includes(repair.estado);
     const nextStatus = nextQuickStatus(repair.estado);
