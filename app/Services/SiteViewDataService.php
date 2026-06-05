@@ -69,7 +69,7 @@ class SiteViewDataService
             'repairUrl' => $repairUrl,
             'footer' => [
                 'address' => $this->value('footer_address', 'Av. Jose de San Martin 2658, Parque San Martin, Merlo'),
-                'hours' => $this->value('footer_hours', 'Lunes a sabados de 10:30 a 13:30 y 17:00 a 20:30'),
+                'hours' => $this->value('footer_hours', 'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30'),
                 'mapUrl' => $this->value('footer_map_url', 'https://maps.google.com/maps?q=sudoku%20merlo&t=m&z=13&output=embed&iwloc=near'),
                 'ctaTitle' => $this->value('footer_cta_title', 'Queres consultar algo?'),
                 'ctaText' => $this->value('footer_cta_text', 'Escribinos por WhatsApp:'),

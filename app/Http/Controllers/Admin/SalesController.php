@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaleStoreRequest;
 use App\Models\Product;
 use App\Models\Sale;
+use App\Models\SiteContactConfig;
+use App\Models\SiteGlobalConfig;
 use App\Services\SaleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -109,6 +111,7 @@ class SalesController extends Controller
         $sale->load('items');
 
         return Inertia::render('Admin/TicketPage', [
+            'business' => $this->ticketBusinessData(),
             'sale' => [
                 'id' => $sale->id,
                 'ticket_number_display' => $sale->ticketNumberDisplay(),
@@ -227,6 +230,36 @@ class SalesController extends Controller
             'description_excerpt' => mb_substr($plainDescription, 0, 120) . (mb_strlen($plainDescription) > 120 ? '...' : ''),
             'exact_sku_match' => $normalizedQuery !== '' && $normalizedQuery === $normalizedSku,
         ];
+    }
+
+    /**
+     * @return array{name:string,address:string,whatsapp:string,hours:string}
+     */
+    private function ticketBusinessData(): array
+    {
+        $contact = SiteContactConfig::query()->find(1);
+
+        return [
+            'name' => 'SUDOKU JUGUETERIA & ELECTRONICA',
+            'address' => (string) SiteGlobalConfig::value('footer_address', 'Av. Jose de San Martin 2658, Merlo'),
+            'whatsapp' => $this->formatWhatsappNumber((string) ($contact?->whatsapp_number ?: SiteGlobalConfig::value('whatsapp_number', config('tienda.whatsapp_number')))),
+            'hours' => (string) SiteGlobalConfig::value('footer_hours', 'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30'),
+        ];
+    }
+
+    private function formatWhatsappNumber(string $number): string
+    {
+        $digits = preg_replace('/\D+/', '', $number) ?? '';
+
+        if (str_starts_with($digits, '54') && strlen($digits) >= 12) {
+            $digits = substr($digits, 2);
+        }
+
+        if (strlen($digits) === 10) {
+            return sprintf('%s %s-%s', substr($digits, 0, 2), substr($digits, 2, 4), substr($digits, 6));
+        }
+
+        return $digits !== '' ? $digits : '-';
     }
 
     /**

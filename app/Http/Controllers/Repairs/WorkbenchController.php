@@ -11,6 +11,7 @@ use App\Models\RepairPayment;
 use App\Models\RepairPart;
 use App\Models\RepairPartBox;
 use App\Models\RepairServiceOption;
+use App\Models\SiteGlobalConfig;
 use App\Services\RepairService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -643,6 +644,7 @@ class WorkbenchController extends Controller
                 'totalSenia' => $ticket['totalSenia'],
                 'saldo' => max(0, (float) $ticket['totalMonto'] - (float) $ticket['totalSenia']),
             ],
+            'businessHours' => $this->businessHours(),
             'returnUrl' => route('repairs.workbench'),
         ]);
     }
@@ -898,6 +900,14 @@ class WorkbenchController extends Controller
             ['value' => 3, 'label' => 'Consolas'],
             ['value' => 4, 'label' => 'Varios'],
         ];
+    }
+
+    private function businessHours(): string
+    {
+        return (string) SiteGlobalConfig::value(
+            'footer_hours',
+            'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30',
+        );
     }
 
     private function customerWhatsappUrl(RepairOrder $order): ?string

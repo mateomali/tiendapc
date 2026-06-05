@@ -33,7 +33,7 @@ class DatabaseSeeder extends Seeder
         ]);
         SiteGlobalConfig::putValue('whatsapp_number', config('tienda.whatsapp_number'));
         SiteGlobalConfig::putValue('footer_address', 'Av. Jose de San Martin 2658, Parque San Martin, Merlo');
-        SiteGlobalConfig::putValue('footer_hours', 'Lunes a sabados de 10:30 a 13:30 y 17:00 a 20:30');
+        SiteGlobalConfig::putValue('footer_hours', 'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30');
         SiteGlobalConfig::putValue('footer_map_url', 'https://maps.google.com/maps?q=sudoku%20merlo&t=m&z=13&output=embed&iwloc=near');
         SiteGlobalConfig::putValue('footer_cta_title', 'Queres consultar algo?');
         SiteGlobalConfig::putValue('footer_cta_text', 'Escribinos por WhatsApp:');

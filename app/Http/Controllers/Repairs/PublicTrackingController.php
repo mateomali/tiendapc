@@ -572,7 +572,7 @@ class PublicTrackingController extends Controller
 
     private function businessHours(): string
     {
-        return $this->value('footer_hours', 'lunes a viernes de 10:30 a 14:00 y de 17:00 a 20:30 | sábados de 17:00 a 20:30');
+        return $this->value('footer_hours', 'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30');
     }
 
     private function mapUrl(): string

@@ -12,10 +12,11 @@ interface TicketPageProps {
         totalSenia: number;
         saldo: number;
     };
+    businessHours: string;
     returnUrl: string;
 }
 
-export default function TicketPage({ ticket, summary, returnUrl }: TicketPageProps): JSX.Element {
+export default function TicketPage({ ticket, summary, businessHours, returnUrl }: TicketPageProps): JSX.Element {
     const [qrUrl, setQrUrl] = useState<string>('');
     const now = new Date();
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -63,9 +64,13 @@ export default function TicketPage({ ticket, summary, returnUrl }: TicketPagePro
                     <div className="hidden print:block print:h-[4mm]" />
 
                     <header className="text-center">
-                        <div className="text-[14px]">SUDOKU</div>
+                        <div className="text-[17px] font-black leading-[1.05] tracking-[0.04em]">SUDOKU</div>
                         <div className="text-[11px] leading-[1.15]">AV. JOSE DE SAN MARTIN 2658 - MERLO</div>
-                        <div className="text-[11px] leading-[1.15]">WHATSAPP: 1128974824</div>
+                        <div className="mx-auto my-[3px] w-full border-t border-dashed border-black pt-[3px]">
+                            <span className="text-[10px] leading-[1.05]">WHATSAPP: </span>
+                            <strong className="text-[12.5px] leading-[1.05] tracking-[0.02em]">1128974824</strong>
+                        </div>
+                        <div className="mx-auto mt-[2px] max-w-[68mm] text-[9.5px] leading-[1.15]">HORARIO DE ATENCION: {businessHours}</div>
                     </header>
 
                     <div className="my-[5px] border-t border-dashed border-black" />

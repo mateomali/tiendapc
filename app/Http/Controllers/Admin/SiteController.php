@@ -362,7 +362,7 @@ class SiteController extends Controller
             'whatsapp_number' => SiteGlobalConfig::value('whatsapp_number', SiteContactConfig::query()->find(1)?->whatsapp_number ?? config('tienda.whatsapp_number')),
             'reparaciones_url' => SiteGlobalConfig::value('reparaciones_url', route('repairs.tracking')),
             'footer_address' => SiteGlobalConfig::value('footer_address', 'Merlo, Buenos Aires'),
-            'footer_hours' => SiteGlobalConfig::value('footer_hours', 'Lunes a sabados'),
+            'footer_hours' => SiteGlobalConfig::value('footer_hours', 'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30'),
             'footer_map_url' => SiteGlobalConfig::value('footer_map_url', ''),
             'footer_cta_title' => SiteGlobalConfig::value('footer_cta_title', 'Hablemos'),
             'footer_cta_text' => SiteGlobalConfig::value('footer_cta_text', 'Escribinos por WhatsApp para consultar stock, reparaciones y presupuestos.'),
