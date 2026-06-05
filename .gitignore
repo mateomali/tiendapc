@@ -18,6 +18,7 @@
 /auth.json
 /node_modules
 /dist
+/tmp/local-server/
 /backup
 /deploy-sudoku-app-hotfix
 /public/build
