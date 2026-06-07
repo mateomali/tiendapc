@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Schema;
 
 class RepairTaskItem extends Model
 {
@@ -23,6 +24,8 @@ class RepairTaskItem extends Model
 
     public function repairOrder(): BelongsTo
     {
-        return $this->belongsTo(RepairOrder::class, 'repair_order_registro_id', 'registro_id');
+        $ownerKey = Schema::hasColumn('ordenes', 'registro_id') ? 'registro_id' : 'id';
+
+        return $this->belongsTo(RepairOrder::class, 'repair_order_registro_id', $ownerKey);
     }
 }
