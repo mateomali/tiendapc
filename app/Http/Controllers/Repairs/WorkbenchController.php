@@ -863,7 +863,7 @@ class WorkbenchController extends Controller
                 ->oldest('id')
                 ->pluck('repair_order_registro_id')
                 ->values()
-                ->mapWithKeys(fn (int $registroId, int $index): array => [$registroId => $index + 1])
+                ->mapWithKeys(fn ($registroId, int $index): array => [(int) $registroId => $index + 1])
                 ->all();
         }
 
