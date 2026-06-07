@@ -1,6 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { FaChartBar, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
+import { FaChartBar, FaClipboardCheck, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
 import { FlashMessages } from '../components/FlashMessages';
 import type { SharedPageProps } from '../types';
 import { cn } from '../utils';
@@ -36,6 +36,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
         { href: route('admin.app'), label: 'Sudoku App', shortLabel: 'App', match: '/admin', icon: <FaHome aria-hidden="true" /> },
         { href: route('admin.products.index'), label: 'Productos y ventas', shortLabel: 'Prod.', match: '/admin/productos', icon: <FaExternalLinkAlt aria-hidden="true" /> },
         { href: route('repairs.workbench'), label: 'Consultas', shortLabel: 'Cons.', match: '/consulta', icon: <FaSearch aria-hidden="true" /> },
+        ...(hasZiggyRoute('tasks.index') ? [{ href: route('tasks.index'), label: 'Tareas', shortLabel: 'Tareas', match: '/tareas', icon: <FaClipboardCheck aria-hidden="true" /> }] : []),
         { href: route('repairs.ingress'), label: 'Nueva Orden', shortLabel: 'Ingreso', match: '/ingreso', icon: <FaInbox aria-hidden="true" /> },
         { href: route('repairs.parts'), label: 'Repuestos', shortLabel: 'Rep.', match: '/repuestos', icon: <FaTools aria-hidden="true" /> },
         { href: route('repairs.lists'), label: 'Listas', shortLabel: 'Listas', match: '/listas-reparacion', icon: <FaList aria-hidden="true" /> },

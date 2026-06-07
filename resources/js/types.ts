@@ -203,6 +203,7 @@ export interface RepairOrderView {
     inventory_part_model?: string | null;
     inventory_part_box?: string | null;
     categorias_reparacion: number;
+    taskQueuePosition?: number | null;
     imagenes: RepairImageView[];
     imagenes_finales: RepairImageView[];
     events?: RepairEventView[];
@@ -221,6 +222,7 @@ export interface RepairOrderView {
         removeOriginalImage: string;
         addFinalImages: string;
         removeFinalImage: string;
+        addToTasks?: string;
     };
     availableStates?: string[];
 }

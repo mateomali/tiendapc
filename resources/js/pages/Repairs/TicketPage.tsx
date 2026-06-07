@@ -104,9 +104,7 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                                         <span className="block">FALLA:</span>
                                         <strong className="mt-px block break-words text-left">{failureLabel}</strong>
                                     </div>
-                                    {deliveredLabel !== null ? (
-                                        <TicketLine label="TOTAL:" value={deliveredLabel} />
-                                    ) : senia > 0 ? (
+                                    {senia > 0 ? (
                                         <>
                                             <TicketLine label="PRESUPUESTO:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
                                             <TicketLine label="SENA:" value={formatCurrency(senia)} />
@@ -115,6 +113,9 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                                     ) : (
                                         <TicketLine label="TOTAL:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
                                     )}
+                                    {deliveredLabel !== null ? (
+                                        <TicketLine label="ENTREGA:" value={deliveredLabel} />
+                                    ) : null}
                                 </div>
                             );
                         })}

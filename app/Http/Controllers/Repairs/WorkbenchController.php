@@ -10,6 +10,7 @@ use App\Models\RepairOrder;
 use App\Models\RepairPayment;
 use App\Models\RepairPart;
 use App\Models\RepairPartBox;
+use App\Models\RepairTaskItem;
 use App\Models\RepairServiceOption;
 use App\Models\SiteGlobalConfig;
 use App\Services\RepairService;
@@ -24,6 +25,9 @@ use RuntimeException;
 
 class WorkbenchController extends Controller
 {
+    /** @var array<int, int>|null */
+    private ?array $taskQueuePositions = null;
+
     public function consultations(Request $request, RepairService $repairService): Response
     {
         $user = $request->user();
@@ -817,6 +821,7 @@ class WorkbenchController extends Controller
             'inventory_part_model' => $order->inventory_part_model,
             'inventory_part_box' => $order->inventory_part_box,
             'categorias_reparacion' => $order->categorias_reparacion,
+            'taskQueuePosition' => $this->taskQueuePosition($order),
             'imagenes' => $this->serializeImages($order->originalImages(), $order, false),
             'imagenes_finales' => $this->serializeImages($order->finalImages(), $order, true),
             'events' => $order->events()->get()->map(fn (RepairEvent $event): array => [
@@ -842,9 +847,27 @@ class WorkbenchController extends Controller
                 'removeOriginalImage' => route('repairs.orders.images.remove', $order),
                 'addFinalImages' => route('repairs.orders.final_images.add', $order),
                 'removeFinalImage' => route('repairs.orders.final_images.remove', $order),
+                'addToTasks' => route('tasks.add_repair', $order),
             ],
             'availableStates' => app(RepairService::class)->availableStates($delivered),
         ];
+    }
+
+    private function taskQueuePosition(RepairOrder $order): ?int
+    {
+        if ($this->taskQueuePositions === null) {
+            $this->taskQueuePositions = RepairTaskItem::query()
+                ->whereDate('task_date', now()->toDateString())
+                ->whereNull('completed_at')
+                ->oldest('created_at')
+                ->oldest('id')
+                ->pluck('repair_order_registro_id')
+                ->values()
+                ->mapWithKeys(fn (int $registroId, int $index): array => [$registroId => $index + 1])
+                ->all();
+        }
+
+        return $this->taskQueuePositions[$order->registro_id] ?? null;
     }
 
     /**

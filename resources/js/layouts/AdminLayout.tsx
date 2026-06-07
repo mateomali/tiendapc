@@ -30,6 +30,7 @@ const linkGroups: AdminLinkGroup[] = [
         label: 'Operacion',
         links: [
             { href: route('admin.dashboard'), label: 'Dashboard', match: '/admin/panel' },
+            { href: route('admin.tasks.index'), label: 'Tareas', match: '/admin/tareas' },
             { href: route('admin.sales.index'), label: 'Ventas', match: '/admin/ventas' },
             { href: route('admin.products.index'), label: 'Productos', match: '/admin/productos' },
             { href: route('admin.categories.index'), label: 'Categorias', match: '/admin/categorias' },

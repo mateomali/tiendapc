@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\ProductController;
 use App\Http\Controllers\Admin\SalesController;
 use App\Http\Controllers\Admin\SiteController;
+use App\Http\Controllers\Admin\TaskController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\DebugController;
@@ -87,11 +88,16 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::post('/repairs/orders/{repairOrder}/cancel', [WorkbenchController::class, 'cancel'])->name('repairs.orders.cancel');
     Route::post('/repairs/orders/{repairOrder}/move-back', [WorkbenchController::class, 'moveBack'])->name('repairs.orders.move_back');
     Route::post('/repairs/orders/{repairOrder}/delete', [WorkbenchController::class, 'destroy'])->name('repairs.orders.delete');
+    Route::get('/tareas', [TaskController::class, 'index'])->name('tasks.index');
+    Route::post('/tareas/agregar/{repairOrder}', [TaskController::class, 'addRepair'])->name('tasks.add_repair');
+    Route::post('/tareas/listo/{taskItem}', [TaskController::class, 'complete'])->name('tasks.complete');
+    Route::post('/tareas/quitar/{taskItem}', [TaskController::class, 'remove'])->name('tasks.remove');
 });
 
 Route::middleware(['auth', 'role:admin,editor'])->group(function (): void {
     Route::get('/admin', AppHomeController::class)->name('admin.app');
     Route::get('/admin/panel', DashboardController::class)->name('admin.dashboard');
+    Route::get('/admin/tareas', [TaskController::class, 'index'])->name('admin.tasks.index');
 
     Route::get('/admin/anuncios', [SiteController::class, 'announcements'])->name('admin.announcements.index');
     Route::post('/admin/anuncios/guardar', [SiteController::class, 'saveAnnouncements'])->name('admin.announcements.save');

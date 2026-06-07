@@ -370,6 +370,48 @@ it('allows delivering repairs with explicit date and delivery channel', function
     expect(RepairEvent::query()->where('orden_id', 777)->where('evento', 'ENTREGA_VIA_TICKET')->exists())->toBeTrue();
 });
 
+it('keeps delivered job data visible when reopening a multi job ticket', function (): void {
+    RepairOrder::query()->create([
+        'id' => 779,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Ticket Mixto',
+        'dni' => 33444557,
+        'modelo' => 'Equipo Entregado',
+        'descripcion' => 'Trabajo terminado',
+        'monto' => 25000,
+        'senia' => 5000,
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'fecha_entregado' => '2026-04-25',
+    ]);
+    RepairOrder::query()->create([
+        'id' => 779,
+        'reparacion' => 2,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Ticket Mixto',
+        'dni' => 33444557,
+        'modelo' => 'Equipo Activo',
+        'descripcion' => 'Trabajo pendiente',
+        'monto' => 18000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.tickets.show', ['orderId' => 779]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/TicketPage')
+            ->has('ticket.repairs', 2)
+            ->where('ticket.repairs.0.monto', '25000.00')
+            ->where('ticket.repairs.0.senia', '5000.00')
+            ->where('ticket.repairs.0.entregado', 'si')
+            ->where('ticket.repairs.0.fecha_entregado', '2026-04-25')
+            ->where('ticket.repairs.1.entregado', 'no'));
+});
+
 it('allows moving cancelled repairs to delivered while preserving cancelled state', function (): void {
     $order = RepairOrder::query()->create([
         'id' => 778,

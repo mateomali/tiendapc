@@ -4,6 +4,7 @@ import {
     FaArrowRight,
     FaCamera,
     FaCheckCircle,
+    FaClipboardCheck,
     FaChevronDown,
     FaDollyFlatbed,
     FaEdit,
@@ -43,7 +44,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(11rem,1.14fr)_minmax(11rem,1.15fr)_5.5rem_4.6rem_6.5rem_minmax(16rem,0.95fr)]';
+    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(11rem,1.14fr)_minmax(9rem,0.92fr)_5.5rem_4.6rem_6.5rem_minmax(19rem,1.18fr)]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -988,6 +989,7 @@ function RepairEditCard({
     const canDeliver = ['LISTA', 'CANCELADA'].includes(repair.estado) && repair.entregado !== 'si';
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'LISTA'].includes(repair.estado);
+    const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
     const nextStatus = nextQuickStatus(repair.estado);
     const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni);
     const hasInfo = (ticket.info ?? '').trim() !== '';
@@ -1175,6 +1177,11 @@ function RepairEditCard({
         }
     };
 
+    const addToTasks = (): void => {
+        if (!repair.actions?.addToTasks) return;
+        router.post(repair.actions.addToTasks, {}, { preserveScroll: true });
+    };
+
     const cancelRepair = (): void => {
         if (!repair.actions?.cancel) return;
         if (window.confirm(`Cancelar orden #${repair.id} trabajo #${repair.reparacion}?`)) {
@@ -1291,64 +1298,93 @@ function RepairEditCard({
         const base = mobile
             ? 'grid h-9 w-9 place-items-center rounded-xl text-[0.78rem] no-underline shadow-sm'
             : 'grid h-7 w-7 place-items-center rounded-md text-[0.72rem] no-underline shadow-sm transition hover:brightness-95';
+        const groupClass = mobile
+            ? 'flex items-center gap-1.5'
+            : 'flex items-center gap-1 border-l border-[#cbd5e1] pl-1.5 first:border-l-0 first:pl-0';
+        const showWorkflowActions = (!readOnly && canAddToTasks && Boolean(repair.actions?.addToTasks)) || canMarkReady || canDeliver;
 
         return (
             <div className={cn(mobile ? 'flex flex-wrap justify-end gap-1.5' : 'flex flex-wrap items-center justify-end gap-1')}>
-                {showGeneralTicketActions ? (
-                    <button
-                        type="button"
-                        className={cn(base, hasInfo ? 'border border-[#0f766e] bg-[#0f766e] text-white' : 'border border-[#cbd5e1] bg-white text-[#334155]')}
-                        onClick={() => setInfoOpen(true)}
-                        title={hasInfo ? 'Info cargada' : 'Agregar info'}
-                    >
-                        <FaInfoCircle aria-hidden="true" />{iconOnly ? null : 'Info'}
-                    </button>
+                {showWorkflowActions ? (
+                    <span className={groupClass}>
+                        {!readOnly && canAddToTasks && repair.actions?.addToTasks ? (
+                            <button
+                                type="button"
+                                className={cn(base, 'relative border border-[#d6b48c] bg-[#d6b48c] text-[#3f2a16]')}
+                                onClick={addToTasks}
+                                title={repair.taskQueuePosition ? `Quitar de tareas: posicion ${repair.taskQueuePosition}` : 'Agregar a tareas'}
+                            >
+                                <FaClipboardCheck aria-hidden="true" />{iconOnly ? null : 'Agregar a tareas'}
+                                {repair.taskQueuePosition ? (
+                                    <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full border border-white bg-[#3f2a16] px-1 text-[0.58rem] font-black leading-none text-white">
+                                        {repair.taskQueuePosition}
+                                    </span>
+                                ) : null}
+                            </button>
+                        ) : null}
+                        {canMarkReady ? (
+                            <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
+                                <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
+                            </button>
+                        ) : null}
+                        {canDeliver ? (
+                            <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
+                                <FaDollyFlatbed aria-hidden="true" />{iconOnly ? null : 'Entregar'}
+                            </button>
+                        ) : null}
+                    </span>
                 ) : null}
-                {canMarkReady ? (
-                    <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
-                        <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
+                <span className={groupClass}>
+                    {showGeneralTicketActions ? (
+                        <button
+                            type="button"
+                            className={cn(base, hasInfo ? 'border border-[#0f766e] bg-[#0f766e] text-white' : 'border border-[#cbd5e1] bg-white text-[#334155]')}
+                            onClick={() => setInfoOpen(true)}
+                            title={hasInfo ? 'Info cargada' : 'Agregar info'}
+                        >
+                            <FaInfoCircle aria-hidden="true" />{iconOnly ? null : 'Info'}
+                        </button>
+                    ) : null}
+                    <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
+                        <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                     </button>
-                ) : null}
-                <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
-                    <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
-                </button>
-                {showGeneralTicketActions ? (
-                    <>
+                    {showGeneralTicketActions ? (
                         <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparacion">
                             <FaPlus aria-hidden="true" />{iconOnly ? null : 'Agregar reparacion'}
                         </button>
+                    ) : null}
+                </span>
+                {showGeneralTicketActions ? (
+                    <span className={groupClass}>
                         <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
                             <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
                         </Link>
                         <a href={ticket.trackingUrl} className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} title="Seguimiento">
                             <FaArrowRight aria-hidden="true" />{iconOnly ? null : 'Seguimiento'}
                         </a>
-                    </>
+                        {ticket.whatsappUrl ? (
+                            <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')} title="WhatsApp">
+                                <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
+                            </a>
+                        ) : (
+                            <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
+                                <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
+                            </span>
+                        )}
+                    </span>
                 ) : null}
-                {canDeliver ? (
-                    <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
-                        <FaDollyFlatbed aria-hidden="true" />{iconOnly ? null : 'Entregar'}
-                    </button>
+                {canCancel || repair.actions?.delete ? (
+                    <span className={groupClass}>
+                        {canCancel ? (
+                            <button type="button" className={cn(base, 'border border-[#f59e0b] bg-[#f59e0b] text-white')} onClick={cancelRepair} title="Cancelar">
+                                <FaTimes aria-hidden="true" />{iconOnly ? null : 'Cancelar'}
+                            </button>
+                        ) : null}
+                        <button type="button" className={cn(base, 'border border-[#dc3545] bg-[#dc3545] text-white')} onClick={deleteRepair} title="Eliminar">
+                            <FaTrashAlt aria-hidden="true" />{iconOnly ? null : 'Eliminar'}
+                        </button>
+                    </span>
                 ) : null}
-                {canCancel ? (
-                    <button type="button" className={cn(base, 'border border-[#f59e0b] bg-[#f59e0b] text-white')} onClick={cancelRepair} title="Cancelar">
-                        <FaTimes aria-hidden="true" />{iconOnly ? null : 'Cancelar'}
-                    </button>
-                ) : null}
-                {showGeneralTicketActions ? (
-                    ticket.whatsappUrl ? (
-                        <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')} title="WhatsApp">
-                            <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
-                        </a>
-                    ) : (
-                        <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
-                            <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
-                        </span>
-                    )
-                ) : null}
-                <button type="button" className={cn(base, 'border border-[#dc3545] bg-[#dc3545] text-white')} onClick={deleteRepair} title="Eliminar">
-                    <FaTrashAlt aria-hidden="true" />{iconOnly ? null : 'Eliminar'}
-                </button>
             </div>
         );
     };

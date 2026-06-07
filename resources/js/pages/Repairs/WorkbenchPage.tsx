@@ -1,6 +1,6 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
@@ -74,6 +74,7 @@ interface WorkbenchPageProps {
         ready: number;
         overdue: number;
         today: number;
+        tasks: number;
         cancelled: number;
     };
     deliveredSearchMatches: number;
@@ -209,7 +210,7 @@ function SummaryFilterCard({
     label: string;
     value: number;
     trend: string;
-    tone: 'blue' | 'orange' | 'purple' | 'green' | 'red' | 'cyan' | 'yellow';
+    tone: 'blue' | 'orange' | 'purple' | 'green' | 'red' | 'cyan' | 'yellow' | 'brown';
     href: string;
     active?: boolean;
     icon: JSX.Element;
@@ -222,6 +223,7 @@ function SummaryFilterCard({
         red: 'from-[#ef4444] to-[#b91c1c]',
         cyan: 'from-[#0ea5e9] to-[#0284c7]',
         yellow: 'from-[#eab308] to-[#facc15]',
+        brown: 'from-[#d6b48c] to-[#a16207]',
     }[tone];
     const trendTone = {
         blue: 'text-[#1d4ed8]',
@@ -230,7 +232,18 @@ function SummaryFilterCard({
         green: 'text-[#15803d]',
         red: 'text-[#b91c1c]',
         cyan: 'text-[#0ea5e9]',
-        yellow: 'text-[#854d0e]',
+        yellow: 'text-[#a16207]',
+        brown: 'text-[#854d0e]',
+    }[tone];
+    const iconShellTone = {
+        blue: 'border-[#bfdbfe] bg-white',
+        orange: 'border-[#fed7aa] bg-[#fff7ed]',
+        purple: 'border-[#ddd6fe] bg-[#faf5ff]',
+        green: 'border-[#bbf7d0] bg-[#f0fdf4]',
+        red: 'border-[#fecaca] bg-[#fef2f2]',
+        cyan: 'border-[#bae6fd] bg-[#f0f9ff]',
+        yellow: 'border-[#fde68a] bg-[#fefce8]',
+        brown: 'border-[#d6b48c] bg-[#fff7ed]',
     }[tone];
 
     return (
@@ -245,7 +258,7 @@ function SummaryFilterCard({
             <div className="text-[0.78rem] font-semibold text-[#1d4ed8]">{label}</div>
             <div className="flex items-center justify-between gap-2.5">
                 <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
-                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border border-[#bfdbfe] bg-white text-[0.86rem]', trendTone)}>
+                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border text-[0.86rem]', iconShellTone, trendTone)}>
                     {icon}
                 </div>
             </div>
@@ -914,6 +927,13 @@ export default function WorkbenchPage({
                         Listas {summary.ready}
                     </Link>
                     <Link
+                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'tareas', ordenar_por: undefined, direccion: undefined }))}
+                        preserveScroll
+                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'tareas' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
+                    >
+                        Tareas {summary.tasks}
+                    </Link>
+                    <Link
                         href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'vencidas' }))}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
@@ -1012,8 +1032,9 @@ export default function WorkbenchPage({
             ) : null}
 
             {isConsultas ? (
-            <section className="hidden grid-cols-2 gap-2 md:grid-cols-4 xl:grid xl:grid-cols-8">
+            <section className="hidden grid-cols-2 gap-2 md:grid-cols-4 xl:grid xl:grid-cols-9">
                 <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: undefined }))} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
+                <SummaryFilterCard label="Tareas" value={summary.tasks} trend="Cola FIFO" tone="brown" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'tareas', ordenar_por: undefined, direccion: undefined }))} active={filters.prioridad === 'tareas'} icon={<FaClipboardCheck aria-hidden="true" />} />
                 <SummaryFilterCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'PENDIENTE', prioridad: undefined }))} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
                 <SummaryFilterCard label="En reparación" value={summary.inRepair} trend="Espera / repuesto" tone="purple" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'EN REPARACION / ESPERA REPUESTO', prioridad: undefined }))} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
                 <SummaryFilterCard label="Listas" value={summary.ready} trend="Para retirar" tone="green" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'LISTA', prioridad: undefined }))} active={filters.estado === 'LISTA'} icon={<FaCheckCircle aria-hidden="true" />} />
@@ -1134,6 +1155,7 @@ export default function WorkbenchPage({
                                 Prioridad
                                 <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.prioridad} onChange={(event) => { filtersForm.setData('prioridad', event.target.value); filtersForm.setData('estado', ''); }}>
                                     <option value="">Todas</option>
+                                    <option value="tareas">Tareas</option>
                                     <option value="vencidas">Vencidas</option>
                                     <option value="hoy">Retiran hoy</option>
                                 </select>

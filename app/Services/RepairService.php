@@ -7,6 +7,7 @@ use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
 use App\Models\RepairPart;
+use App\Models\RepairTaskItem;
 use App\Models\RepairServiceOption;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -91,7 +92,17 @@ class RepairService
 
     public function activeOrders(array $filters = []): Collection
     {
-        return $this->baseQuery(false, $filters)->get();
+        $orders = $this->baseQuery(false, $filters)->get();
+
+        if (($filters['prioridad'] ?? '') === 'tareas') {
+            $positions = array_flip($this->taskQueueRegistroIds());
+
+            return $orders
+                ->sortBy(fn (RepairOrder $order): int => $positions[$order->registro_id] ?? PHP_INT_MAX)
+                ->values();
+        }
+
+        return $orders;
     }
 
     public function deliveredOrders(array $filters = []): Collection
@@ -549,6 +560,7 @@ class RepairService
 
             if (Str::upper((string) $order->estado) === 'LISTA') {
                 $this->consumeInventoryReservation($order);
+                $this->syncTaskQueueForState($order, 'LISTA');
             }
 
             $this->recordEvent($order, $order->entregado === 'si' ? 'ACTUALIZADA_ENTREGADA' : 'ACTUALIZADA', $previousState, $order->estado);
@@ -809,6 +821,7 @@ class RepairService
 
         if (Str::upper($state) === 'LISTA') {
             $this->consumeInventoryReservation($order->refresh());
+            $this->syncTaskQueueForState($order, $state);
         }
 
         $this->recordEvent($order, $event, $previousState, $state);
@@ -818,6 +831,18 @@ class RepairService
         }
 
         return $order->refresh();
+    }
+
+    private function syncTaskQueueForState(RepairOrder $order, string $state): void
+    {
+        if (Str::upper($state) !== 'LISTA') {
+            return;
+        }
+
+        RepairTaskItem::query()
+            ->where('repair_order_registro_id', $order->registro_id)
+            ->whereNull('completed_at')
+            ->update(['completed_at' => now()]);
     }
 
     public function addOriginalImages(RepairOrder $order, array $images): RepairOrder
@@ -903,6 +928,7 @@ class RepairService
                 ->where('entregado', 'no')
                 ->filter(fn (RepairOrder $order): bool => $order->fecha_estimada !== null && $order->fecha_estimada->isSameDay(now()))
                 ->count(),
+            'tasks' => count($this->taskQueueRegistroIds()),
             'cancelled' => $orders->where('entregado', 'no')->where('estado', 'CANCELADA')->count(),
             'ready' => $orders->where('entregado', 'no')->where('estado', 'LISTA')->count(),
         ];
@@ -1121,6 +1147,12 @@ class RepairService
             $query->whereDate('fecha_estimada', now()->toDateString());
         }
 
+        if (! $hasSearchTerm && ($filters['prioridad'] ?? '') === 'tareas') {
+            $registroIds = $this->taskQueueRegistroIds();
+
+            $query->whereIn(Schema::hasColumn('ordenes', 'registro_id') ? 'registro_id' : 'id', $registroIds !== [] ? $registroIds : [-1]);
+        }
+
         if (($filters['q'] ?? '') !== '') {
             $term = trim((string) $filters['q']);
             $search = '%' . $term . '%';
@@ -1221,6 +1253,10 @@ class RepairService
 
     private function applyOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
     {
+        if (($filters['prioridad'] ?? '') === 'tareas') {
+            return;
+        }
+
         $direction = strtolower((string) ($filters['direccion'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
         $sort = (string) ($filters['ordenar_por'] ?? 'ticket');
 
@@ -1237,6 +1273,22 @@ class RepairService
             'saldo' => $query->orderByRaw('(monto - senia) ' . $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             default => $query->orderBy('id', $direction)->orderBy('reparacion'),
         };
+    }
+
+    /**
+     * @return array<int, int>
+     */
+    private function taskQueueRegistroIds(): array
+    {
+        return RepairTaskItem::query()
+            ->whereDate('task_date', now()->toDateString())
+            ->whereNull('completed_at')
+            ->oldest('created_at')
+            ->oldest('id')
+            ->pluck('repair_order_registro_id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
     }
 
     private function summaryQuery(array $filters): \Illuminate\Database\Eloquent\Builder
