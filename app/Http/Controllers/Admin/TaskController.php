@@ -7,30 +7,52 @@ use App\Models\RepairOrder;
 use App\Models\RepairTaskItem;
 use App\Services\RepairService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class TaskController extends Controller
 {
     public function index(): Response
     {
-        $items = RepairTaskItem::query()
-            ->with('repairOrder')
-            ->whereDate('task_date', now()->toDateString())
-            ->whereNull('completed_at')
-            ->oldest('created_at')
-            ->oldest('id')
-            ->get()
-            ->filter(fn (RepairTaskItem $item): bool => $item->repairOrder !== null)
-            ->values();
+        try {
+            $items = RepairTaskItem::query()
+                ->with('repairOrder')
+                ->whereDate('task_date', now()->toDateString())
+                ->whereNull('completed_at')
+                ->oldest('created_at')
+                ->oldest('id')
+                ->get()
+                ->filter(fn (RepairTaskItem $item): bool => $item->repairOrder !== null)
+                ->values();
 
-        return Inertia::render('Admin/TasksPage', [
-            'todayLabel' => now()->format('d/m/Y'),
-            'items' => $items->map(fn (RepairTaskItem $item): array => $this->serializeTaskItem($item))->all(),
-            'urls' => [
-                'consultations' => route('repairs.workbench'),
-            ],
-        ]);
+            return Inertia::render('Admin/TasksPage', [
+                'todayLabel' => now()->format('d/m/Y'),
+                'items' => $items->map(fn (RepairTaskItem $item): array => $this->serializeTaskItem($item))->all(),
+                'urls' => [
+                    'consultations' => route('repairs.workbench'),
+                ],
+                'debugError' => null,
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('Tasks page failed to load.', [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+            ]);
+
+            return Inertia::render('Admin/TasksPage', [
+                'todayLabel' => now()->format('d/m/Y'),
+                'items' => [],
+                'urls' => [
+                    'consultations' => route('repairs.workbench'),
+                ],
+                'debugError' => $this->tasksDebugPayload($exception),
+            ]);
+        }
     }
 
     public function addRepair(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
@@ -111,5 +133,42 @@ class TaskController extends Controller
             'completeAction' => route('tasks.complete', $item),
             'removeAction' => route('tasks.remove', $item),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function tasksDebugPayload(Throwable $exception): array
+    {
+        return [
+            'exception' => $exception::class,
+            'message' => $exception->getMessage(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'database' => config('database.default'),
+            'checks' => $this->tasksDebugChecks(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function tasksDebugChecks(): array
+    {
+        try {
+            return [
+                'repair_task_items_exists' => Schema::hasTable('repair_task_items'),
+                'ordenes_exists' => Schema::hasTable('ordenes'),
+                'ordenes_has_registro_id' => Schema::hasColumn('ordenes', 'registro_id'),
+                'ordenes_has_id' => Schema::hasColumn('ordenes', 'id'),
+                'repair_task_items_columns' => Schema::hasTable('repair_task_items') ? Schema::getColumnListing('repair_task_items') : [],
+            ];
+        } catch (Throwable $checkException) {
+            return [
+                'checks_failed' => true,
+                'exception' => $checkException::class,
+                'message' => $checkException->getMessage(),
+            ];
+        }
     }
 }

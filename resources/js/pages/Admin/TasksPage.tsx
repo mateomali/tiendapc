@@ -30,6 +30,14 @@ interface TasksPageProps {
     urls: {
         consultations: string;
     };
+    debugError?: {
+        exception: string;
+        message: string;
+        file: string;
+        line: number;
+        database: string;
+        checks: Record<string, unknown>;
+    } | null;
 }
 
 function formatDate(value?: string | null): string {
@@ -51,9 +59,29 @@ function post(action: string): void {
     router.post(action, {}, { preserveScroll: true });
 }
 
-export default function TasksPage({ todayLabel, items, urls }: TasksPageProps): JSX.Element {
+export default function TasksPage({ todayLabel, items, urls, debugError = null }: TasksPageProps): JSX.Element {
     return (
         <RepairLayout title="Lista de tareas">
+            {debugError ? (
+                <section className="grid gap-3 rounded-lg border border-[#fecaca] bg-[#fef2f2] p-4 text-left shadow-sm">
+                    <div>
+                        <h1 className="text-lg font-black text-[#991b1b]">Error al cargar tareas</h1>
+                        <p className="mt-1 text-sm font-semibold text-[#7f1d1d]">
+                            Esta informacion es temporal para diagnosticar el error 500 en Hostinger.
+                        </p>
+                    </div>
+                    <div className="grid gap-2 text-sm text-[#450a0a]">
+                        <DebugLine label="Excepcion" value={debugError.exception} />
+                        <DebugLine label="Mensaje" value={debugError.message} />
+                        <DebugLine label="Archivo" value={`${debugError.file}:${debugError.line}`} />
+                        <DebugLine label="Conexion" value={debugError.database} />
+                    </div>
+                    <pre className="max-h-72 overflow-auto rounded-md border border-[#fecaca] bg-white p-3 text-xs font-semibold normal-case text-[#111827]">
+                        {JSON.stringify(debugError.checks, null, 2)}
+                    </pre>
+                </section>
+            ) : null}
+
             <section className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -147,5 +175,14 @@ export default function TasksPage({ todayLabel, items, urls }: TasksPageProps): 
                 )}
             </section>
         </RepairLayout>
+    );
+}
+
+function DebugLine({ label, value }: { label: string; value: string }): JSX.Element {
+    return (
+        <div className="grid gap-1 sm:grid-cols-[8rem_1fr]">
+            <span className="font-black">{label}</span>
+            <code className="break-words rounded-md bg-white px-2 py-1 text-xs font-semibold">{value}</code>
+        </div>
     );
 }
