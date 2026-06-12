@@ -70,10 +70,25 @@ class WorkbenchController extends Controller
             'filter_estado' => ['nullable', 'string'],
         ]);
 
-        $orders = $repairService->activeOrders($filters);
         $searchTerm = trim((string) ($filters['q'] ?? ''));
+
+        if ($searchTerm !== '') {
+            $filters['summary_range'] = 'all';
+            $filters['summary_from'] = '';
+            $filters['summary_to'] = '';
+            $filters['categoria_filter'] = '';
+        }
+
+        $orders = $repairService->activeOrders($filters);
         $deliveredSearchMatches = $searchTerm !== ''
             ? $repairService->deliveredOrders([
+                ...$filters,
+                'estado' => '',
+                'prioridad' => '',
+            ])->count()
+            : 0;
+        $archivedSearchMatches = $searchTerm !== ''
+            ? $repairService->archivedOrders([
                 ...$filters,
                 'estado' => '',
                 'prioridad' => '',
@@ -85,6 +100,7 @@ class WorkbenchController extends Controller
             'tickets' => $this->groupTickets($orders, false),
             'summary' => $repairService->summary($filters),
             'deliveredSearchMatches' => $deliveredSearchMatches,
+            'archivedSearchMatches' => $archivedSearchMatches,
             'states' => $repairService->availableStates(false),
             'serviceCategories' => $this->serviceCategories(),
             'serviceTemplates' => $repairService->serviceTemplates(),
@@ -117,6 +133,41 @@ class WorkbenchController extends Controller
             'tickets' => $tickets,
             'summary' => $repairService->summary(),
             'states' => $repairService->availableStates(true),
+            'pageKind' => 'delivered',
+            'pageTitle' => 'Entregados',
+            'indexRoute' => 'repairs.delivered',
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $allTickets->count(),
+                'totalPages' => max(1, (int) ceil(max(1, $allTickets->count()) / $perPage)),
+            ],
+        ]);
+    }
+
+    public function archived(Request $request, RepairService $repairService): Response
+    {
+        $filters = $request->validate([
+            'q' => ['nullable', 'string'],
+            'estado' => ['nullable', 'string'],
+            'orden' => ['nullable', 'string'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $orders = $repairService->archivedOrders($filters);
+        $allTickets = collect($this->groupTickets($orders, false));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $perPage = 12;
+        $tickets = $allTickets->forPage($page, $perPage)->values()->all();
+
+        return Inertia::render('Repairs/DeliveredPage', [
+            'filters' => $filters,
+            'tickets' => $tickets,
+            'summary' => $repairService->summary(),
+            'states' => $repairService->availableStates(false),
+            'pageKind' => 'archived',
+            'pageTitle' => 'Archivados',
+            'indexRoute' => 'repairs.archived',
             'pagination' => [
                 'page' => $page,
                 'perPage' => $perPage,
@@ -703,6 +754,7 @@ class WorkbenchController extends Controller
             'fecha_entregado' => ['nullable', 'date'],
             'entrega_via' => ['nullable', 'string', 'in:dni,ticket,persona,otra'],
             'entrega_detalle' => ['nullable', 'required_if:entrega_via,otra', 'string', 'max:500'],
+            'enviar_archivados' => ['nullable', 'boolean'],
         ]);
 
         $repairService->deliver(
@@ -710,9 +762,19 @@ class WorkbenchController extends Controller
             $validated['fecha_entregado'] ?? null,
             $validated['entrega_via'] ?? null,
             $validated['entrega_detalle'] ?? null,
+            filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL),
         );
 
-        return back()->with('success', 'Orden marcada como entregada.');
+        return back()->with('success', filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL)
+            ? 'Orden enviada a archivados.'
+            : 'Orden marcada como entregada.');
+    }
+
+    public function archive(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        $repairService->archive($repairOrder);
+
+        return back()->with('success', 'Orden enviada a archivados.');
     }
 
     public function markReady(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
@@ -726,7 +788,7 @@ class WorkbenchController extends Controller
     {
         $repairService->cancel($repairOrder);
 
-        return back()->with('success', 'Orden cancelada.');
+        return back()->with('success', 'Orden cancelada y enviada a archivados.');
     }
 
     public function moveBack(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
@@ -814,6 +876,8 @@ class WorkbenchController extends Controller
             'estado' => $order->estado,
             'entregado' => $order->entregado,
             'fecha_entregado' => optional($order->fecha_entregado)->format('Y-m-d'),
+            'archivado_at' => optional($order->archivado_at)->format('Y-m-d H:i'),
+            'archivado_motivo' => $order->archivado_motivo,
             'repuesto' => $order->repuesto,
             'repuesto_pedido' => (bool) $order->repuesto_pedido,
             'repuesto_pedido_at' => optional($order->repuesto_pedido_at)->format('Y-m-d H:i'),
@@ -839,6 +903,7 @@ class WorkbenchController extends Controller
                 'addPayment' => route('repairs.orders.payments.store', $order),
                 'state' => route('repairs.orders.state', $order),
                 'deliver' => route('repairs.orders.deliver', $order),
+                'archive' => route('repairs.orders.archive', $order),
                 'markReady' => route('repairs.orders.mark_ready', $order),
                 'cancel' => route('repairs.orders.cancel', $order),
                 'moveBack' => route('repairs.orders.move_back', $order),

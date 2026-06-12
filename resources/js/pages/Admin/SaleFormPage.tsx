@@ -580,6 +580,11 @@ export default function SaleFormPage({ defaults, features, suggestedProducts, ur
                                         type="number"
                                         min="0"
                                         value={manualDraft.unit_price}
+                                        onFocus={() => {
+                                            if (manualDraft.unit_price === 0) {
+                                                setManualDraft((current) => ({ ...current, unit_price: '' }));
+                                            }
+                                        }}
                                         onChange={(event) => {
                                             const value = event.target.value;
                                             setManualDraft((current) => ({ ...current, unit_price: value === '' ? '' : Math.max(0, Number(value)) }));

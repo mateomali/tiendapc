@@ -78,6 +78,7 @@ interface WorkbenchPageProps {
         cancelled: number;
     };
     deliveredSearchMatches: number;
+    archivedSearchMatches: number;
     states: string[];
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates: ServiceTemplateOption[];
@@ -318,6 +319,7 @@ export default function WorkbenchPage({
     deviceModels,
     nextOrderId,
     pageMode = 'consultas',
+    archivedSearchMatches,
 }: WorkbenchPageProps): JSX.Element {
     const isConsultas = pageMode === 'consultas';
     const isIngreso = pageMode === 'ingreso';
@@ -1027,6 +1029,14 @@ export default function WorkbenchPage({
                     Encontrado en entregados: {deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
                     <Link className="underline decoration-2 underline-offset-2" href={route('repairs.delivered', { q: filters.q ?? '' })}>
                         Ir a entregados.php
+                    </Link>
+                </div>
+            ) : null}
+            {isConsultas && archivedSearchMatches > 0 ? (
+                <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-4 py-3 text-sm font-bold text-[#334155] shadow-sm">
+                    Encontrado en archivados: {archivedSearchMatches} {archivedSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
+                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.archived', { q: filters.q ?? '' })}>
+                        Ir a archivados.php
                     </Link>
                 </div>
             ) : null}

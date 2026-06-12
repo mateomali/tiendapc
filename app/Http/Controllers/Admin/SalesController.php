@@ -9,11 +9,13 @@ use App\Models\Sale;
 use App\Models\SiteContactConfig;
 use App\Models\SiteGlobalConfig;
 use App\Services\SaleService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class SalesController extends Controller
 {
@@ -191,19 +193,31 @@ class SalesController extends Controller
 
     public function apiStore(SaleStoreRequest $request, SaleService $saleService): JsonResponse
     {
-        $sale = $saleService->create(
-            $request->validated()['items'],
-            $request->user()?->id,
-            (string) ($request->validated()['customer_label'] ?? 'Consumidor final'),
-            $request->validated()['notes'] ?? null,
-        );
+        try {
+            $sale = $saleService->create(
+                $request->validated()['items'],
+                $request->user()?->id,
+                (string) ($request->validated()['customer_label'] ?? 'Consumidor final'),
+                $request->validated()['notes'] ?? null,
+            );
+        } catch (UniqueConstraintViolationException) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'No se pudo generar el numero de ticket. Intenta nuevamente.',
+            ], 422);
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'ok' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
 
         return response()->json([
             'ok' => true,
             'id' => $sale->id,
             'ticket_number' => $sale->ticket_number,
             'ticket_number_display' => $sale->ticketNumberDisplay(),
-            'ticket_url' => route('admin.sales.ticket', $sale),
+            'ticket_url' => route('admin.sales.ticket', $sale, false),
         ]);
     }
 

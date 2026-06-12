@@ -92,6 +92,8 @@ class RepairService
 
     public function activeOrders(array $filters = []): Collection
     {
+        $this->archiveStaleOrders();
+
         $orders = $this->baseQuery(false, $filters)->get();
 
         if (($filters['prioridad'] ?? '') === 'tareas') {
@@ -107,7 +109,16 @@ class RepairService
 
     public function deliveredOrders(array $filters = []): Collection
     {
+        $this->archiveStaleOrders();
+
         return $this->baseQuery(true, $filters)->get();
+    }
+
+    public function archivedOrders(array $filters = []): Collection
+    {
+        $this->archiveStaleOrders();
+
+        return $this->archivedQuery($filters)->get();
     }
 
     public function ticketOrders(int $orderId): Collection
@@ -593,15 +604,23 @@ class RepairService
 
     public function cancel(RepairOrder $order): RepairOrder
     {
-        return $this->setState($order, 'CANCELADA', 'CANCELADA');
+        $cancelled = $this->setState($order, 'CANCELADA', 'CANCELADA');
+
+        return $this->archive($cancelled, 'cancelada');
     }
 
-    public function deliver(RepairOrder $order, ?string $date = null, ?string $via = null, ?string $detail = null): RepairOrder
+    public function deliver(RepairOrder $order, ?string $date = null, ?string $via = null, ?string $detail = null, bool $archive = false): RepairOrder
     {
+        if ($archive) {
+            return $this->archive($order, 'manual');
+        }
+
         $previousState = $order->estado;
         $updates = [
             'entregado' => 'si',
             'fecha_entregado' => $date ?: now()->toDateString(),
+            'archivado_at' => null,
+            'archivado_motivo' => null,
             'estado' => in_array($order->estado, self::DELIVERED_STATES, true) ? $order->estado : 'ENTREGADA',
         ];
 
@@ -664,12 +683,45 @@ class RepairService
         $order->update([
             'entregado' => 'no',
             'fecha_entregado' => null,
+            'archivado_at' => null,
+            'archivado_motivo' => null,
             'estado' => 'PENDIENTE',
         ]);
 
         $this->recordEvent($order, 'MOVER_A_CONSULTAS', $previousState, 'PENDIENTE');
 
         return $order->refresh();
+    }
+
+    public function archive(RepairOrder $order, string $reason = 'manual'): RepairOrder
+    {
+        $previousState = $order->estado;
+
+        $order->update([
+            'entregado' => 'no',
+            'fecha_entregado' => null,
+            'archivado_at' => now(),
+            'archivado_motivo' => $reason,
+        ]);
+
+        $this->recordEvent($order, 'ARCHIVADA_' . Str::upper($reason), $previousState, $order->estado);
+
+        return $order->refresh();
+    }
+
+    public function archiveStaleOrders(): int
+    {
+        $staleOrders = RepairOrder::query()
+            ->where('entregado', 'no')
+            ->whereNull('archivado_at')
+            ->whereDate('fecha', '<=', now()->subDays(45)->toDateString())
+            ->get();
+
+        foreach ($staleOrders as $order) {
+            $this->archive($order, 'automatico_45_dias');
+        }
+
+        return $staleOrders->count();
     }
 
     public function delete(RepairOrder $order): void
@@ -908,29 +960,31 @@ class RepairService
     public function summary(array $filters = []): array
     {
         $orders = $this->summaryQuery($filters)->get();
+        $unarchivedOrders = $orders->whereNull('archivado_at');
 
         return [
-            'active' => $orders->where('entregado', 'no')->where('estado', '!=', 'CANCELADA')->count(),
-            'delivered' => $orders->where('entregado', 'si')->count(),
-            'pending' => $orders->where('entregado', 'no')->where('estado', 'PENDIENTE')->count(),
-            'inRepair' => $orders->where('entregado', 'no')->whereIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])->count(),
-            'waitingParts' => $orders
+            'active' => $unarchivedOrders->where('entregado', 'no')->where('estado', '!=', 'CANCELADA')->count(),
+            'delivered' => $unarchivedOrders->where('entregado', 'si')->count(),
+            'archived' => $orders->whereNotNull('archivado_at')->count(),
+            'pending' => $unarchivedOrders->where('entregado', 'no')->where('estado', 'PENDIENTE')->count(),
+            'inRepair' => $unarchivedOrders->where('entregado', 'no')->whereIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])->count(),
+            'waitingParts' => $unarchivedOrders
                 ->where('entregado', 'no')
                 ->where('repuesto_pedido', true)
                 ->whereNull('repuesto_pedido_oculto_at')
                 ->count(),
-            'overdue' => $orders
+            'overdue' => $unarchivedOrders
                 ->where('entregado', 'no')
                 ->whereIn('estado', ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])
                 ->filter(fn (RepairOrder $order): bool => $order->fecha_estimada !== null && $order->fecha_estimada->lt(now()->startOfDay()))
                 ->count(),
-            'today' => $orders
+            'today' => $unarchivedOrders
                 ->where('entregado', 'no')
                 ->filter(fn (RepairOrder $order): bool => $order->fecha_estimada !== null && $order->fecha_estimada->isSameDay(now()))
                 ->count(),
             'tasks' => count($this->taskQueueRegistroIds()),
-            'cancelled' => $orders->where('entregado', 'no')->where('estado', 'CANCELADA')->count(),
-            'ready' => $orders->where('entregado', 'no')->where('estado', 'LISTA')->count(),
+            'cancelled' => $unarchivedOrders->where('entregado', 'no')->where('estado', 'CANCELADA')->count(),
+            'ready' => $unarchivedOrders->where('entregado', 'no')->where('estado', 'LISTA')->count(),
         ];
     }
 
@@ -1107,7 +1161,9 @@ class RepairService
 
     private function baseQuery(bool $delivered, array $filters): \Illuminate\Database\Eloquent\Builder
     {
+        $hasSearchTerm = trim((string) ($filters['q'] ?? '')) !== '';
         $query = RepairOrder::query()
+            ->whereNull('archivado_at')
             ->when($delivered, fn ($builder) => $builder->where('entregado', 'si'))
             ->when(! $delivered, fn ($builder) => $builder->where('entregado', 'no'))
             ->when(! $delivered, fn ($builder) => $this->applyOrderFilters($builder, $filters))
@@ -1115,13 +1171,14 @@ class RepairService
 
         $categoryFilter = (int) ($filters['categoria_filter'] ?? 0);
 
-        if ($categoryFilter > 0) {
+        if (! $hasSearchTerm && $categoryFilter > 0) {
             $query->where('categorias_reparacion', $categoryFilter);
         }
 
-        $this->applySummaryFilters($query, $filters, false);
+        if (! $hasSearchTerm) {
+            $this->applySummaryFilters($query, $filters, false);
+        }
 
-        $hasSearchTerm = trim((string) ($filters['q'] ?? '')) !== '';
         $hasStateFilter = trim((string) ($filters['filter_estado'] ?? '')) !== '';
         $this->applyColumnFilters($query, $filters);
 
@@ -1176,6 +1233,45 @@ class RepairService
                     }
                 }
             });
+        }
+
+        return $query;
+    }
+
+    private function archivedQuery(array $filters): \Illuminate\Database\Eloquent\Builder
+    {
+        $query = RepairOrder::query()
+            ->whereNotNull('archivado_at');
+
+        $this->applyDeliveredOrderFilters($query, $filters, 'archivado_at');
+
+        if (($filters['q'] ?? '') !== '') {
+            $term = trim((string) $filters['q']);
+            $search = '%' . $term . '%';
+            $numericTerm = ctype_digit($term) ? (int) $term : null;
+
+            $query->where(function ($subQuery) use ($search, $numericTerm): void {
+                $subQuery
+                    ->where('nombre_cliente', 'like', $search)
+                    ->orWhere('modelo', 'like', $search)
+                    ->orWhere('descripcion', 'like', $search)
+                    ->orWhere('contacto', 'like', $search)
+                    ->orWhere('dni', 'like', $search);
+
+                if ($numericTerm !== null) {
+                    $subQuery
+                        ->orWhere('id', $numericTerm)
+                        ->orWhere('reparacion', $numericTerm);
+
+                    if (Schema::hasColumn('ordenes', 'registro_id')) {
+                        $subQuery->orWhere('registro_id', $numericTerm);
+                    }
+                }
+            });
+        }
+
+        if (($filters['estado'] ?? '') !== '') {
+            $query->where('estado', (string) $filters['estado']);
         }
 
         return $query;
@@ -1240,13 +1336,13 @@ class RepairService
         }
     }
 
-    private function applyDeliveredOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
+    private function applyDeliveredOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters, string $dateColumn = 'fecha_entregado'): void
     {
         $direction = strtolower((string) ($filters['orden'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
 
         $query
-            ->orderByRaw('fecha_entregado IS NULL')
-            ->orderBy('fecha_entregado', $direction)
+            ->orderByRaw($dateColumn . ' IS NULL')
+            ->orderBy($dateColumn, $direction)
             ->orderBy('id', $direction)
             ->orderBy('reparacion');
     }

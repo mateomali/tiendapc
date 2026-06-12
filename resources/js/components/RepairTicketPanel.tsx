@@ -2,6 +2,7 @@ import { Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import {
     FaArrowRight,
+    FaArchive,
     FaCamera,
     FaCheckCircle,
     FaClipboardCheck,
@@ -44,7 +45,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(11rem,1.14fr)_minmax(9rem,0.92fr)_5.5rem_4.6rem_6.5rem_minmax(19rem,1.18fr)]';
+    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_5.5rem_4.6rem_6.5rem_minmax(20.1rem,1.29fr)]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -54,6 +55,7 @@ interface RepairTicketPanelProps {
     partInventory?: RepairPartInventoryOption[];
     allowAddRepair?: boolean;
     readOnly?: boolean;
+    archived?: boolean;
 }
 
 interface RepairUpdateFormData {
@@ -928,6 +930,7 @@ function RepairEditCard({
     partInventory,
     desktopGroupExpanded = true,
     onToggleDesktopGroup,
+    archived = false,
 }: {
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
@@ -940,6 +943,7 @@ function RepairEditCard({
     onAddRepair: () => void;
     desktopGroupExpanded?: boolean;
     onToggleDesktopGroup?: () => void;
+    archived?: boolean;
 }): JSX.Element {
     const initialBrand = inferredRepairBrand(repair);
     const form = useForm<RepairUpdateFormData>({
@@ -977,6 +981,7 @@ function RepairEditCard({
     const [deliveryOpen, setDeliveryOpen] = useState(false);
     const [deliveryVia, setDeliveryVia] = useState<DeliveryVia>('dni');
     const [deliveryDetail, setDeliveryDetail] = useState('');
+    const [deliveryArchive, setDeliveryArchive] = useState(false);
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [finalImagePreviews, setFinalImagePreviews] = useState<string[]>([]);
@@ -1213,6 +1218,7 @@ function RepairEditCard({
                 fecha_entregado: form.data.fecha_entregado || undefined,
                 entrega_via: deliveryVia,
                 entrega_detalle: deliveryVia === 'otra' ? deliveryDetail : undefined,
+                enviar_archivados: deliveryArchive,
             },
             {
                 preserveScroll: true,
@@ -1220,6 +1226,7 @@ function RepairEditCard({
                     setDeliveryOpen(false);
                     setDeliveryDetail('');
                     setDeliveryVia('dni');
+                    setDeliveryArchive(false);
                 },
             },
         );
@@ -1378,6 +1385,11 @@ function RepairEditCard({
                         {canCancel ? (
                             <button type="button" className={cn(base, 'border border-[#f59e0b] bg-[#f59e0b] text-white')} onClick={cancelRepair} title="Cancelar">
                                 <FaTimes aria-hidden="true" />{iconOnly ? null : 'Cancelar'}
+                            </button>
+                        ) : null}
+                        {!readOnly && repair.actions?.archive && !repair.archivado_at ? (
+                            <button type="button" className={cn(base, 'border border-[#64748b] bg-[#64748b] text-white')} onClick={() => router.post(repair.actions?.archive ?? '', {}, { preserveScroll: true })} title="Archivar">
+                                <FaArchive aria-hidden="true" />{iconOnly ? null : 'Archivar'}
                             </button>
                         ) : null}
                         <button type="button" className={cn(base, 'border border-[#dc3545] bg-[#dc3545] text-white')} onClick={deleteRepair} title="Eliminar">
@@ -1661,9 +1673,19 @@ function RepairEditCard({
                                 />
                             </label>
                         ) : null}
+                        {!repair.archivado_at ? (
+                            <label className="flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#334155]">
+                                <input
+                                    type="checkbox"
+                                    checked={deliveryArchive}
+                                    onChange={(event) => setDeliveryArchive(event.target.checked)}
+                                />
+                                Enviar a archivados
+                            </label>
+                        ) : null}
                         <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setDeliveryOpen(false)}>Cancelar</button>
-                            <button type="submit" className={buttonClass('primary', 'sm')}>Confirmar entrega</button>
+                            <button type="submit" className={buttonClass('primary', 'sm')}>{deliveryArchive ? 'Enviar a archivados' : 'Confirmar entrega'}</button>
                         </div>
                     </form>
                 </ModalShell>
@@ -1747,12 +1769,17 @@ function RepairEditCard({
                                 <span className="text-[0.66rem] font-bold text-[#64748b]">{formatLegacyDate(repair.fecha_entregado)}</span>
                                 {repair.actions?.deliver ? (
                                     <button type="button" className="rounded-md border border-[#bfdbfe] bg-white px-2 py-1 text-[0.66rem] font-black uppercase text-[#1d4ed8] transition hover:bg-[#eff6ff]" onClick={openDeliveryModal}>
-                                        Cambiar
+                                        {archived ? 'Entregar' : 'Cambiar'}
                                     </button>
                                 ) : null}
                                 {repair.actions?.moveBack ? (
                                     <button type="button" className="rounded-md border border-[#f59e0b] bg-[#fff7ed] px-2 py-1 text-[0.66rem] font-black uppercase text-[#92400e] transition hover:bg-[#ffedd5]" onClick={moveBackToConsultas}>
                                         A consultas
+                                    </button>
+                                ) : null}
+                                {archived && repair.actions?.delete ? (
+                                    <button type="button" className="rounded-md border border-[#fecdd3] bg-[#fff1f2] px-2 py-1 text-[0.66rem] font-black uppercase text-[#be123c] transition hover:bg-[#ffe4e6]" onClick={deleteRepair}>
+                                        Eliminar
                                     </button>
                                 ) : null}
                             </div>
@@ -1826,12 +1853,17 @@ function RepairEditCard({
                     </div>
                     {readOnly && repair.actions?.deliver ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={openDeliveryModal}>
-                            Cambiar forma de entrega
+                            {archived ? 'Entregar' : 'Cambiar forma de entrega'}
                         </button>
                     ) : null}
                     {readOnly && repair.actions?.moveBack ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={moveBackToConsultas}>
                             Devolver a consultas
+                        </button>
+                    ) : null}
+                    {readOnly && archived && repair.actions?.delete ? (
+                        <button type="button" className={buttonClass('danger', 'sm', 'w-full')} onClick={deleteRepair}>
+                            Eliminar
                         </button>
                     ) : null}
                     {showMore ? (
@@ -1865,6 +1897,7 @@ export function RepairDesktopRow({
     rowTotal = ticket.repairs.length,
     desktopGroupExpanded = true,
     onToggleDesktopGroup,
+    archived = false,
 }: {
     ticket: RepairTicketView;
     repair: RepairOrderView;
@@ -1876,6 +1909,7 @@ export function RepairDesktopRow({
     rowTotal?: number;
     desktopGroupExpanded?: boolean;
     onToggleDesktopGroup?: () => void;
+    archived?: boolean;
 }): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
 
@@ -1892,6 +1926,7 @@ export function RepairDesktopRow({
                 rowTotal={rowTotal}
                 desktopGroupExpanded={desktopGroupExpanded}
                 onToggleDesktopGroup={onToggleDesktopGroup}
+                archived={archived}
                 onAddRepair={() => setAddOpen(true)}
             />
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
@@ -1907,6 +1942,7 @@ export function RepairTicketPanel({
     partInventory = [],
     allowAddRepair = false,
     readOnly = false,
+    archived = false,
 }: RepairTicketPanelProps): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
     const [desktopGroupExpanded, setDesktopGroupExpanded] = useState(false);
@@ -1977,6 +2013,7 @@ export function RepairTicketPanel({
                                 rowTotal={ticket.repairs.length}
                                 desktopGroupExpanded={desktopGroupExpanded}
                                 onToggleDesktopGroup={index === 0 && ticket.repairs.length > 1 ? () => setDesktopGroupExpanded((expanded) => !expanded) : undefined}
+                                archived={archived}
                                 onAddRepair={() => setAddOpen(true)}
                             />
                         ))}
@@ -1996,6 +2033,7 @@ export function RepairTicketPanel({
                         variant="mobile"
                         rowIndex={index}
                         rowTotal={ticket.repairs.length}
+                        archived={archived}
                         onAddRepair={() => setAddOpen(true)}
                     />
                 ))}

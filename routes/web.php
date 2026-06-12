@@ -57,6 +57,8 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/consulta/ticket/{orderId}', [WorkbenchController::class, 'showTicket']);
     Route::get('/entregados', [WorkbenchController::class, 'delivered'])->name('repairs.delivered');
     Route::get('/entregados.php', [WorkbenchController::class, 'delivered']);
+    Route::get('/archivados', [WorkbenchController::class, 'archived'])->name('repairs.archived');
+    Route::get('/archivados.php', [WorkbenchController::class, 'archived']);
     Route::get('/metricas', [WorkbenchController::class, 'metrics'])->name('repairs.metrics');
     Route::get('/listas-reparacion', [WorkbenchController::class, 'lists'])->name('repairs.lists');
     Route::post('/listas-reparacion/opciones', [WorkbenchController::class, 'storeServiceOption'])->name('repairs.lists.service_options.store');
@@ -84,6 +86,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::post('/repairs/orders/{repairOrder}/final-images/add', [WorkbenchController::class, 'addFinalImages'])->name('repairs.orders.final_images.add');
     Route::post('/repairs/orders/{repairOrder}/final-images/remove', [WorkbenchController::class, 'removeFinalImage'])->name('repairs.orders.final_images.remove');
     Route::post('/repairs/orders/{repairOrder}/deliver', [WorkbenchController::class, 'deliver'])->name('repairs.orders.deliver');
+    Route::post('/repairs/orders/{repairOrder}/archive', [WorkbenchController::class, 'archive'])->name('repairs.orders.archive');
     Route::post('/repairs/orders/{repairOrder}/mark-ready', [WorkbenchController::class, 'markReady'])->name('repairs.orders.mark_ready');
     Route::post('/repairs/orders/{repairOrder}/cancel', [WorkbenchController::class, 'cancel'])->name('repairs.orders.cancel');
     Route::post('/repairs/orders/{repairOrder}/move-back', [WorkbenchController::class, 'moveBack'])->name('repairs.orders.move_back');

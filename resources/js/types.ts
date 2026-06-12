@@ -196,6 +196,8 @@ export interface RepairOrderView {
     estado: string;
     entregado: string;
     fecha_entregado?: string | null;
+    archivado_at?: string | null;
+    archivado_motivo?: string | null;
     repuesto?: string | null;
     repuesto_pedido?: boolean;
     repuesto_pedido_at?: string | null;
@@ -214,6 +216,7 @@ export interface RepairOrderView {
         addPayment: string;
         state: string;
         deliver: string;
+        archive?: string;
         markReady: string;
         cancel: string;
         moveBack: string;

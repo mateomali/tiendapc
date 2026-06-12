@@ -17,12 +17,16 @@ interface DeliveredPageProps {
     summary: {
         active: number;
         delivered: number;
+        archived: number;
         pending: number;
         inRepair: number;
         waitingParts: number;
         ready: number;
     };
     states: string[];
+    pageKind?: 'delivered' | 'archived';
+    pageTitle?: string;
+    indexRoute?: string;
     pagination: {
         page: number;
         totalPages: number;
@@ -31,7 +35,7 @@ interface DeliveredPageProps {
     };
 }
 
-export default function DeliveredPage({ filters, tickets, summary, states, pagination }: DeliveredPageProps): JSX.Element {
+export default function DeliveredPage({ filters, tickets, summary, states, pagination, pageKind = 'delivered', pageTitle = 'Entregados', indexRoute = 'repairs.delivered' }: DeliveredPageProps): JSX.Element {
     const form = useForm({
         q: filters.q ?? '',
         estado: filters.estado ?? '',
@@ -47,6 +51,11 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
     ];
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
+    const isArchived = pageKind === 'archived';
+    const listLabel = isArchived ? 'archivadas' : 'entregadas';
+    const emptyLabel = isArchived ? 'No hay tickets archivados para los filtros actuales.' : 'No hay tickets entregados para los filtros actuales.';
+    const archivedCancelledTickets = isArchived ? filterTicketsByRepairState(tickets, true) : [];
+    const archivedPendingPickupTickets = isArchived ? filterTicketsByRepairState(tickets, false) : [];
 
     const toggleDesktopTicket = (ticketId: number): void => {
         setExpandedDesktopTickets((current) => ({
@@ -60,18 +69,22 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
             ...data,
             page,
         }));
-        form.get(route('repairs.delivered'), {
+        form.get(route(indexRoute), {
             preserveScroll: true,
             preserveState: true,
         });
     };
 
     return (
-        <RepairLayout title="Entregados">
+        <RepairLayout title={pageTitle}>
             <section className={ui.statsGrid}>
                 <article className={ui.statCard}>
                     <p className={ui.statLabel}>Entregadas</p>
                     <p className={ui.statValue}>{summary.delivered}</p>
+                </article>
+                <article className={ui.statCard}>
+                    <p className={ui.statLabel}>Archivadas</p>
+                    <p className={ui.statValue}>{summary.archived}</p>
                 </article>
                 <article className={ui.statCard}>
                     <p className={ui.statLabel}>Activas</p>
@@ -93,13 +106,13 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                     onSubmit={(event) => {
                         event.preventDefault();
                         form.setData('page', 1);
-                        form.get(route('repairs.delivered'));
+                        form.get(route(indexRoute));
                     }}
                 >
                     <div className={ui.repairCardHeading}>
                         <div className={ui.cardTitleWrap}>
                             <p className={ui.eyebrow}>Detalle</p>
-                            <h2 className={ui.cardTitle}>Filtrar entregadas</h2>
+                            <h2 className={ui.cardTitle}>Filtrar {listLabel}</h2>
                         </div>
                     </div>
                     <div className="grid gap-3 lg:grid-cols-[minmax(320px,1fr)_220px_220px_auto] lg:items-center">
@@ -113,8 +126,8 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                             ))}
                         </select>
                         <select className={ui.repairDenseInput} value={form.data.orden} onChange={(event) => form.setData('orden', event.target.value)}>
-                            <option value="desc">Detalle: entrega mas reciente</option>
-                            <option value="asc">Detalle: entrega mas antigua</option>
+                            <option value="desc">Detalle: {isArchived ? 'archivo' : 'entrega'} mas reciente</option>
+                            <option value="asc">Detalle: {isArchived ? 'archivo' : 'entrega'} mas antigua</option>
                         </select>
                         <button className={buttonClass('primary', 'default', 'lg:min-w-[132px]')} type="submit">
                             Buscar
@@ -124,7 +137,7 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
 
                 <div className={ui.pagination}>
                     <span>
-                        Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}. Pagina {pagination.page} de {pagination.totalPages}. Total archivadas: {pagination.total}.
+                        Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}. Pagina {pagination.page} de {pagination.totalPages}. Total {listLabel}: {pagination.total}.
                     </span>
                     <div className={ui.inlineActions}>
                         <button type="button" className={buttonClass('soft', 'sm')} disabled={pagination.page <= 1} onClick={() => goToPage(Math.max(1, pagination.page - 1))}>
@@ -136,62 +149,169 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                     </div>
                 </div>
 
-                <div className="hidden overflow-x-auto rounded-[16px] border border-[#dbe7f6] bg-white shadow-[0_14px_32px_rgba(15,23,42,0.09)] ring-1 ring-white/70 xl:block">
-                    <div className="w-full min-w-0">
-                        <div className={cn('grid w-full items-stretch divide-x divide-emerald-300/45 bg-[linear-gradient(180deg,#047857,#065f46)] text-[0.62rem] font-extrabold uppercase tracking-[0.015em] text-white [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
-                            <span className="text-center">ID</span>
-                            <span>Cliente</span>
-                            <span>DNI</span>
-                            <span>Contacto</span>
-                            <span>Ingreso</span>
-                            <span className="text-center">Imagen</span>
-                            <span>Modelo</span>
-                            <span>Falla</span>
-                            <span>Estimada</span>
-                            <span>Saldo</span>
-                            <span className="text-center">Estado</span>
-                            <span className="text-center">Detalle</span>
-                        </div>
-                        <div className="grid bg-white">
-                            {tickets.length > 0 ? (
-                                tickets.flatMap((ticket) => {
-                                    const expanded = expandedDesktopTickets[ticket.id] ?? false;
-                                    const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
-
-                                    return desktopRepairs.map((repair, repairIndex) => (
-                                        <RepairDesktopRow
-                                            key={`delivered-desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
-                                            ticket={ticket}
-                                            repair={repair}
-                                            serviceCategories={deliveredCategories}
-                                            rowIndex={repairIndex}
-                                            rowTotal={ticket.repairs.length}
-                                            desktopGroupExpanded={expanded}
-                                            onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
-                                            readOnly
-                                        />
-                                    ));
-                                })
-                            ) : (
-                                <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets entregados para los filtros actuales.</div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid gap-3 xl:hidden">
-                    {tickets.map((ticket) => (
-                        <RepairTicketPanel
-                            key={ticket.id}
-                            ticket={ticket}
+                {isArchived ? (
+                    <>
+                        <ArchivedSection
+                            title="Sin retirar"
+                            tickets={archivedPendingPickupTickets}
                             states={states}
                             serviceCategories={deliveredCategories}
-                            readOnly
+                            expandedDesktopTickets={expandedDesktopTickets}
+                            onToggleDesktopTicket={toggleDesktopTicket}
+                            emptyLabel="No hay archivadas sin retirar para los filtros actuales."
                         />
-                    ))}
-                    {tickets.length === 0 ? <div className="rounded-[22px] border border-white/70 bg-white/90 p-6 text-center font-semibold text-[#475569] shadow-[0_10px_26px_rgba(15,23,42,0.08)]">No hay tickets entregados para los filtros actuales.</div> : null}
-                </div>
+                        <ArchivedSection
+                            title="Canceladas"
+                            tickets={archivedCancelledTickets}
+                            states={states}
+                            serviceCategories={deliveredCategories}
+                            expandedDesktopTickets={expandedDesktopTickets}
+                            onToggleDesktopTicket={toggleDesktopTicket}
+                            emptyLabel="No hay archivadas canceladas para los filtros actuales."
+                        />
+                    </>
+                ) : (
+                    <DeliveredTicketList
+                        tickets={tickets}
+                        states={states}
+                        serviceCategories={deliveredCategories}
+                        expandedDesktopTickets={expandedDesktopTickets}
+                        onToggleDesktopTicket={toggleDesktopTicket}
+                        emptyLabel={emptyLabel}
+                    />
+                )}
             </section>
         </RepairLayout>
+    );
+}
+
+function filterTicketsByRepairState(tickets: RepairTicketView[], cancelled: boolean): RepairTicketView[] {
+    return tickets
+        .map((ticket) => {
+            const repairs = ticket.repairs.filter((repair) => cancelled ? repair.estado === 'CANCELADA' : repair.estado !== 'CANCELADA');
+
+            return {
+                ...ticket,
+                repairs,
+                repairsCount: repairs.length,
+                totalMonto: repairs.reduce((total, repair) => total + Number(repair.monto ?? 0), 0),
+                totalSenia: repairs.reduce((total, repair) => total + Number(repair.senia ?? 0), 0),
+            };
+        })
+        .filter((ticket) => ticket.repairs.length > 0);
+}
+
+function ArchivedSection({
+    title,
+    tickets,
+    states,
+    serviceCategories,
+    expandedDesktopTickets,
+    onToggleDesktopTicket,
+    emptyLabel,
+}: {
+    title: string;
+    tickets: RepairTicketView[];
+    states: string[];
+    serviceCategories: { value: number; label: string }[];
+    expandedDesktopTickets: Record<number, boolean>;
+    onToggleDesktopTicket: (ticketId: number) => void;
+    emptyLabel: string;
+}): JSX.Element {
+    return (
+        <section className="grid gap-3">
+            <div className="flex items-center justify-between border-b border-[#cbd5e1] pb-2">
+                <h3 className="text-base font-black text-[#0f172a]">{title}</h3>
+                <span className="text-sm font-bold text-[#475569]">{tickets.reduce((total, ticket) => total + ticket.repairs.length, 0)}</span>
+            </div>
+            <DeliveredTicketList
+                tickets={tickets}
+                states={states}
+                serviceCategories={serviceCategories}
+                expandedDesktopTickets={expandedDesktopTickets}
+                onToggleDesktopTicket={onToggleDesktopTicket}
+                emptyLabel={emptyLabel}
+                archived
+            />
+        </section>
+    );
+}
+
+function DeliveredTicketList({
+    tickets,
+    states,
+    serviceCategories,
+    expandedDesktopTickets,
+    onToggleDesktopTicket,
+    emptyLabel,
+    archived = false,
+}: {
+    tickets: RepairTicketView[];
+    states: string[];
+    serviceCategories: { value: number; label: string }[];
+    expandedDesktopTickets: Record<number, boolean>;
+    onToggleDesktopTicket: (ticketId: number) => void;
+    emptyLabel: string;
+    archived?: boolean;
+}): JSX.Element {
+    return (
+        <>
+            <div className="hidden overflow-x-auto rounded-[16px] border border-[#dbe7f6] bg-white shadow-[0_14px_32px_rgba(15,23,42,0.09)] ring-1 ring-white/70 xl:block">
+                <div className="w-full min-w-0">
+                    <div className={cn('grid w-full items-stretch divide-x divide-emerald-300/45 bg-[linear-gradient(180deg,#047857,#065f46)] text-[0.62rem] font-extrabold uppercase tracking-[0.015em] text-white [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
+                        <span className="text-center">ID</span>
+                        <span>Cliente</span>
+                        <span>DNI</span>
+                        <span>Contacto</span>
+                        <span>Ingreso</span>
+                        <span className="text-center">Imagen</span>
+                        <span>Modelo</span>
+                        <span>Falla</span>
+                        <span>Estimada</span>
+                        <span>Saldo</span>
+                        <span className="text-center">Estado</span>
+                        <span className="text-center">Detalle</span>
+                    </div>
+                    <div className="grid bg-white">
+                        {tickets.length > 0 ? (
+                            tickets.flatMap((ticket) => {
+                                const expanded = expandedDesktopTickets[ticket.id] ?? false;
+                                const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+                                return desktopRepairs.map((repair, repairIndex) => (
+                                    <RepairDesktopRow
+                                        key={`delivered-desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                                        ticket={ticket}
+                                        repair={repair}
+                                        serviceCategories={serviceCategories}
+                                        rowIndex={repairIndex}
+                                        rowTotal={ticket.repairs.length}
+                                        desktopGroupExpanded={expanded}
+                                        onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => onToggleDesktopTicket(ticket.id) : undefined}
+                                        readOnly
+                                        archived={archived}
+                                    />
+                                ));
+                            })
+                        ) : (
+                            <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">{emptyLabel}</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <div className="grid gap-3 xl:hidden">
+                {tickets.map((ticket) => (
+                    <RepairTicketPanel
+                        key={ticket.id}
+                        ticket={ticket}
+                        states={states}
+                        serviceCategories={serviceCategories}
+                        readOnly
+                        archived={archived}
+                    />
+                ))}
+                {tickets.length === 0 ? <div className="rounded-lg border border-white/70 bg-white/90 p-6 text-center font-semibold text-[#475569] shadow-sm">{emptyLabel}</div> : null}
+            </div>
+        </>
     );
 }
