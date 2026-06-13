@@ -70,6 +70,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/repuestos', [WorkbenchController::class, 'parts'])->name('repairs.parts');
     Route::get('/repuestos.php', [WorkbenchController::class, 'parts']);
     Route::post('/repairs/parts/inventory', [WorkbenchController::class, 'storePartInventory'])->name('repairs.parts.inventory.store');
+    Route::post('/repairs/parts/inventory/sync', [WorkbenchController::class, 'syncPartInventory'])->name('repairs.parts.inventory.sync');
     Route::post('/repairs/parts/boxes', [WorkbenchController::class, 'storePartBox'])->name('repairs.parts.boxes.store');
     Route::post('/repairs/parts/inventory/{repairPart}', [WorkbenchController::class, 'updatePartInventory'])->name('repairs.parts.inventory.update');
     Route::post('/repairs/parts/inventory/{repairPart}/delete', [WorkbenchController::class, 'destroyPartInventory'])->name('repairs.parts.inventory.delete');

@@ -1,7 +1,7 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { FaPlus, FaSave, FaSearch, FaTimes, FaTools, FaTrashAlt } from 'react-icons/fa';
+import { FaClipboardList, FaCopy, FaPlus, FaSave, FaSearch, FaSyncAlt, FaTimes, FaTools, FaTrashAlt } from 'react-icons/fa';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
 import { cn } from '../../utils';
@@ -28,6 +28,21 @@ interface InventoryPart {
     delete_url: string;
 }
 
+interface PendingCellphonePartRow {
+    registro_id: number;
+    marca: string;
+    modelo: string;
+    repair_type: string;
+    pedido: string;
+    cliente: string;
+    ticket_url: string;
+}
+
+interface PendingCellphonePartGroup {
+    repairType: string;
+    rows: PendingCellphonePartRow[];
+}
+
 interface PartsPageProps {
     period: 'week' | 'month' | 'all';
     rows: PartRequestRow[];
@@ -36,10 +51,12 @@ interface PartsPageProps {
         month: string;
         all: string;
     };
+    pendingCellphoneParts: PendingCellphonePartRow[];
     inventory: InventoryPart[];
     boxes: string[];
     inventoryActions: {
         store: string;
+        sync: string;
         storeBox: string;
     };
 }
@@ -94,13 +111,58 @@ function sortBoxes(values: string[]): string[] {
     return Array.from(new Set(values.map((value) => value.trim().toLowerCase()).filter((value) => value !== '' && value !== '|'))).sort((a, b) => boxSortValue(a) - boxSortValue(b) || a.localeCompare(b));
 }
 
-export default function PartsPage({ period, rows, filters, inventory, boxes, inventoryActions }: PartsPageProps): JSX.Element {
+function pendingDeviceName(row: PendingCellphonePartRow): string {
+    return [row.marca || 'Sin marca', row.modelo || 'Sin modelo'].join(' ');
+}
+
+function groupPendingCellphoneParts(rows: PendingCellphonePartRow[]): PendingCellphonePartGroup[] {
+    const groups = rows.reduce<Record<string, PendingCellphonePartRow[]>>((carry, row) => {
+        const repairType = row.repair_type || 'Otros trabajos';
+        carry[repairType] = [...(carry[repairType] ?? []), row];
+
+        return carry;
+    }, {});
+
+    return Object.entries(groups)
+        .map(([repairType, groupRows]) => ({
+            repairType,
+            rows: [...groupRows].sort((left, right) => pendingDeviceName(left).localeCompare(pendingDeviceName(right), 'es', { sensitivity: 'base' })),
+        }))
+        .sort((left, right) => left.repairType.localeCompare(right.repairType, 'es', { sensitivity: 'base' }));
+}
+
+function groupedPendingText(groups: PendingCellphonePartGroup[]): string {
+    return groups
+        .map((group) => `${group.repairType}:\n${group.rows.map((row) => `- ${pendingDeviceName(row)} (${row.pedido})`).join('\n')}`)
+        .join('\n\n');
+}
+
+function copyText(value: string): void {
+    if (navigator.clipboard !== undefined && window.isSecureContext) {
+        void navigator.clipboard.writeText(value);
+        return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', 'true');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+}
+
+export default function PartsPage({ period, rows, filters, pendingCellphoneParts, inventory, boxes, inventoryActions }: PartsPageProps): JSX.Element {
     const [parts, setParts] = useState<InventoryPart[]>(inventory);
     const [boxList, setBoxList] = useState<string[]>(sortBoxes(boxes));
     const [modelFilter, setModelFilter] = useState('');
     const [boxFilter, setBoxFilter] = useState('');
     const [savingIds, setSavingIds] = useState<number[]>([]);
     const [dirtyIds, setDirtyIds] = useState<number[]>([]);
+    const [pendingOpen, setPendingOpen] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     const createForm = useForm<InventoryCreateForm>({
         quantity: '1',
@@ -137,6 +199,8 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
     }, [boxFilter, modelFilter, parts]);
 
     const totalUnits = filteredParts.reduce((sum, part) => sum + part.quantity, 0);
+    const pendingCellphoneGroups = useMemo(() => groupPendingCellphoneParts(pendingCellphoneParts), [pendingCellphoneParts]);
+    const pendingCellphoneText = useMemo(() => groupedPendingText(pendingCellphoneGroups), [pendingCellphoneGroups]);
 
     const updatePart = (partId: number, changes: Partial<InventoryPart>): void => {
         setParts((current) => current.map((part) => (part.id === partId ? { ...part, ...changes } : part)));
@@ -199,6 +263,23 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
         router.post(part.delete_url, {}, { preserveScroll: true, preserveState: true });
     };
 
+    const syncInventory = (): void => {
+        const accepted = window.confirm('Se van a importar los repuestos desde la planilla y eliminar los actuales. ¿Esta seguro?');
+        if (!accepted) {
+            return;
+        }
+
+        setSyncing(true);
+        router.post(
+            inventoryActions.sync,
+            { confirmed: true },
+            {
+                preserveScroll: true,
+                onFinish: () => setSyncing(false),
+            },
+        );
+    };
+
     const removeRequestRow = (row: PartRequestRow): void => {
         router.post(row.remove_url, {}, { preserveScroll: true });
     };
@@ -232,16 +313,16 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                         </p>
                     </div>
 
-                    <div className="grid gap-2 md:grid-cols-[1fr_11rem_auto]">
+                    <div className="grid gap-2 md:grid-cols-[1fr_11rem_auto_auto]">
                         <label className="grid gap-1 text-xs font-black uppercase tracking-[0.08em] text-blue-100">
                             Modelo
                             <span className="relative">
-                                <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#2563eb]" aria-hidden="true" />
+                                <FaSearch className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#2563eb]" aria-hidden="true" />
                                 <input
                                     type="search"
                                     value={modelFilter}
                                     onChange={(event) => setModelFilter(event.target.value)}
-                                    className={cn(inputClass, 'pl-9')}
+                                    className={cn(inputClass, 'pr-9')}
                                     placeholder="Buscar modelo"
                                 />
                             </span>
@@ -266,6 +347,15 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                             }}
                         >
                             Limpiar
+                        </button>
+                        <button
+                            type="button"
+                            className={cn(buttonClass('soft', 'sm'), 'self-end border-white bg-white/12 text-white')}
+                            onClick={syncInventory}
+                            disabled={syncing}
+                        >
+                            <FaSyncAlt aria-hidden="true" className={syncing ? 'animate-spin' : ''} />
+                            {syncing ? 'Sincronizando' : 'Sincronizar'}
                         </button>
                     </div>
                 </div>
@@ -452,6 +542,14 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                         <h2 className="text-lg font-black text-[#0f172a]">Repuestos pendientes</h2>
                     </div>
                     <div className="flex gap-2 overflow-x-auto">
+                        <button
+                            type="button"
+                            className={cn(buttonClass('primary', 'sm'), pendingOpen && 'bg-[#102a56]')}
+                            onClick={() => setPendingOpen((current) => !current)}
+                        >
+                            <FaClipboardList aria-hidden="true" />
+                            Repuestos pendientes
+                        </button>
                         {(['week', 'month', 'all'] as const).map((key) => (
                             <Link
                                 key={key}
@@ -466,6 +564,56 @@ export default function PartsPage({ period, rows, filters, inventory, boxes, inv
                         ))}
                     </div>
                 </div>
+
+                {pendingOpen ? (
+                    <div className="border-b border-[#dbe7f6] bg-white p-3">
+                        <div className="grid gap-3 rounded-xl border border-[#dbe7f6] bg-[#f8fbff] p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <strong className="text-sm font-black text-[#0f172a]">
+                                    Celulares pendientes: {pendingCellphoneParts.length}
+                                </strong>
+                                <button
+                                    type="button"
+                                    className={buttonClass('soft', 'sm')}
+                                    onClick={() => copyText(pendingCellphoneText)}
+                                    disabled={pendingCellphoneParts.length === 0}
+                                >
+                                    <FaCopy aria-hidden="true" />
+                                    Copiar lista
+                                </button>
+                            </div>
+
+                            {pendingCellphoneGroups.length > 0 ? (
+                                <div className="grid gap-3">
+                                    {pendingCellphoneGroups.map((group) => (
+                                        <section key={group.repairType} className="grid gap-2">
+                                            <div className="flex items-center justify-between gap-2 border-b border-[#dbe7f6] pb-1">
+                                                <strong className="text-sm font-black text-[#0f172a]">{group.repairType}</strong>
+                                                <span className="text-xs font-black text-[#64748b]">{group.rows.length}</span>
+                                            </div>
+                                            {group.rows.map((row) => (
+                                                <article key={row.registro_id} className="grid gap-1 rounded-lg border border-[#dbe7f6] bg-white px-3 py-2 sm:grid-cols-[1fr_auto] sm:items-center">
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-black text-[#0f172a]">{pendingDeviceName(row)}</p>
+                                                        <p className="truncate text-xs font-semibold text-[#64748b]">{row.pedido} - {row.cliente}</p>
+                                                    </div>
+                                                    <Link href={row.ticket_url} className="text-xs font-black text-[#1d4ed8] underline-offset-2 hover:underline">
+                                                        {row.pedido}
+                                                    </Link>
+                                                </article>
+                                            ))}
+                                        </section>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className={ui.repairCard}>
+                                    <h2 className={ui.cardTitle}>No hay celulares pendientes.</h2>
+                                    <p className={ui.inlineCaption}>La lista toma ordenes con categoria Celulares y estado PENDIENTE.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
 
                 <div className="flex min-h-10 items-center overflow-hidden border-b border-[#dbe7f6] bg-[#f8fbff] text-sm font-black text-[#17427f]">
                     <div className="animate-[marquee_28s_linear_infinite] whitespace-nowrap px-4">

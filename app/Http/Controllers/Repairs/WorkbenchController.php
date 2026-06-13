@@ -18,6 +18,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -222,6 +224,26 @@ class WorkbenchController extends Controller
                 'month' => route('repairs.parts', ['periodo' => 'month']),
                 'all' => route('repairs.parts', ['periodo' => 'all']),
             ],
+            'pendingCellphoneParts' => RepairOrder::query()
+                ->where('categorias_reparacion', 1)
+                ->where('estado', 'PENDIENTE')
+                ->where('entregado', 'no')
+                ->whereNull('archivado_at')
+                ->orderByDesc('fecha')
+                ->orderByDesc('id')
+                ->orderBy('reparacion')
+                ->get()
+                ->map(fn (RepairOrder $order): array => [
+                    'registro_id' => $order->registro_id,
+                    'marca' => trim((string) ($order->marca ?? '')),
+                    'modelo' => trim((string) ($order->modelo ?? '')),
+                    'repair_type' => $this->pendingCellphoneRepairType($order),
+                    'pedido' => sprintf('#%d - Reparacion %d', $order->id, $order->reparacion),
+                    'cliente' => $order->nombre_cliente,
+                    'ticket_url' => route('repairs.tickets.show', ['orderId' => $order->id]),
+                ])
+                ->values()
+                ->all(),
             'inventory' => RepairPart::query()
                 ->get()
                 ->sortBy(fn (RepairPart $part): string => sprintf(
@@ -240,6 +262,7 @@ class WorkbenchController extends Controller
                 ->all(),
             'inventoryActions' => [
                 'store' => route('repairs.parts.inventory.store'),
+                'sync' => route('repairs.parts.inventory.sync'),
                 'storeBox' => route('repairs.parts.boxes.store'),
             ],
         ]);
@@ -259,6 +282,64 @@ class WorkbenchController extends Controller
         ]);
 
         return back()->with('success', 'Repuesto agregado al inventario.');
+    }
+
+    public function syncPartInventory(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'confirmed' => ['accepted'],
+        ]);
+
+        if (! filter_var($validated['confirmed'] ?? false, FILTER_VALIDATE_BOOL)) {
+            return back()->with('error', 'La sincronizacion fue cancelada.');
+        }
+
+        try {
+            $response = Http::timeout(20)->get($this->partsSpreadsheetCsvUrl());
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'No se pudo leer la planilla de repuestos.');
+        }
+
+        if (! $response->successful()) {
+            return back()->with('error', 'No se pudo leer la planilla de repuestos.');
+        }
+
+        $rows = $this->parsePartsCsv($response->body());
+
+        if ($rows === []) {
+            return back()->with('error', 'La planilla no tiene repuestos validos para importar.');
+        }
+
+        DB::transaction(function () use ($rows): void {
+            RepairPart::query()->delete();
+            RepairPartBox::query()->delete();
+
+            foreach (array_chunk($rows, 100) as $chunk) {
+                RepairPart::query()->insert($chunk);
+            }
+
+            $now = now();
+            $boxes = collect($rows)
+                ->pluck('box')
+                ->unique()
+                ->sortBy(fn (string $box): int => $this->boxSortOrder($box))
+                ->values()
+                ->map(fn (string $box): array => [
+                    'code' => $box,
+                    'sort_order' => $this->boxSortOrder($box),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
+                ->all();
+
+            if ($boxes !== []) {
+                RepairPartBox::query()->insert($boxes);
+            }
+        });
+
+        return back()->with('success', sprintf('Inventario sincronizado: %d repuesto(s) importados.', count($rows)));
     }
 
     public function updatePartInventory(Request $request, RepairPart $repairPart): RedirectResponse
@@ -350,6 +431,130 @@ class WorkbenchController extends Controller
         }
 
         return $value > 0 ? $value : 999999;
+    }
+
+    private function partsSpreadsheetCsvUrl(): string
+    {
+        return 'https://docs.google.com/spreadsheets/d/15Yf1xz10GVpduWHsEH1ySmCxOCuIw6SUfUTc-6Li1-Q/export?format=csv&gid=0';
+    }
+
+    /**
+     * @return array<int, array{quantity:int, model:string, box:string, sort_order:int, created_at:\Illuminate\Support\Carbon, updated_at:\Illuminate\Support\Carbon}>
+     */
+    private function parsePartsCsv(string $csv): array
+    {
+        $handle = fopen('php://temp', 'r+');
+        if ($handle === false) {
+            return [];
+        }
+
+        fwrite($handle, $csv);
+        rewind($handle);
+
+        $headers = fgetcsv($handle);
+        if ($headers === false) {
+            fclose($handle);
+
+            return [];
+        }
+
+        $columns = $this->partsCsvColumns($headers);
+        if ($columns['quantity'] === null || $columns['model'] === null || $columns['box'] === null) {
+            fclose($handle);
+
+            return [];
+        }
+
+        $rows = [];
+        $sortOrder = 1;
+        $now = now();
+
+        while (($line = fgetcsv($handle)) !== false) {
+            $model = trim((string) ($line[$columns['model']] ?? ''));
+            $box = $this->normalizePartBox((string) ($line[$columns['box']] ?? ''));
+
+            if ($model === '' || $box === '') {
+                continue;
+            }
+
+            $quantity = trim((string) ($line[$columns['quantity']] ?? ''));
+
+            $rows[] = [
+                'quantity' => $quantity === '' ? 1 : max(0, (int) $quantity),
+                'model' => $model,
+                'box' => $box,
+                'sort_order' => $sortOrder++,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        fclose($handle);
+
+        return $rows;
+    }
+
+    /**
+     * @param array<int, string|null> $headers
+     * @return array{quantity:?int, model:?int, box:?int}
+     */
+    private function partsCsvColumns(array $headers): array
+    {
+        $columns = [
+            'quantity' => null,
+            'model' => null,
+            'box' => null,
+        ];
+
+        foreach ($headers as $index => $header) {
+            $normalized = Str::of((string) $header)
+                ->trim()
+                ->lower()
+                ->ascii()
+                ->replaceMatches('/[^a-z0-9]+/', '_')
+                ->trim('_')
+                ->toString();
+
+            if (in_array($normalized, ['cantidad', 'quantity', 'stock'], true)) {
+                $columns['quantity'] = $index;
+            } elseif (in_array($normalized, ['modelo', 'model', 'repuesto'], true)) {
+                $columns['model'] = $index;
+            } elseif (in_array($normalized, ['caja', 'box'], true)) {
+                $columns['box'] = $index;
+            }
+        }
+
+        return $columns;
+    }
+
+    private function normalizePartBox(string $box): string
+    {
+        return Str::of($box)
+            ->trim()
+            ->lower()
+            ->ascii()
+            ->replaceMatches('/[^a-z]/', '')
+            ->substr(0, 16)
+            ->toString();
+    }
+
+    private function pendingCellphoneRepairType(RepairOrder $order): string
+    {
+        $text = Str::of((string) $order->descripcion . ' ' . (string) $order->repuesto)
+            ->lower()
+            ->ascii()
+            ->toString();
+
+        return match (true) {
+            str_contains($text, 'modulo'), str_contains($text, 'pantalla'), str_contains($text, 'display') => 'Cambio de modulo',
+            str_contains($text, 'bateria') => 'Cambio de bateria',
+            str_contains($text, 'pin'), str_contains($text, 'carga') => 'Cambio de pin',
+            str_contains($text, 'placa') => 'Trabajo en placa',
+            str_contains($text, 'sistema'), str_contains($text, 'software') => 'Software / sistema',
+            str_contains($text, 'desbloqueo') => 'Desbloqueo',
+            str_contains($text, 'revision'), str_contains($text, 'diagnostico') => 'Revision / diagnostico',
+            default => 'Otros trabajos',
+        };
     }
 
     private function serializeRepairPart(RepairPart $part): array
