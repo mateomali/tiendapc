@@ -27,6 +27,9 @@ use RuntimeException;
 
 class WorkbenchController extends Controller
 {
+    private const PARTS_SPREADSHEET_CONFIG_KEY = 'repair_parts_spreadsheet_url';
+    private const DEFAULT_PARTS_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/15Yf1xz10GVpduWHsEH1ySmCxOCuIw6SUfUTc-6Li1-Q/edit?usp=drive_link';
+
     /** @var array<int, int>|null */
     private ?array $taskQueuePositions = null;
 
@@ -342,6 +345,32 @@ class WorkbenchController extends Controller
         return back()->with('success', sprintf('Inventario sincronizado: %d repuesto(s) importados.', count($rows)));
     }
 
+    public function partsSettings(): Response
+    {
+        $spreadsheetUrl = $this->partsSpreadsheetPageUrl();
+
+        return Inertia::render('Repairs/PartsSettingsPage', [
+            'spreadsheetUrl' => $spreadsheetUrl,
+            'csvUrl' => $this->partsSpreadsheetCsvUrl(),
+            'defaultSpreadsheetUrl' => self::DEFAULT_PARTS_SPREADSHEET_URL,
+            'actions' => [
+                'save' => route('repairs.parts.settings.save'),
+            ],
+        ]);
+    }
+
+    public function savePartsSettings(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'spreadsheet_url' => ['required', 'url', 'max:1000'],
+        ]);
+
+        $spreadsheetUrl = trim((string) $validated['spreadsheet_url']);
+        SiteGlobalConfig::putValue(self::PARTS_SPREADSHEET_CONFIG_KEY, $spreadsheetUrl);
+
+        return back()->with('success', 'Base de repuestos actualizada.');
+    }
+
     public function updatePartInventory(Request $request, RepairPart $repairPart): RedirectResponse
     {
         if ($repairPart->reserved_order_id !== null) {
@@ -435,7 +464,44 @@ class WorkbenchController extends Controller
 
     private function partsSpreadsheetCsvUrl(): string
     {
-        return 'https://docs.google.com/spreadsheets/d/15Yf1xz10GVpduWHsEH1ySmCxOCuIw6SUfUTc-6Li1-Q/export?format=csv&gid=0';
+        return $this->spreadsheetPageUrlToCsv($this->partsSpreadsheetPageUrl());
+    }
+
+    private function partsSpreadsheetPageUrl(): string
+    {
+        $configured = trim((string) SiteGlobalConfig::value(self::PARTS_SPREADSHEET_CONFIG_KEY, self::DEFAULT_PARTS_SPREADSHEET_URL));
+
+        return $configured !== '' ? $configured : self::DEFAULT_PARTS_SPREADSHEET_URL;
+    }
+
+    private function spreadsheetPageUrlToCsv(string $url): string
+    {
+        $url = trim($url);
+
+        if (str_contains($url, '/export') && str_contains($url, 'format=csv')) {
+            return $url;
+        }
+
+        if (preg_match('~/spreadsheets/d/([^/?#]+)~', $url, $matches) !== 1) {
+            return $url;
+        }
+
+        $gid = '0';
+        $query = (string) parse_url($url, PHP_URL_QUERY);
+        parse_str($query, $params);
+
+        if (isset($params['gid']) && is_scalar($params['gid'])) {
+            $gid = preg_replace('/\D+/', '', (string) $params['gid']) ?: '0';
+        } else {
+            $fragment = (string) parse_url($url, PHP_URL_FRAGMENT);
+            parse_str($fragment, $fragmentParams);
+
+            if (isset($fragmentParams['gid']) && is_scalar($fragmentParams['gid'])) {
+                $gid = preg_replace('/\D+/', '', (string) $fragmentParams['gid']) ?: '0';
+            }
+        }
+
+        return sprintf('https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s', $matches[1], $gid);
     }
 
     /**
@@ -712,7 +778,24 @@ class WorkbenchController extends Controller
     {
         return Inertia::render('Repairs/MetricsPage', [
             'metrics' => $repairService->metrics(),
+            'actions' => [
+                'saveSettings' => route('repairs.metrics.settings.save'),
+            ],
         ]);
+    }
+
+    public function saveMetricsSettings(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'profit_percentage' => ['required', 'numeric', 'min:0', 'max:1000'],
+        ]);
+
+        SiteGlobalConfig::putValue(
+            RepairService::PROFIT_PERCENT_CONFIG_KEY,
+            rtrim(rtrim(number_format((float) $validated['profit_percentage'], 2, '.', ''), '0'), '.'),
+        );
+
+        return back()->with('success', 'Porcentaje de ganancia actualizado.');
     }
 
     public function lists(RepairService $repairService): Response

@@ -1,6 +1,8 @@
-import { type CSSProperties, useMemo, useState } from 'react';
-import { FaChartBar } from 'react-icons/fa';
+import { useForm } from '@inertiajs/react';
+import { type CSSProperties, type FormEvent, useMemo, useState } from 'react';
+import { FaChartBar, FaPercent, FaSave } from 'react-icons/fa';
 import { RepairLayout } from '../../layouts/RepairLayout';
+import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
 import { formatCurrency } from '../../utils';
 
 interface RankedMetric {
@@ -23,6 +25,10 @@ interface MetricsPageProps {
             yearPaid: number;
             quarterPaid: number;
             monthPaid: number;
+            profitPercentage: number;
+            yearRealProfit: number;
+            quarterRealProfit: number;
+            monthRealProfit: number;
             openBalance: number;
             averageTicket: number;
             collectionRate: number;
@@ -38,12 +44,26 @@ interface MetricsPageProps {
         statusBreakdown: RankedMetric[];
         monthlyBilled: MonthlyMetric[];
     };
+    actions: {
+        saveSettings: string;
+    };
 }
 
 type ChartMode = 'billing' | 'collection' | 'models' | 'workTypes' | 'states';
 
-export default function MetricsPage({ metrics }: MetricsPageProps): JSX.Element {
+interface MetricsSettingsForm {
+    profit_percentage: string;
+}
+
+export default function MetricsPage({ metrics, actions }: MetricsPageProps): JSX.Element {
     const [chartMode, setChartMode] = useState<ChartMode>('billing');
+    const settingsForm = useForm<MetricsSettingsForm>({
+        profit_percentage: String(metrics.totals.profitPercentage ?? 20),
+    });
+    const profitPercentage = Number.parseFloat(settingsForm.data.profit_percentage || '0');
+    const normalizedProfitPercentage = Number.isFinite(profitPercentage) ? Math.min(1000, Math.max(0, profitPercentage)) : 0;
+    const realProfitShare = normalizedProfitPercentage > 0 ? (normalizedProfitPercentage / (100 + normalizedProfitPercentage)) * 100 : 0;
+    const expensePercentage = Math.max(0, 100 - realProfitShare);
     const collectionData = useMemo(() => [
         { label: 'Ano', billed: metrics.totals.yearBilled, paid: metrics.totals.yearPaid },
         { label: 'Trimestre', billed: metrics.totals.quarterBilled, paid: metrics.totals.quarterPaid },
@@ -51,12 +71,17 @@ export default function MetricsPage({ metrics }: MetricsPageProps): JSX.Element 
     ], [metrics.totals.monthBilled, metrics.totals.monthPaid, metrics.totals.quarterBilled, metrics.totals.quarterPaid, metrics.totals.yearBilled, metrics.totals.yearPaid]);
 
     const chartButtons: Array<{ key: ChartMode; label: string }> = [
-        { key: 'billing', label: 'Facturado' },
+        { key: 'billing', label: 'Ganancia' },
         { key: 'collection', label: 'Cobrado' },
         { key: 'models', label: 'Modelos' },
         { key: 'workTypes', label: 'Trabajos' },
         { key: 'states', label: 'Estados' },
     ];
+
+    const saveSettings = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        settingsForm.post(actions.saveSettings, { preserveScroll: true });
+    };
 
     return (
         <RepairLayout title="Metricas">
@@ -64,20 +89,48 @@ export default function MetricsPage({ metrics }: MetricsPageProps): JSX.Element 
                 <div className="flex flex-wrap items-end justify-between gap-3">
                     <div>
                         <h1 className="text-xl font-black text-[#0f172a]">Metricas de reparaciones</h1>
-                        <p className="text-sm font-semibold text-[#64748b]">Facturacion, cobros y demanda del taller.</p>
+                        <p className="text-sm font-semibold text-[#64748b]">Ganancias reconocidas, cobros y demanda del taller.</p>
                     </div>
+                    <form onSubmit={saveSettings} className="grid gap-1 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-2 sm:grid-cols-[10rem_auto] sm:items-end">
+                        <label className="grid gap-1 text-xs font-black text-[#334155]">
+                            Ganancia estimada
+                            <span className="relative">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="1000"
+                                    step="0.01"
+                                    className={ui.repairDenseInput}
+                                    value={settingsForm.data.profit_percentage}
+                                    onChange={(event) => settingsForm.setData('profit_percentage', event.target.value)}
+                                    required
+                                />
+                                <FaPercent className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b]" aria-hidden="true" />
+                            </span>
+                        </label>
+                        <button type="submit" className={buttonClass('primary', 'sm')} disabled={settingsForm.processing}>
+                            <FaSave aria-hidden="true" />
+                            Guardar
+                        </button>
+                        <p className="text-xs font-semibold text-[#64748b] sm:col-span-2">
+                            Margen sobre costo: {normalizedProfitPercentage}%. Sobre lo cobrado: {realProfitShare.toFixed(1)}% ganancia real, {expensePercentage.toFixed(1)}% costo/gastos.
+                        </p>
+                    </form>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-3">
-                    <MetricBox label="Facturado este ano" value={formatCurrency(metrics.totals.yearBilled)} />
-                    <MetricBox label="Facturado trimestre" value={formatCurrency(metrics.totals.quarterBilled)} />
-                    <MetricBox label="Facturado mes" value={formatCurrency(metrics.totals.monthBilled)} />
+                    <MetricBox label="Ganancia este ano" value={formatCurrency(metrics.totals.yearBilled)} />
+                    <MetricBox label="Ganancia trimestre" value={formatCurrency(metrics.totals.quarterBilled)} />
+                    <MetricBox label="Ganancia mes" value={formatCurrency(metrics.totals.monthBilled)} />
+                    <MetricBox label="Ganancia real ano" value={formatCurrency(metrics.totals.yearRealProfit)} />
+                    <MetricBox label="Ganancia real trimestre" value={formatCurrency(metrics.totals.quarterRealProfit)} />
+                    <MetricBox label="Ganancia real mes" value={formatCurrency(metrics.totals.monthRealProfit)} />
                     <MetricBox label="Cobrado este ano" value={formatCurrency(metrics.totals.yearPaid)} />
                     <MetricBox label="Pendiente de pago listas" value={formatCurrency(metrics.totals.openBalance)} />
                     <MetricBox label="Ticket promedio" value={formatCurrency(metrics.totals.averageTicket)} />
                     <MetricBox label="Ordenes activas" value={String(metrics.counts.active)} />
                     <MetricBox label="Listas para retirar" value={String(metrics.counts.ready)} />
-                    <MetricBox label="Cobrado / facturado" value={`${metrics.totals.collectionRate}%`} />
+                    <MetricBox label="Cobrado / ganancia" value={`${metrics.totals.collectionRate}%`} />
                 </div>
 
                 <div className="flex flex-wrap gap-2 border-y border-[#e2e8f0] py-3">
@@ -146,7 +199,7 @@ function MonthlyBillingChart({ items }: { items: MonthlyMetric[] }): JSX.Element
 
     return (
         <section className="grid gap-3 rounded-lg border border-[#e2e8f0] p-3">
-            <h2 className="text-sm font-black text-[#0f172a]">Facturado por mes</h2>
+            <h2 className="text-sm font-black text-[#0f172a]">Ganancia por mes</h2>
             <div className="grid gap-2">
                 {items.map((item) => (
                     <div key={item.label} className="grid grid-cols-[3rem_1fr_7rem] items-center gap-2 text-sm">
@@ -167,7 +220,7 @@ function CollectionChart({ items }: { items: Array<{ label: string; billed: numb
 
     return (
         <section className="grid gap-3 rounded-lg border border-[#e2e8f0] p-3">
-            <h2 className="text-sm font-black text-[#0f172a]">Cobrado vs facturado</h2>
+            <h2 className="text-sm font-black text-[#0f172a]">Cobrado vs ganancia</h2>
             <div className="grid gap-3">
                 {items.map((item) => (
                     <div key={item.label} className="grid gap-1.5 text-sm">
@@ -185,7 +238,7 @@ function CollectionChart({ items }: { items: Array<{ label: string; billed: numb
                 ))}
             </div>
             <div className="flex flex-wrap gap-3 text-xs font-bold text-[#64748b]">
-                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-[#2563eb]" />Facturado</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-[#2563eb]" />Ganancia</span>
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-[#059669]" />Cobrado</span>
             </div>
         </section>

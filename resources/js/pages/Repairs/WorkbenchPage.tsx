@@ -305,6 +305,113 @@ const columnFilterKeys = [
 
 type SortableRepairColumn = 'ticket' | 'cliente' | 'dni' | 'contacto' | 'ingreso' | 'trabajo' | 'modelo' | 'falla' | 'estimada' | 'saldo' | 'estado';
 
+interface TicketDateGroup {
+    key: string;
+    label: string;
+    count: number;
+    repairCount: number;
+    tickets: RepairTicketView[];
+}
+
+function localDateKey(date = new Date()): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+
+const weekdayLabels = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'] as const;
+const monthLabels = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+] as const;
+
+function dateGroupLabel(value?: string | null): string {
+    if (!value) {
+        return 'Sin fecha';
+    }
+
+    const key = value.slice(0, 10);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    if (key === localDateKey(today)) {
+        return 'Hoy';
+    }
+
+    if (key === localDateKey(yesterday)) {
+        return 'Ayer';
+    }
+
+    const [year, month, day] = key.split('-');
+
+    if (!year || !month || !day) {
+        return 'Sin fecha';
+    }
+
+    const parsedYear = Number(year);
+    const parsedMonth = Number(month);
+    const parsedDay = Number(day);
+
+    if (
+        !Number.isInteger(parsedYear) ||
+        !Number.isInteger(parsedMonth) ||
+        !Number.isInteger(parsedDay) ||
+        parsedMonth < 1 ||
+        parsedMonth > 12 ||
+        parsedDay < 1 ||
+        parsedDay > 31
+    ) {
+        return 'Sin fecha';
+    }
+
+    const date = new Date(parsedYear, parsedMonth - 1, parsedDay);
+
+    if (date.getFullYear() !== parsedYear || date.getMonth() !== parsedMonth - 1 || date.getDate() !== parsedDay) {
+        return 'Sin fecha';
+    }
+
+    return `${weekdayLabels[date.getDay()]} ${parsedDay} de ${monthLabels[parsedMonth - 1]} del ${parsedYear}`;
+}
+
+function groupTicketsByEntryDate(tickets: RepairTicketView[]): TicketDateGroup[] {
+    const groups = new Map<string, TicketDateGroup>();
+
+    tickets.forEach((ticket) => {
+        const key = ticket.fecha?.slice(0, 10) || 'sin-fecha';
+        const group = groups.get(key);
+
+        if (group) {
+            group.tickets.push(ticket);
+            group.count += 1;
+            group.repairCount += ticket.repairs.length;
+            return;
+        }
+
+        groups.set(key, {
+            key,
+            label: dateGroupLabel(ticket.fecha),
+            count: 1,
+            repairCount: ticket.repairs.length,
+            tickets: [ticket],
+        });
+    });
+
+    return Array.from(groups.values());
+}
+
 export default function WorkbenchPage({
     filters,
     tickets,
@@ -360,6 +467,7 @@ export default function WorkbenchPage({
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
+    const ticketDateGroups = groupTicketsByEntryDate(tickets);
 
     const toggleDesktopTicket = (ticketId: number): void => {
         setExpandedDesktopTickets((current) => ({
@@ -1760,25 +1868,31 @@ export default function WorkbenchPage({
                         </form>
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (
-                                tickets.flatMap((ticket) => {
-                                    const expanded = expandedDesktopTickets[ticket.id] ?? false;
-                                    const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+                                ticketDateGroups.flatMap((group) => [
+                                    <div key={`desktop-date-group-${group.key}`} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
+                                        <span>{group.label}</span>
+                                        <span className="text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'} - {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}</span>
+                                    </div>,
+                                    ...group.tickets.flatMap((ticket) => {
+                                        const expanded = expandedDesktopTickets[ticket.id] ?? false;
+                                        const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
 
-                                    return desktopRepairs.map((repair, repairIndex) => (
-                                        <RepairDesktopRow
-                                            key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
-                                            ticket={ticket}
-                                            repair={repair}
-                                            serviceCategories={serviceCategories}
-                                            serviceTemplates={serviceTemplates}
-                                            partInventory={partInventory}
-                                            rowIndex={repairIndex}
-                                            rowTotal={ticket.repairs.length}
-                                            desktopGroupExpanded={expanded}
-                                            onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
-                                        />
-                                    ));
-                                })
+                                        return desktopRepairs.map((repair, repairIndex) => (
+                                            <RepairDesktopRow
+                                                key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                                                ticket={ticket}
+                                                repair={repair}
+                                                serviceCategories={serviceCategories}
+                                                serviceTemplates={serviceTemplates}
+                                                partInventory={partInventory}
+                                                rowIndex={repairIndex}
+                                                rowTotal={ticket.repairs.length}
+                                                desktopGroupExpanded={expanded}
+                                                onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
+                                            />
+                                        ));
+                                    }),
+                                ])
                             ) : (
                                 <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets activos para los filtros actuales.</div>
                             )}
@@ -1787,16 +1901,24 @@ export default function WorkbenchPage({
                 </div>
 
                 <div className="grid gap-3 xl:hidden">
-                    {tickets.map((ticket) => (
-                        <RepairTicketPanel
-                            key={ticket.id}
-                            ticket={ticket}
-                            states={states}
-                            serviceCategories={serviceCategories}
-                            serviceTemplates={serviceTemplates}
-                            partInventory={partInventory}
-                            allowAddRepair
-                        />
+                    {ticketDateGroups.map((group) => (
+                        <section key={`mobile-date-group-${group.key}`} className="grid gap-2">
+                            <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
+                                <span>{group.label}</span>
+                                <span className="text-xs text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'}</span>
+                            </div>
+                            {group.tickets.map((ticket) => (
+                                <RepairTicketPanel
+                                    key={ticket.id}
+                                    ticket={ticket}
+                                    states={states}
+                                    serviceCategories={serviceCategories}
+                                    serviceTemplates={serviceTemplates}
+                                    partInventory={partInventory}
+                                    allowAddRepair
+                                />
+                            ))}
+                        </section>
                     ))}
                     {tickets.length === 0 ? <div className="rounded-lg border border-[#cbd5e1] bg-white p-6 text-center font-semibold text-[#475569] shadow-sm">No hay tickets activos para los filtros actuales.</div> : null}
                 </div>

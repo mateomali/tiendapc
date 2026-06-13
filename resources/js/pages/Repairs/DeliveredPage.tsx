@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
@@ -33,6 +33,118 @@ interface DeliveredPageProps {
         total: number;
         perPage: number;
     };
+}
+
+interface DeliveredDateGroup {
+    key: string;
+    label: string;
+    count: number;
+    repairCount: number;
+    tickets: RepairTicketView[];
+}
+
+function localDateKey(date = new Date()): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
+
+const weekdayLabels = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'] as const;
+const monthLabels = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+] as const;
+
+function dateGroupLabel(value?: string | null): string {
+    if (!value) {
+        return 'Sin fecha';
+    }
+
+    const key = value.slice(0, 10);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    if (key === localDateKey(today)) {
+        return 'Hoy';
+    }
+
+    if (key === localDateKey(yesterday)) {
+        return 'Ayer';
+    }
+
+    const [year, month, day] = key.split('-');
+
+    if (!year || !month || !day) {
+        return 'Sin fecha';
+    }
+
+    const parsedYear = Number(year);
+    const parsedMonth = Number(month);
+    const parsedDay = Number(day);
+
+    if (
+        !Number.isInteger(parsedYear) ||
+        !Number.isInteger(parsedMonth) ||
+        !Number.isInteger(parsedDay) ||
+        parsedMonth < 1 ||
+        parsedMonth > 12 ||
+        parsedDay < 1 ||
+        parsedDay > 31
+    ) {
+        return 'Sin fecha';
+    }
+
+    const date = new Date(parsedYear, parsedMonth - 1, parsedDay);
+
+    if (date.getFullYear() !== parsedYear || date.getMonth() !== parsedMonth - 1 || date.getDate() !== parsedDay) {
+        return 'Sin fecha';
+    }
+
+    return `${weekdayLabels[date.getDay()]} ${parsedDay} de ${monthLabels[parsedMonth - 1]} del ${parsedYear}`;
+}
+
+function deliveredGroupDate(ticket: RepairTicketView): string | null {
+    return ticket.repairs[0]?.fecha_entregado ?? ticket.fecha ?? null;
+}
+
+function groupTicketsByDeliveredDate(tickets: RepairTicketView[]): DeliveredDateGroup[] {
+    const groups = new Map<string, DeliveredDateGroup>();
+
+    tickets.forEach((ticket) => {
+        const value = deliveredGroupDate(ticket);
+        const key = value?.slice(0, 10) || 'sin-fecha';
+        const group = groups.get(key);
+
+        if (group) {
+            group.tickets.push(ticket);
+            group.count += 1;
+            group.repairCount += ticket.repairs.length;
+            return;
+        }
+
+        groups.set(key, {
+            key,
+            label: dateGroupLabel(value),
+            count: 1,
+            repairCount: ticket.repairs.length,
+            tickets: [ticket],
+        });
+    });
+
+    return Array.from(groups.values());
 }
 
 export default function DeliveredPage({ filters, tickets, summary, states, pagination, pageKind = 'delivered', pageTitle = 'Entregados', indexRoute = 'repairs.delivered' }: DeliveredPageProps): JSX.Element {
@@ -254,6 +366,8 @@ function DeliveredTicketList({
     emptyLabel: string;
     archived?: boolean;
 }): JSX.Element {
+    const ticketDateGroups = groupTicketsByDeliveredDate(tickets);
+
     return (
         <>
             <div className="hidden overflow-x-auto rounded-[16px] border border-[#dbe7f6] bg-white shadow-[0_14px_32px_rgba(15,23,42,0.09)] ring-1 ring-white/70 xl:block">
@@ -274,25 +388,35 @@ function DeliveredTicketList({
                     </div>
                     <div className="grid bg-white">
                         {tickets.length > 0 ? (
-                            tickets.flatMap((ticket) => {
-                                const expanded = expandedDesktopTickets[ticket.id] ?? false;
-                                const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+                            ticketDateGroups.map((group) => (
+                                <Fragment key={`delivered-desktop-group-${group.key}`}>
+                                    <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
+                                        <span>{group.label}</span>
+                                        <span>
+                                            {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}
+                                        </span>
+                                    </div>
+                                    {group.tickets.flatMap((ticket) => {
+                                        const expanded = expandedDesktopTickets[ticket.id] ?? false;
+                                        const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
 
-                                return desktopRepairs.map((repair, repairIndex) => (
-                                    <RepairDesktopRow
-                                        key={`delivered-desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
-                                        ticket={ticket}
-                                        repair={repair}
-                                        serviceCategories={serviceCategories}
-                                        rowIndex={repairIndex}
-                                        rowTotal={ticket.repairs.length}
-                                        desktopGroupExpanded={expanded}
-                                        onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => onToggleDesktopTicket(ticket.id) : undefined}
-                                        readOnly
-                                        archived={archived}
-                                    />
-                                ));
-                            })
+                                        return desktopRepairs.map((repair, repairIndex) => (
+                                            <RepairDesktopRow
+                                                key={`delivered-desktop-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                                                ticket={ticket}
+                                                repair={repair}
+                                                serviceCategories={serviceCategories}
+                                                rowIndex={repairIndex}
+                                                rowTotal={ticket.repairs.length}
+                                                desktopGroupExpanded={expanded}
+                                                onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => onToggleDesktopTicket(ticket.id) : undefined}
+                                                readOnly
+                                                archived={archived}
+                                            />
+                                        ));
+                                    })}
+                                </Fragment>
+                            ))
                         ) : (
                             <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">{emptyLabel}</div>
                         )}
@@ -300,15 +424,25 @@ function DeliveredTicketList({
                 </div>
             </div>
             <div className="grid gap-3 xl:hidden">
-                {tickets.map((ticket) => (
-                    <RepairTicketPanel
-                        key={ticket.id}
-                        ticket={ticket}
-                        states={states}
-                        serviceCategories={serviceCategories}
-                        readOnly
-                        archived={archived}
-                    />
+                {ticketDateGroups.map((group) => (
+                    <Fragment key={`delivered-mobile-group-${group.key}`}>
+                        <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
+                            <span>{group.label}</span>
+                            <span>
+                                {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}
+                            </span>
+                        </div>
+                        {group.tickets.map((ticket) => (
+                            <RepairTicketPanel
+                                key={ticket.id}
+                                ticket={ticket}
+                                states={states}
+                                serviceCategories={serviceCategories}
+                                readOnly
+                                archived={archived}
+                            />
+                        ))}
+                    </Fragment>
                 ))}
                 {tickets.length === 0 ? <div className="rounded-lg border border-white/70 bg-white/90 p-6 text-center font-semibold text-[#475569] shadow-sm">{emptyLabel}</div> : null}
             </div>

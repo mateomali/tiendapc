@@ -1,6 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
+import { useState } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { FaArchive, FaChartBar, FaClipboardCheck, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
+import { FaArchive, FaChartBar, FaClipboardCheck, FaDatabase, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
 import { FlashMessages } from '../components/FlashMessages';
 import type { SharedPageProps } from '../types';
 import { cn } from '../utils';
@@ -17,6 +18,11 @@ interface NavItem {
     icon: ReactNode;
 }
 
+interface NavGroup {
+    label: string;
+    items: NavItem[];
+}
+
 function hasZiggyRoute(name: string): boolean {
     try {
         const router = route();
@@ -27,23 +33,51 @@ function hasZiggyRoute(name: string): boolean {
     }
 }
 
+function isNavMatch(currentUrl: string, match: string): boolean {
+    if (match === '/repuestos') {
+        return currentUrl === match || currentUrl.startsWith(`${match}?`);
+    }
+
+    return currentUrl === match || currentUrl.startsWith(`${match}/`) || currentUrl.startsWith(`${match}?`);
+}
+
 export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Element {
     const page = usePage<SharedPageProps>();
     const currentUrl = page.url;
     const { auth } = page.props;
+    const [openNavGroup, setOpenNavGroup] = useState<string | null>(null);
 
-    const navItems: NavItem[] = [
-        { href: route('admin.app'), label: 'Sudoku App', shortLabel: 'App', match: '/admin', icon: <FaHome aria-hidden="true" /> },
-        { href: route('admin.products.index'), label: 'Productos y ventas', shortLabel: 'Prod.', match: '/admin/productos', icon: <FaExternalLinkAlt aria-hidden="true" /> },
+    const directNavItems: NavItem[] = [
         { href: route('repairs.workbench'), label: 'Consultas', shortLabel: 'Cons.', match: '/consulta', icon: <FaSearch aria-hidden="true" /> },
-        ...(hasZiggyRoute('tasks.index') ? [{ href: route('tasks.index'), label: 'Tareas', shortLabel: 'Tareas', match: '/tareas', icon: <FaClipboardCheck aria-hidden="true" /> }] : []),
         { href: route('repairs.ingress'), label: 'Nueva Orden', shortLabel: 'Ingreso', match: '/ingreso', icon: <FaInbox aria-hidden="true" /> },
-        { href: route('repairs.parts'), label: 'Repuestos', shortLabel: 'Rep.', match: '/repuestos', icon: <FaTools aria-hidden="true" /> },
-        { href: route('repairs.lists'), label: 'Listas', shortLabel: 'Listas', match: '/listas-reparacion', icon: <FaList aria-hidden="true" /> },
-        ...(hasZiggyRoute('repairs.metrics') ? [{ href: route('repairs.metrics'), label: 'Metricas', shortLabel: 'Met.', match: '/metricas', icon: <FaChartBar aria-hidden="true" /> }] : []),
-        { href: route('repairs.delivered'), label: 'Entregados', shortLabel: 'Entreg.', match: '/entregados', icon: <FaTools aria-hidden="true" /> },
-        ...(hasZiggyRoute('repairs.archived') ? [{ href: route('repairs.archived'), label: 'Archivados', shortLabel: 'Arch.', match: '/archivados', icon: <FaArchive aria-hidden="true" /> }] : []),
-        { href: route('repairs.tracking'), label: 'Consulta publica', shortLabel: 'Publica', match: '/reparacion', icon: <FaSearch aria-hidden="true" /> },
+        ...(hasZiggyRoute('tasks.index') ? [{ href: route('tasks.index'), label: 'Tareas', shortLabel: 'Tareas', match: '/tareas', icon: <FaClipboardCheck aria-hidden="true" /> }] : []),
+    ];
+
+    const navGroups: NavGroup[] = [
+        {
+            label: 'Repuestos',
+            items: [
+                { href: route('repairs.parts'), label: 'Repuestos', shortLabel: 'Rep.', match: '/repuestos', icon: <FaTools aria-hidden="true" /> },
+                { href: route('repairs.lists'), label: 'Opciones', shortLabel: 'Opc.', match: '/listas-reparacion', icon: <FaList aria-hidden="true" /> },
+                { href: route('repairs.parts.settings'), label: 'Base de repuestos', shortLabel: 'Base', match: '/repuestos/base', icon: <FaDatabase aria-hidden="true" /> },
+            ],
+        },
+        {
+            label: 'Control',
+            items: [
+                ...(hasZiggyRoute('repairs.metrics') ? [{ href: route('repairs.metrics'), label: 'Metricas', shortLabel: 'Met.', match: '/metricas', icon: <FaChartBar aria-hidden="true" /> }] : []),
+                { href: route('repairs.delivered'), label: 'Entregados', shortLabel: 'Entreg.', match: '/entregados', icon: <FaTools aria-hidden="true" /> },
+                ...(hasZiggyRoute('repairs.archived') ? [{ href: route('repairs.archived'), label: 'Archivados', shortLabel: 'Arch.', match: '/archivados', icon: <FaArchive aria-hidden="true" /> }] : []),
+            ],
+        },
+        {
+            label: 'Accesos',
+            items: [
+                { href: route('admin.products.index'), label: 'Productos y ventas', shortLabel: 'Prod.', match: '/admin/productos', icon: <FaExternalLinkAlt aria-hidden="true" /> },
+                { href: route('repairs.tracking'), label: 'Consulta publica', shortLabel: 'Publica', match: '/reparacion', icon: <FaSearch aria-hidden="true" /> },
+                { href: route('store.catalog'), label: 'Tienda', shortLabel: 'Tienda', match: '/productos', icon: <FaHome aria-hidden="true" /> },
+            ],
+        },
     ];
 
     const navLinkClasses =
@@ -51,6 +85,9 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     const navLinkActiveClasses = 'border-[#bfdbfe] bg-white !text-[#0b3a83] shadow-sm';
     const newOrderLinkClasses = 'border-[#7dd3fc] bg-[#38bdf8] text-[#082f49] shadow-sm hover:border-[#bae6fd] hover:bg-[#0ea5e9] hover:text-white';
     const newOrderActiveClasses = 'border-[#bae6fd] bg-[#0ea5e9] text-white shadow-sm';
+    const navMenuClasses = 'relative shrink-0';
+    const navMenuButtonClasses = 'flex min-h-8 cursor-pointer items-center justify-between gap-2 rounded-md border border-white/15 bg-white/10 px-2.5 py-1.5 text-[0.72rem] font-black text-[#eaf2ff] transition hover:border-[#7fb4ff] hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#bfdbfe] xl:min-h-9 xl:px-3 xl:text-[0.82rem]';
+    const navMenuPanelClasses = 'absolute left-0 z-40 mt-1 grid min-w-[12rem] gap-1 rounded-md border border-white/20 bg-[#123f91] p-1.5 shadow-[0_12px_24px_rgba(8,24,60,0.24)]';
 
     return (
         <>
@@ -66,10 +103,16 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                             </Link>
                             <div className="xl:hidden">
                                 {auth.user ? (
-                                    <Link href={route('logout')} method="post" as="button" className={cn(navLinkClasses, 'bg-white/10')} aria-label="Salir" title="Salir">
-                                        <FaPowerOff aria-hidden="true" />
-                                        <span>Salir</span>
-                                    </Link>
+                                    <div className="flex gap-1">
+                                        <Link href={route('admin.app')} className={cn(navLinkClasses, 'bg-white/10')} aria-label="Sudoku App" title="Sudoku App">
+                                            <FaHome aria-hidden="true" />
+                                            <span>App</span>
+                                        </Link>
+                                        <Link href={route('logout')} method="post" as="button" className={cn(navLinkClasses, 'bg-white/10')} aria-label="Salir" title="Salir">
+                                            <FaPowerOff aria-hidden="true" />
+                                            <span>Salir</span>
+                                        </Link>
+                                    </div>
                                 ) : auth.isRepairTech ? (
                                     <Link href={route('repairs.logout')} className={cn(navLinkClasses, 'bg-white/10')} aria-label="Salir" title="Salir">
                                         <FaPowerOff aria-hidden="true" />
@@ -83,9 +126,9 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                                 )}
                             </div>
                         </div>
-                        <div className="-mx-0.5 flex gap-1 overflow-x-auto pb-0.5 xl:mx-0 xl:contents xl:overflow-visible xl:pb-0">
-                            {navItems.map((item) => {
-                                const isActive = currentUrl === item.match || currentUrl.startsWith(`${item.match}/`);
+                        <div className="-mx-0.5 flex gap-1 overflow-x-auto pb-0.5 xl:mx-0 xl:overflow-visible xl:pb-0">
+                            {directNavItems.map((item) => {
+                                const isActive = isNavMatch(currentUrl, item.match);
                                 const isNewOrder = item.match === '/ingreso';
 
                                 return (
@@ -93,6 +136,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                                         key={item.href}
                                         href={item.href}
                                         className={cn(navLinkClasses, isNewOrder && newOrderLinkClasses, isActive && (isNewOrder ? newOrderActiveClasses : navLinkActiveClasses))}
+                                        onClick={() => setOpenNavGroup(null)}
                                         aria-label={item.label}
                                         title={item.label}
                                     >
@@ -102,16 +146,58 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                                     </Link>
                                 );
                             })}
-                            <Link href={route('store.catalog')} className={navLinkClasses} aria-label="Tienda" title="Tienda">
-                                <FaHome aria-hidden="true" />
-                                <span>Tienda</span>
-                            </Link>
+                            {navGroups.map((group) => {
+                                const hasActiveItem = group.items.some((item) => isNavMatch(currentUrl, item.match));
+                                const isOpen = openNavGroup === group.label;
+
+                                return (
+                                    <div key={group.label} className={navMenuClasses}>
+                                        <button
+                                            type="button"
+                                            className={cn(navMenuButtonClasses, hasActiveItem && navLinkActiveClasses)}
+                                            aria-expanded={isOpen}
+                                            onClick={() => setOpenNavGroup(isOpen ? null : group.label)}
+                                        >
+                                            {group.label}
+                                            <span aria-hidden="true" className="text-[0.62rem]">{isOpen ? '^' : 'v'}</span>
+                                        </button>
+                                        {isOpen ? (
+                                            <div className={navMenuPanelClasses}>
+                                                {group.items.map((item) => {
+                                                    const isActive = isNavMatch(currentUrl, item.match);
+                                                    const isNewOrder = item.match === '/ingreso';
+
+                                                    return (
+                                                        <Link
+                                                            key={item.href}
+                                                            href={item.href}
+                                                            className={cn(navLinkClasses, 'justify-start', isNewOrder && newOrderLinkClasses, isActive && (isNewOrder ? newOrderActiveClasses : navLinkActiveClasses))}
+                                                            onClick={() => setOpenNavGroup(null)}
+                                                            aria-label={item.label}
+                                                            title={item.label}
+                                                        >
+                                                            {item.icon}
+                                                            <span>{item.label}</span>
+                                                        </Link>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
                         </div>
                         {auth.user ? (
-                            <Link href={route('logout')} method="post" as="button" className={cn(navLinkClasses, 'ml-auto !hidden xl:!inline-flex')}>
-                                <FaPowerOff aria-hidden="true" />
-                                <span>Salir</span>
-                            </Link>
+                            <div className="ml-auto hidden items-center gap-2 xl:flex">
+                                <Link href={route('admin.app')} className={navLinkClasses} aria-label="Sudoku App" title="Sudoku App">
+                                    <FaHome aria-hidden="true" />
+                                    <span>Sudoku App</span>
+                                </Link>
+                                <Link href={route('logout')} method="post" as="button" className={navLinkClasses}>
+                                    <FaPowerOff aria-hidden="true" />
+                                    <span>Salir</span>
+                                </Link>
+                            </div>
                         ) : auth.isRepairTech ? (
                             <Link href={route('repairs.logout')} className={cn(navLinkClasses, 'ml-auto !hidden xl:!inline-flex')}>
                                 <FaPowerOff aria-hidden="true" />

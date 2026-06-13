@@ -157,10 +157,10 @@ export default function ListsPage({ serviceCategories, serviceOptions, deviceMod
     };
 
     return (
-        <RepairLayout title="Listas de reparacion">
+        <RepairLayout title="Opciones de reparacion">
             <section className={ui.repairShell}>
                 <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                    <h1 className="text-xl font-black text-[#0f172a]">Listas de carga</h1>
+                    <h1 className="text-xl font-black text-[#0f172a]">Opciones de carga</h1>
                     <span className="text-sm font-semibold text-[#475569]">Modelos, tipos y fallas usados en ingreso.</span>
                 </div>
 

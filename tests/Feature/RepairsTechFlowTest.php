@@ -5,6 +5,7 @@ use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
 use App\Models\RepairServiceOption;
+use App\Models\SiteGlobalConfig;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('authenticates repair tech users and renders workbench', function (): void {
@@ -323,6 +324,20 @@ it('renders repair business metrics', function (): void {
         'entregado' => 'no',
     ]);
 
+    RepairOrder::query()->create([
+        'id' => 814,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Metricas Cancelada',
+        'dni' => 30111225,
+        'modelo' => 'Xiaomi Redmi',
+        'descripcion' => 'Cambio de bateria',
+        'monto' => 90000,
+        'senia' => 15000,
+        'estado' => 'CANCELADA',
+        'entregado' => 'no',
+    ]);
+
     RepairPayment::query()->create([
         'orden_id' => 811,
         'reparacion' => 1,
@@ -336,11 +351,28 @@ it('renders repair business metrics', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/MetricsPage')
-            ->where('metrics.totals.monthBilled', 160000)
+            ->where('metrics.totals.monthBilled', 60000)
             ->where('metrics.totals.monthPaid', 60000)
+            ->where('metrics.totals.profitPercentage', 20)
+            ->where('metrics.totals.monthRealProfit', 10000)
             ->where('metrics.totals.openBalance', 60000)
             ->where('metrics.counts.delivered', 1)
             ->where('metrics.topWorkTypes.0.label', 'Cambio de modulo/pantalla'));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.metrics.settings.save'), [
+            'profit_percentage' => 50,
+        ])
+        ->assertRedirect();
+
+    expect(SiteGlobalConfig::value('repair_metrics_profit_percentage'))->toBe('50');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.metrics'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('metrics.totals.profitPercentage', 50)
+            ->where('metrics.totals.monthRealProfit', 20000));
 });
 
 it('allows delivering repairs with explicit date and delivery channel', function (): void {

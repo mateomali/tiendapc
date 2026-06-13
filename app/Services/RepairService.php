@@ -9,6 +9,7 @@ use App\Models\RepairPayment;
 use App\Models\RepairPart;
 use App\Models\RepairTaskItem;
 use App\Models\RepairServiceOption;
+use App\Models\SiteGlobalConfig;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -20,6 +21,9 @@ use Illuminate\Support\Str;
 
 class RepairService
 {
+    public const PROFIT_PERCENT_CONFIG_KEY = 'repair_metrics_profit_percentage';
+    public const DEFAULT_PROFIT_PERCENTAGE = 20.0;
+
     public const ACTIVE_STATES = [
         'PENDIENTE',
         'EN REPARACION / ESPERA REPUESTO',
@@ -783,29 +787,34 @@ class RepairService
         $quarterStart = $now->startOfQuarter();
         $monthStart = $now->startOfMonth();
 
-        $billableQuery = fn () => RepairOrder::query()
-            ->whereNotIn('estado', ['CANCELADA'])
-            ->where('monto', '>', 0);
-
         $orders = RepairOrder::query()->get();
-        $billableOrders = $orders->filter(fn (RepairOrder $order): bool => $order->estado !== 'CANCELADA' && (float) $order->monto > 0);
-        $totalBilled = (float) $billableOrders->sum(fn (RepairOrder $order): float => (float) $order->monto);
         $payments = RepairPayment::query()->get();
-        $totalPaid = $this->metricPaidTotal($billableOrders, $payments);
+        $paymentGroups = $this->metricPaymentGroups($payments);
+        $revenueOrders = $orders->filter(fn (RepairOrder $order): bool => $this->metricOrderRevenue($order, $paymentGroups) > 0);
+        $totalRevenue = $this->metricRevenueTotal($orders, $payments);
+        $totalPaid = $totalRevenue;
+        $profitPercentage = $this->metricProfitPercentage();
+        $yearRevenue = $this->metricRevenueTotal($orders, $payments, $yearStart);
+        $quarterRevenue = $this->metricRevenueTotal($orders, $payments, $quarterStart);
+        $monthRevenue = $this->metricRevenueTotal($orders, $payments, $monthStart);
 
         return [
             'totals' => [
-                'yearBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $yearStart->toDateString())->sum('monto'),
-                'quarterBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $quarterStart->toDateString())->sum('monto'),
-                'monthBilled' => (float) $billableQuery()->whereDate('fecha', '>=', $monthStart->toDateString())->sum('monto'),
-                'yearPaid' => $this->metricPaidTotal($billableOrders, $payments, $yearStart),
-                'quarterPaid' => $this->metricPaidTotal($billableOrders, $payments, $quarterStart),
-                'monthPaid' => $this->metricPaidTotal($billableOrders, $payments, $monthStart),
+                'yearBilled' => $yearRevenue,
+                'quarterBilled' => $quarterRevenue,
+                'monthBilled' => $monthRevenue,
+                'yearPaid' => $yearRevenue,
+                'quarterPaid' => $quarterRevenue,
+                'monthPaid' => $monthRevenue,
+                'profitPercentage' => $profitPercentage,
+                'yearRealProfit' => $this->metricRealProfit($yearRevenue, $profitPercentage),
+                'quarterRealProfit' => $this->metricRealProfit($quarterRevenue, $profitPercentage),
+                'monthRealProfit' => $this->metricRealProfit($monthRevenue, $profitPercentage),
                 'openBalance' => (float) $orders
-                    ->filter(fn (RepairOrder $order): bool => $order->entregado !== 'si' && $order->estado === 'LISTA')
+                    ->filter(fn (RepairOrder $order): bool => $order->entregado !== 'si' && $order->estado === 'LISTA' && $order->estado !== 'CANCELADA')
                     ->sum(fn (RepairOrder $order): float => max(0, (float) $order->monto - (float) $order->senia)),
-                'averageTicket' => $billableOrders->count() > 0 ? round($totalBilled / $billableOrders->count(), 2) : 0,
-                'collectionRate' => $totalBilled > 0 ? round(($totalPaid / $totalBilled) * 100, 1) : 0,
+                'averageTicket' => $revenueOrders->count() > 0 ? round($totalRevenue / $revenueOrders->count(), 2) : 0,
+                'collectionRate' => $totalRevenue > 0 ? round(($totalPaid / $totalRevenue) * 100, 1) : 0,
             ],
             'counts' => [
                 'active' => $orders->where('entregado', 'no')->count(),
@@ -813,29 +822,37 @@ class RepairService
                 'cancelled' => $orders->where('estado', 'CANCELADA')->count(),
                 'ready' => $orders->where('estado', 'LISTA')->where('entregado', 'no')->count(),
             ],
-            'topModels' => $this->topTextMetric($billableOrders, 'modelo'),
-            'topWorkTypes' => $this->topWorkTypes($billableOrders),
+            'topModels' => $this->topTextMetric($revenueOrders, 'modelo', $paymentGroups),
+            'topWorkTypes' => $this->topWorkTypes($revenueOrders, $paymentGroups),
             'statusBreakdown' => $orders
                 ->groupBy(fn (RepairOrder $order): string => (string) ($order->estado ?: 'SIN ESTADO'))
                 ->map(fn (Collection $items, string $label): array => ['label' => $label, 'count' => $items->count()])
                 ->sortByDesc('count')
                 ->values()
                 ->all(),
-            'monthlyBilled' => $this->monthlyBilled($yearStart),
+            'monthlyBilled' => $this->monthlyBilled($yearStart, $orders, $payments),
         ];
     }
 
-    private function metricPaidTotal(Collection $orders, Collection $payments, ?CarbonImmutable $since = null): float
+    private function metricProfitPercentage(): float
     {
-        $paymentGroups = $payments
-            ->filter(function (RepairPayment $payment) use ($since): bool {
-                if ($since === null) {
-                    return true;
-                }
+        $configured = (float) SiteGlobalConfig::value(self::PROFIT_PERCENT_CONFIG_KEY, (string) self::DEFAULT_PROFIT_PERCENTAGE);
 
-                return optional($payment->paid_at)->format('Y-m-d') >= $since->toDateString();
-            })
-            ->groupBy(fn (RepairPayment $payment): string => $payment->orden_id . ':' . $payment->reparacion);
+        return min(1000.0, max(0.0, $configured));
+    }
+
+    private function metricRealProfit(float $revenue, float $profitPercentage): float
+    {
+        if ($profitPercentage <= 0) {
+            return 0.0;
+        }
+
+        return round(max(0, $revenue) * ($profitPercentage / (100 + $profitPercentage)), 2);
+    }
+
+    private function metricRevenueTotal(Collection $orders, Collection $payments, ?CarbonImmutable $since = null): float
+    {
+        $paymentGroups = $this->metricPaymentGroups($payments, $since);
 
         return (float) $orders->sum(function (RepairOrder $order) use ($paymentGroups, $since): float {
             if ($order->entregado === 'si') {
@@ -846,6 +863,10 @@ class RepairService
                 }
 
                 return (float) $order->monto;
+            }
+
+            if ($order->estado === 'CANCELADA') {
+                return 0;
             }
 
             $key = $order->id . ':' . $order->reparacion;
@@ -861,6 +882,42 @@ class RepairService
 
             return optional($order->fecha)->format('Y-m-d') >= $since->toDateString() ? (float) $order->senia : 0;
         });
+    }
+
+    /**
+     * @param Collection<int, RepairPayment> $payments
+     * @return Collection<string, Collection<int, RepairPayment>>
+     */
+    private function metricPaymentGroups(Collection $payments, ?CarbonImmutable $since = null): Collection
+    {
+        return $payments
+            ->filter(function (RepairPayment $payment) use ($since): bool {
+                if ($since === null) {
+                    return true;
+                }
+
+                return optional($payment->paid_at)->format('Y-m-d') >= $since->toDateString();
+            })
+            ->groupBy(fn (RepairPayment $payment): string => $payment->orden_id . ':' . $payment->reparacion);
+    }
+
+    /**
+     * @param Collection<string, Collection<int, RepairPayment>> $paymentGroups
+     */
+    private function metricOrderRevenue(RepairOrder $order, Collection $paymentGroups): float
+    {
+        if ($order->entregado === 'si') {
+            return max(0, (float) $order->monto);
+        }
+
+        if ($order->estado === 'CANCELADA') {
+            return 0;
+        }
+
+        $key = $order->id . ':' . $order->reparacion;
+        $paymentsTotal = (float) ($paymentGroups->get($key, collect())->sum(fn (RepairPayment $payment): float => (float) $payment->amount));
+
+        return max($paymentsTotal, (float) $order->senia, 0);
     }
 
     private function setState(RepairOrder $order, string $state, string $event): RepairOrder
@@ -1480,15 +1537,15 @@ class RepairService
      * @param Collection<int, RepairOrder> $orders
      * @return array<int, array{label:string,count:int,total:float}>
      */
-    private function topTextMetric(Collection $orders, string $field): array
+    private function topTextMetric(Collection $orders, string $field, Collection $paymentGroups): array
     {
         return $orders
-            ->map(function (RepairOrder $order) use ($field): array {
+            ->map(function (RepairOrder $order) use ($field, $paymentGroups): array {
                 $label = trim((string) ($order->{$field} ?? ''));
 
                 return [
                     'label' => $label !== '' ? Str::upper($label) : 'SIN DATO',
-                    'total' => (float) $order->monto,
+                    'total' => $this->metricOrderRevenue($order, $paymentGroups),
                 ];
             })
             ->groupBy('label')
@@ -1507,10 +1564,10 @@ class RepairService
      * @param Collection<int, RepairOrder> $orders
      * @return array<int, array{label:string,count:int,total:float}>
      */
-    private function topWorkTypes(Collection $orders): array
+    private function topWorkTypes(Collection $orders, Collection $paymentGroups): array
     {
         return $orders
-            ->map(function (RepairOrder $order): array {
+            ->map(function (RepairOrder $order) use ($paymentGroups): array {
                 $text = Str::lower((string) $order->descripcion . ' ' . (string) $order->repuesto);
                 $label = match (true) {
                     str_contains($text, 'modulo'), str_contains($text, 'pantalla'), str_contains($text, 'display') => 'Cambio de modulo/pantalla',
@@ -1523,7 +1580,7 @@ class RepairService
                     default => 'Otros trabajos',
                 };
 
-                return ['label' => $label, 'total' => (float) $order->monto];
+                return ['label' => $label, 'total' => $this->metricOrderRevenue($order, $paymentGroups)];
             })
             ->groupBy('label')
             ->map(fn (Collection $items, string $label): array => [
@@ -1539,15 +1596,48 @@ class RepairService
     /**
      * @return array<int, array{label:string,total:float}>
      */
-    private function monthlyBilled(CarbonImmutable $yearStart): array
+    private function monthlyBilled(CarbonImmutable $yearStart, Collection $orders, Collection $payments): array
     {
-        $rows = RepairOrder::query()
-            ->whereNotIn('estado', ['CANCELADA'])
-            ->whereDate('fecha', '>=', $yearStart->toDateString())
-            ->where('monto', '>', 0)
-            ->get()
-            ->groupBy(fn (RepairOrder $order): string => optional($order->fecha)->format('m') ?: '00')
-            ->map(fn (Collection $items): float => (float) $items->sum(fn (RepairOrder $order): float => (float) $order->monto));
+        $paymentGroups = $this->metricPaymentGroups($payments);
+        $rows = collect(range(1, 12))->mapWithKeys(fn (int $month): array => [str_pad((string) $month, 2, '0', STR_PAD_LEFT) => 0.0]);
+
+        foreach ($orders as $order) {
+            if ($order->entregado === 'si') {
+                $date = $order->fecha_entregado ?? $order->fecha;
+
+                if (optional($date)->format('Y') === (string) $yearStart->year) {
+                    $month = optional($date)->format('m') ?: '00';
+                    $rows[$month] = (float) $rows[$month] + max(0, (float) $order->monto);
+                }
+
+                continue;
+            }
+
+            if ($order->estado === 'CANCELADA') {
+                continue;
+            }
+
+            $key = $order->id . ':' . $order->reparacion;
+            $orderPayments = $paymentGroups->get($key, collect());
+
+            if ($orderPayments->isNotEmpty()) {
+                foreach ($orderPayments as $payment) {
+                    if (optional($payment->paid_at)->format('Y') !== (string) $yearStart->year) {
+                        continue;
+                    }
+
+                    $month = optional($payment->paid_at)->format('m') ?: '00';
+                    $rows[$month] = (float) $rows[$month] + max(0, (float) $payment->amount);
+                }
+
+                continue;
+            }
+
+            if ((float) $order->senia > 0 && optional($order->fecha)->format('Y') === (string) $yearStart->year) {
+                $month = optional($order->fecha)->format('m') ?: '00';
+                $rows[$month] = (float) $rows[$month] + max(0, (float) $order->senia);
+            }
+        }
 
         return collect(range(1, 12))
             ->map(fn (int $month): array => [

@@ -60,6 +60,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/archivados', [WorkbenchController::class, 'archived'])->name('repairs.archived');
     Route::get('/archivados.php', [WorkbenchController::class, 'archived']);
     Route::get('/metricas', [WorkbenchController::class, 'metrics'])->name('repairs.metrics');
+    Route::post('/metricas/ganancia-estimada', [WorkbenchController::class, 'saveMetricsSettings'])->name('repairs.metrics.settings.save');
     Route::get('/listas-reparacion', [WorkbenchController::class, 'lists'])->name('repairs.lists');
     Route::post('/listas-reparacion/opciones', [WorkbenchController::class, 'storeServiceOption'])->name('repairs.lists.service_options.store');
     Route::post('/listas-reparacion/opciones/{repairServiceOption}', [WorkbenchController::class, 'updateServiceOption'])->name('repairs.lists.service_options.update');
@@ -69,6 +70,8 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::post('/listas-reparacion/modelos/{repairDeviceModel}/eliminar', [WorkbenchController::class, 'destroyDeviceModel'])->name('repairs.lists.device_models.delete');
     Route::get('/repuestos', [WorkbenchController::class, 'parts'])->name('repairs.parts');
     Route::get('/repuestos.php', [WorkbenchController::class, 'parts']);
+    Route::get('/repuestos/base', [WorkbenchController::class, 'partsSettings'])->name('repairs.parts.settings');
+    Route::post('/repuestos/base', [WorkbenchController::class, 'savePartsSettings'])->name('repairs.parts.settings.save');
     Route::post('/repairs/parts/inventory', [WorkbenchController::class, 'storePartInventory'])->name('repairs.parts.inventory.store');
     Route::post('/repairs/parts/inventory/sync', [WorkbenchController::class, 'syncPartInventory'])->name('repairs.parts.inventory.sync');
     Route::post('/repairs/parts/boxes', [WorkbenchController::class, 'storePartBox'])->name('repairs.parts.boxes.store');
