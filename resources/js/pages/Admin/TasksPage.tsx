@@ -85,10 +85,10 @@ export default function TasksPage({ todayLabel, items, urls, debugError = null }
             <section className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-xs font-black uppercase tracking-[0.08em] text-[#1d4ed8]">Trabajo diario</p>
+                        <p className="text-xs font-black uppercase tracking-[0.08em] text-[#1d4ed8]">Cola activa</p>
                         <h1 className="text-2xl font-black text-[#0f172a]">Lista de tareas</h1>
                         <p className="text-sm font-semibold text-[#475569]">
-                            Los trabajos se agregan desde la grilla de consultas al final de la cola y se quitan cuando estan listos.
+                            Los trabajos se agregan desde la grilla de consultas y quedan en cola hasta terminarlos o quitarlos.
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

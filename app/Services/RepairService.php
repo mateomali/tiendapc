@@ -1378,7 +1378,11 @@ class RepairService
 
         $balance = trim((string) ($filters['filter_saldo'] ?? ''));
 
-        if ($balance !== '' && is_numeric($balance)) {
+        if ($balance === 'con_senia') {
+            $query->where('senia', '>', 0);
+        } elseif ($balance === 'sin_senia') {
+            $query->where('senia', '<=', 0);
+        } elseif ($balance !== '' && is_numeric($balance)) {
             $query->whereRaw('(monto - senia) = ?', [(float) $balance]);
         }
 
@@ -1434,8 +1438,8 @@ class RepairService
     private function taskQueueRegistroIds(): array
     {
         return RepairTaskItem::query()
-            ->whereDate('task_date', now()->toDateString())
             ->whereNull('completed_at')
+            ->oldest('task_date')
             ->oldest('created_at')
             ->oldest('id')
             ->pluck('repair_order_registro_id')

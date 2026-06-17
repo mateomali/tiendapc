@@ -45,7 +45,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_5.5rem_4.6rem_6.5rem_minmax(20.1rem,1.29fr)]';
+    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_6rem_4.6rem_6rem_minmax(20.1rem,1.29fr)]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -177,8 +177,25 @@ function nextQuickStatus(status: string): string {
 
 function formatLegacyDate(value?: string | null): string {
     if (!value) return '-';
-    const [year, month, day] = value.split('-');
+    const [year, month, day] = value.slice(0, 10).split('-');
     return year && month && day ? `${day}/${month}/${year}` : value;
+}
+
+function seniaBadgeLabel(monto: number, senia: number): string | null {
+    if (senia <= 0) return null;
+    if (monto > 0 && senia >= monto) return null;
+
+    return `Seña ${formatCurrency(senia)}`;
+}
+
+function SeniaBadge({ label }: { label: string | null }): JSX.Element | null {
+    if (!label) return null;
+
+    return (
+        <span className="inline-flex w-fit items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[0.65rem] font-black text-amber-900">
+            {label}
+        </span>
+    );
 }
 
 function daysSinceDate(value?: string | null): number | null {
@@ -818,7 +835,7 @@ function AddRepairModal({
                         <EditField label="Monto">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
                         </EditField>
-                        <EditField label="Senia">
+                        <EditField label="Seña">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
                         </EditField>
                     </div>
@@ -988,6 +1005,7 @@ function RepairEditCard({
     const [partSearch, setPartSearch] = useState(repair.repuesto ?? '');
     const monto = Number(repair.monto ?? 0);
     const senia = Number(repair.senia ?? 0);
+    const seniaLabel = seniaBadgeLabel(monto, senia);
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'].includes(repair.estado);
@@ -1748,8 +1766,9 @@ function RepairEditCard({
                         {isToday(repair.fecha_estimada) ? <span className="w-fit rounded bg-[#ffc107] px-1 text-[0.65rem] font-black leading-tight text-[#111827]">Hoy</span> : null}
                         {overdueText ? <span className="w-fit rounded bg-[#dc3545] px-1 text-[0.65rem] font-black leading-tight text-white">{overdueText}</span> : null}
                     </button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-black text-[#0f172a]" onClick={openInlineEditor}>
+                    <button type="button" className="grid content-center gap-1 text-left font-black text-[#0f172a]" onClick={openInlineEditor}>
                         <PaymentStatus monto={monto} senia={senia} />
+                        <SeniaBadge label={seniaLabel} />
                     </button>
                     <div className="flex items-center justify-center">
                         <button
@@ -1818,6 +1837,7 @@ function RepairEditCard({
                                 <span className="rounded-md border border-[#111827] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
                                     Saldo: <PaymentStatus monto={monto} senia={senia} />
                                 </span>
+                                <SeniaBadge label={seniaLabel} />
                             </div>
                         </div>
                         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/25 ring-1 ring-white/35">
@@ -1849,7 +1869,7 @@ function RepairEditCard({
                         <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
                         <FieldSummary label="Estado" value={compactStatus(repair.estado)} onClick={openInlineEditor} />
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
-                        {senia > 0 ? <FieldSummary label="Senia" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
+                        {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                     </div>
                     {readOnly && repair.actions?.deliver ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={openDeliveryModal}>

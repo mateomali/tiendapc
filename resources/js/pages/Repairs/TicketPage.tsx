@@ -107,7 +107,7 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                                     {senia > 0 ? (
                                         <>
                                             <TicketLine label="PRESUPUESTO:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
-                                            <TicketLine label="SENA:" value={formatCurrency(senia)} />
+                                            <TicketLine label="SEÑA:" value={formatCurrency(senia)} />
                                             <TicketLine label="SALDO:" value={monto > 0 ? saldoLabel : 'A DEFINIR'} />
                                         </>
                                     ) : (

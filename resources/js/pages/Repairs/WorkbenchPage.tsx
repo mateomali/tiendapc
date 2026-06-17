@@ -1329,6 +1329,15 @@ export default function WorkbenchPage({
                                     </select>
                                 </label>
                             </div>
+
+                            <label className="grid gap-1 text-xs font-semibold text-[#475569]">
+                                Seña
+                                <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.filter_saldo} onChange={(event) => filtersForm.setData('filter_saldo', event.target.value)}>
+                                    <option value="">Todas</option>
+                                    <option value="con_senia">Con seña</option>
+                                    <option value="sin_senia">Sin seña</option>
+                                </select>
+                            </label>
                         </div>
 
                         <div className="sticky bottom-0 mt-4 grid grid-cols-[1fr_1.2fr] gap-2 bg-white pt-3">
@@ -1421,7 +1430,7 @@ export default function WorkbenchPage({
                                             <p className="text-xs font-semibold text-slate-500 md:text-sm">Completa equipo, falla, presupuesto, repuesto y fotos.</p>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className={ui.repairMiniChip}>{Number(job.monto || 0) <= 0 ? 'A presupuestar' : Number(job.senia || 0) > 0 ? 'Con sena' : 'Presupuestado'}</span>
+                                            <span className={ui.repairMiniChip}>{Number(job.monto || 0) <= 0 ? 'A presupuestar' : Number(job.senia || 0) > 0 ? 'Con seña' : 'Presupuestado'}</span>
                                             <span className={ui.repairMiniChip}>{imagePreviews[index]?.length ? `${imagePreviews[index].length} foto(s)` : 'Sin fotos'}</span>
                                             <button className={buttonClass('soft', 'sm')} type="button" onClick={() => duplicateJob(index)} aria-label="Duplicar trabajo"><FaCopy aria-hidden="true" /></button>
                                             {createForm.data.jobs.length > 1 ? <button type="button" className={buttonClass('danger', 'sm')} onClick={() => removeJob(index)} aria-label="Eliminar trabajo"><FaTimes aria-hidden="true" /></button> : null}
@@ -1468,7 +1477,7 @@ export default function WorkbenchPage({
                                             <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
                                         </div>
                                         <div className={fieldPanelGreen}>
-                                            <label className={repairLabelClass}>Sena ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
+                                            <label className={repairLabelClass}>Seña ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
                                         </div>
                                         <div className={guidedPanelClass(fieldPanelAmber, `job-${index}-date`)}>
                                             <label className={repairLabelClass}>Fecha estimada<input className={guidedInputClass(`job-${index}-date`)} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
@@ -1572,10 +1581,10 @@ export default function WorkbenchPage({
                             ))}
                         </div>
 
-                        <section className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4 md:grid-cols-[repeat(4,minmax(0,1fr))]">
+                        <section className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong></div>
-                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Senas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
+                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
                             <div className="hidden gap-2 border-t border-[#dbeafe] pt-3 md:col-span-4 lg:grid lg:grid-cols-[auto_auto] lg:justify-end">
                                 <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Agregar reparacion</button>
@@ -1729,7 +1738,7 @@ export default function WorkbenchPage({
                                         />
                                         <input
                                             className={ui.input}
-                                            placeholder="Senia"
+                                            placeholder="Seña"
                                             value={job.senia}
                                             onFocus={() => clearAmountForTyping(index, 'senia')}
                                             onKeyDown={preventAmountArrowStep}
@@ -1848,7 +1857,11 @@ export default function WorkbenchPage({
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('saldo')} preserveScroll className={sortHeaderClass('saldo')}>Saldo {sortIndicator('saldo')}</Link>
-                                    <input className={gridFilterInputClass} inputMode="decimal" placeholder="Saldo" value={filtersForm.data.filter_saldo} onChange={(event) => setSingleGridFilter('filter_saldo', event.target.value)} />
+                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_saldo} onChange={(event) => setSingleGridFilter('filter_saldo', event.target.value)} aria-label="Filtrar por saldo o seña">
+                                        <option value="">Saldo</option>
+                                        <option value="con_senia">Con seña</option>
+                                        <option value="sin_senia">Sin seña</option>
+                                    </select>
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('estado')} preserveScroll className={cn(sortHeaderClass('estado'), 'justify-center')}>Estado {sortIndicator('estado')}</Link>

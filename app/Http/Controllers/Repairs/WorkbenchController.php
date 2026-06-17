@@ -1210,8 +1210,8 @@ class WorkbenchController extends Controller
     {
         if ($this->taskQueuePositions === null) {
             $this->taskQueuePositions = RepairTaskItem::query()
-                ->whereDate('task_date', now()->toDateString())
                 ->whereNull('completed_at')
+                ->oldest('task_date')
                 ->oldest('created_at')
                 ->oldest('id')
                 ->pluck('repair_order_registro_id')

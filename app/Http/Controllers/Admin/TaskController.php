@@ -20,8 +20,8 @@ class TaskController extends Controller
         try {
             $items = RepairTaskItem::query()
                 ->with('repairOrder')
-                ->whereDate('task_date', now()->toDateString())
                 ->whereNull('completed_at')
+                ->oldest('task_date')
                 ->oldest('created_at')
                 ->oldest('id')
                 ->get()
@@ -29,7 +29,7 @@ class TaskController extends Controller
                 ->values();
 
             return Inertia::render('Admin/TasksPage', [
-                'todayLabel' => now()->format('d/m/Y'),
+                'todayLabel' => 'Cola activa',
                 'items' => $items->map(fn (RepairTaskItem $item): array => $this->serializeTaskItem($item))->all(),
                 'urls' => [
                     'consultations' => route('repairs.workbench'),
@@ -45,7 +45,7 @@ class TaskController extends Controller
             ]);
 
             return Inertia::render('Admin/TasksPage', [
-                'todayLabel' => now()->format('d/m/Y'),
+                'todayLabel' => 'Cola activa',
                 'items' => [],
                 'urls' => [
                     'consultations' => route('repairs.workbench'),
@@ -60,8 +60,10 @@ class TaskController extends Controller
         $today = now()->toDateString();
         $item = RepairTaskItem::query()
             ->where('repair_order_registro_id', $repairOrder->registro_id)
-            ->whereDate('task_date', $today)
             ->whereNull('completed_at')
+            ->oldest('task_date')
+            ->oldest('created_at')
+            ->oldest('id')
             ->first();
 
         if ($item !== null) {
@@ -73,7 +75,7 @@ class TaskController extends Controller
 
         RepairTaskItem::query()
             ->where('repair_order_registro_id', $repairOrder->registro_id)
-            ->whereDate('task_date', $today)
+            ->whereNull('completed_at')
             ->delete();
 
         $item = RepairTaskItem::query()->create([
