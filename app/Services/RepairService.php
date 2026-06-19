@@ -1382,6 +1382,8 @@ class RepairService
             $query->where('senia', '>', 0);
         } elseif ($balance === 'sin_senia') {
             $query->where('senia', '<=', 0);
+        } elseif ($balance === 'pagado') {
+            $query->where('monto', '>', 0)->whereColumn('senia', '>=', 'monto');
         } elseif ($balance !== '' && is_numeric($balance)) {
             $query->whereRaw('(monto - senia) = ?', [(float) $balance]);
         }
@@ -1458,10 +1460,10 @@ class RepairService
 
     private function applySummaryFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters, bool $includeCategory): void
     {
-        $range = (string) ($filters['summary_range'] ?? 'month');
+        $range = (string) ($filters['summary_range'] ?? 'quarter');
 
         if (! array_key_exists($range, self::SUMMARY_RANGE_DAYS)) {
-            $range = 'month';
+            $range = 'quarter';
         }
 
         if ($range === 'custom') {

@@ -87,7 +87,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     const newOrderActiveClasses = 'border-[#bae6fd] bg-[#0ea5e9] text-white shadow-sm';
     const navMenuClasses = 'relative shrink-0';
     const navMenuButtonClasses = 'flex min-h-8 cursor-pointer items-center justify-between gap-2 rounded-md border border-white/15 bg-white/10 px-2.5 py-1.5 text-[0.72rem] font-black text-[#eaf2ff] transition hover:border-[#7fb4ff] hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#bfdbfe] xl:min-h-9 xl:px-3 xl:text-[0.82rem]';
-    const navMenuPanelClasses = 'absolute left-0 z-40 mt-1 grid min-w-[12rem] gap-1 rounded-md border border-white/20 bg-[#123f91] p-1.5 shadow-[0_12px_24px_rgba(8,24,60,0.24)]';
+    const navMenuPanelClasses = 'fixed left-3 right-3 top-[5.9rem] z-50 grid max-h-[60vh] gap-1 overflow-y-auto rounded-md border border-white/20 bg-[#123f91] p-1.5 shadow-[0_12px_24px_rgba(8,24,60,0.24)] xl:absolute xl:left-0 xl:right-auto xl:top-auto xl:mt-1 xl:min-w-[12rem] xl:overflow-visible';
 
     return (
         <>

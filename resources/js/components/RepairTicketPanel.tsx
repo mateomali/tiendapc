@@ -126,12 +126,12 @@ function compactStatus(status: string): string {
 function repairStatusHeaderClass(status: string): string {
     const normalized = normalizeStatus(status);
 
-    if (normalized === 'LISTA') return 'bg-[#16a34a] text-white';
-    if (normalized === 'CANCELADA') return 'bg-[#dc2626] text-white';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#6d28d9] text-white';
-    if (normalized === 'PENDIENTE') return 'bg-[#facc15] text-[#111827]';
+    if (normalized === 'LISTA') return 'border-l-4 border-l-[#198754] bg-[#f8fafc] text-[#0f172a]';
+    if (normalized === 'CANCELADA') return 'border-l-4 border-l-[#dc3545] bg-[#f8fafc] text-[#0f172a]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-4 border-l-[#6d28d9] bg-[#f8fafc] text-[#0f172a]';
+    if (normalized === 'PENDIENTE') return 'border-l-4 border-l-[#d97706] bg-[#f8fafc] text-[#0f172a]';
 
-    return 'bg-[#64748b] text-white';
+    return 'border-l-4 border-l-[#64748b] bg-[#f8fafc] text-[#0f172a]';
 }
 
 function repairStatusBadgeClass(status: string): string {
@@ -154,6 +154,17 @@ function repairStatusSelectClass(status: string): string {
     if (normalized === 'PENDIENTE') return 'border-[#ffc107] bg-[#fff8db] text-[#664d03]';
 
     return 'border-[#6c757d] bg-slate-100 text-slate-800';
+}
+
+function repairStatusTextClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'text-[#198754]';
+    if (normalized === 'CANCELADA') return 'text-[#dc3545]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'text-[#6d28d9]';
+    if (normalized === 'PENDIENTE') return 'text-[#b45309]';
+
+    return 'text-[#64748b]';
 }
 
 function desktopGroupedRepairClass(index: number): string {
@@ -396,11 +407,17 @@ function FieldSummary({
     label,
     value,
     strong = false,
+    labelClassName,
+    valueClassName,
+    className,
     onClick,
 }: {
     label: string;
     value: ReactNode;
     strong?: boolean;
+    labelClassName?: string;
+    valueClassName?: string;
+    className?: string;
     onClick?: () => void;
 }): JSX.Element {
     const Wrapper = onClick ? 'button' : 'div';
@@ -409,13 +426,15 @@ function FieldSummary({
         <Wrapper
             type={onClick ? 'button' : undefined}
             className={cn(
-                'grid min-w-0 gap-0.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-left',
-                onClick && 'cursor-pointer transition hover:border-[#94a3b8] hover:bg-[#f8fafc]',
+                'grid min-w-0 gap-0.5 rounded-md px-3 py-2 text-left',
+                className ? 'border' : 'border border-slate-200 bg-white',
+                onClick && (className ? 'cursor-pointer transition hover:border-[#94a3b8]' : 'cursor-pointer transition hover:border-[#94a3b8] hover:bg-[#f8fafc]'),
+                className,
             )}
             onClick={onClick}
         >
-            <span className="text-[0.72rem] font-semibold text-slate-500">{label}</span>
-            <span className={cn('text-sm text-[#0f172a]', strong && 'font-black')}>{value}</span>
+            <span className={cn('text-[0.72rem] font-semibold', labelClassName ?? 'text-slate-500')}>{label}</span>
+            <span className={cn('text-sm', valueClassName ?? 'text-[#0f172a]', strong && 'font-black')}>{value}</span>
         </Wrapper>
     );
 }
@@ -1318,10 +1337,10 @@ function RepairEditCard({
         </button>
     );
 
-    const ActionButtons = ({ mobile = false, showGeneralTicketActions = true }: { mobile?: boolean; showGeneralTicketActions?: boolean }): JSX.Element => {
+    const ActionButtons = ({ mobile = false, showGeneralTicketActions = true, showOrderActions = showGeneralTicketActions }: { mobile?: boolean; showGeneralTicketActions?: boolean; showOrderActions?: boolean }): JSX.Element => {
         const iconOnly = true;
         const base = mobile
-            ? 'grid h-9 w-9 place-items-center rounded-xl text-[0.78rem] no-underline shadow-sm'
+            ? 'grid h-9 w-9 place-items-center rounded-md text-[0.78rem] no-underline'
             : 'grid h-7 w-7 place-items-center rounded-md text-[0.72rem] no-underline shadow-sm transition hover:brightness-95';
         const groupClass = mobile
             ? 'flex items-center gap-1.5'
@@ -1373,13 +1392,13 @@ function RepairEditCard({
                     <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                         <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                     </button>
-                    {showGeneralTicketActions ? (
+                    {showOrderActions ? (
                         <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparacion">
                             <FaPlus aria-hidden="true" />{iconOnly ? null : 'Agregar reparacion'}
                         </button>
                     ) : null}
                 </span>
-                {showGeneralTicketActions ? (
+                {showOrderActions ? (
                     <span className={groupClass}>
                         <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
                             <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
@@ -1819,28 +1838,28 @@ function RepairEditCard({
 
     return (
         <>
-            <details className="overflow-hidden rounded-lg border border-[#cbd5e1] bg-white shadow-sm">
-                <summary className={cn('cursor-pointer list-none px-2.5 py-2', repairStatusHeaderClass(repair.estado))}>
+            <details className="overflow-hidden rounded-md border border-[#cbd5e1] bg-white">
+                <summary className={cn('cursor-pointer list-none border-b border-[#e2e8f0] px-2.5 py-2', repairStatusHeaderClass(repair.estado))}>
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                             <div className="mb-1 flex items-center gap-1.5">
-                                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.66rem] font-bold text-[#0f172a]">#{repair.id}</span>
-                                <span className="rounded-md bg-white/80 px-1.5 py-0.5 text-[0.66rem] font-bold text-[#1d4ed8]">{rowIndex + 1}/{rowTotal}</span>
-                                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.62rem] font-bold text-[#0f172a]">{compactStatus(repair.estado)}</span>
+                                <span className="text-[0.68rem] font-bold text-[#0f172a]">#{repair.id}</span>
+                                <span className="text-[0.68rem] font-bold text-[#64748b]">{rowIndex + 1}/{rowTotal}</span>
+                                <span className={cn('rounded-md border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{compactStatus(repair.estado)}</span>
                             </div>
                             <h4 className="truncate text-[0.96rem] font-black leading-tight">{repairDisplayModel || 'Sin modelo'}</h4>
                             <p className="truncate text-[0.78rem] font-bold opacity-90">{displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription}</p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
-                                <span className="rounded-md bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
+                                <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>
                                 {isToday(repair.fecha_estimada) ? <span className="rounded-md bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
                                 {overdueText ? <span className="rounded-md bg-[#dc3545] px-1.5 py-0.5 text-white">{overdueText}</span> : null}
-                                <span className="rounded-md border border-[#111827] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
+                                <span className="rounded-md border border-[#cbd5e1] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
                                     Saldo: <PaymentStatus monto={monto} senia={senia} />
                                 </span>
                                 <SeniaBadge label={seniaLabel} />
                             </div>
                         </div>
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/25 ring-1 ring-white/35">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]">
                             <FaChevronDown aria-hidden="true" />
                         </span>
                     </div>
@@ -1867,7 +1886,7 @@ function RepairEditCard({
                         {repair.contacto ? <FieldSummary label="Contacto" value={repair.contacto} onClick={openInlineEditor} /> : null}
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
                         <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
-                        <FieldSummary label="Estado" value={compactStatus(repair.estado)} onClick={openInlineEditor} />
+                        <FieldSummary label="Estado" value={compactStatus(repair.estado)} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                     </div>
@@ -1898,7 +1917,7 @@ function RepairEditCard({
                         </details>
                     ) : null}
                     {!readOnly && inlineOpen ? <InlineEditor mobile /> : null}
-                    {!readOnly && !inlineOpen ? <ActionButtons mobile showGeneralTicketActions={rowIndex === 0} /> : null}
+                    {!readOnly && !inlineOpen ? <ActionButtons mobile showGeneralTicketActions={rowIndex === 0} showOrderActions={false} /> : null}
                 </div>
             </details>
             {modals}
@@ -1969,20 +1988,22 @@ export function RepairTicketPanel({
     const desktopRepairs = desktopGroupExpanded ? ticket.repairs : ticket.repairs.slice(0, 1);
 
     return (
-        <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-xl max-xl:border-2 max-xl:border-[#94a3b8] max-xl:bg-[#eef4fb] max-xl:p-2 max-xl:shadow-[0_2px_8px_rgba(15,23,42,0.12)]')}>
-            <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between max-xl:border-[#94a3b8] max-xl:bg-white">
-                <div className="min-w-0">
-                    <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs">Ticket #{ticket.id}</p>
-                    <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl">{ticket.nombre_cliente}</h3>
-                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.78rem] font-semibold text-[#475569] md:gap-2 md:text-sm">
+        <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-lg max-xl:border max-xl:border-[#64748b] max-xl:bg-white max-xl:p-2 max-xl:shadow-[0_2px_6px_rgba(15,23,42,0.10)]')}>
+            <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between max-xl:border-0 max-xl:border-b max-xl:border-[#e2e8f0] max-xl:bg-white max-xl:p-0 max-xl:pb-2">
+                <div className="min-w-0 max-xl:grid max-xl:gap-2">
+                    <div className="max-xl:rounded-lg max-xl:border max-xl:border-[#111827] max-xl:bg-[#111827] max-xl:px-3 max-xl:py-2">
+                        <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs max-xl:text-[0.68rem] max-xl:font-black max-xl:uppercase max-xl:text-[#cbd5e1]">Ticket #{ticket.id}</p>
+                        <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl max-xl:text-[1.22rem] max-xl:font-black max-xl:uppercase max-xl:leading-tight max-xl:text-white">{ticket.nombre_cliente}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.78rem] font-semibold text-[#475569] md:gap-2 md:text-sm max-xl:gap-1.5 max-xl:text-[0.73rem]">
                         <span>DNI: {ticket.dni}</span>
-                        <span>Contacto: {ticket.contacto || 'Sin dato'}</span>
+                        {ticket.contacto ? <span>Contacto: {ticket.contacto}</span> : null}
                         <span>Fecha: {formatLegacyDate(ticket.fecha)}</span>
-                        <span>Reparaciones: {ticket.repairsCount}</span>
-                        <span>Total: {formatCurrency(ticket.totalMonto)}</span>
+                        {ticket.repairsCount > 1 ? <span>Reparaciones: {ticket.repairsCount}</span> : null}
+                        <span>Total: {ticket.totalMonto > 0 ? formatCurrency(ticket.totalMonto) : 'Cotizar'}</span>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                <div className="hidden flex-wrap items-center gap-1.5 md:gap-2 xl:flex">
                     <Link href={ticket.ticketUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#111827] bg-[#111827] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
                         Ticket tecnico
                     </Link>
@@ -2041,7 +2062,7 @@ export function RepairTicketPanel({
                 </div>
             </div>
 
-            <div className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#dbeafe] p-2 xl:hidden">
+            <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 xl:hidden">
                 {ticket.repairs.map((repair, index) => (
                     <RepairEditCard
                         key={`mobile-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
@@ -2057,6 +2078,25 @@ export function RepairTicketPanel({
                         onAddRepair={() => setAddOpen(true)}
                     />
                 ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 xl:hidden">
+                <Link href={ticket.ticketUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#111827] bg-[#111827] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220]">
+                    Ticket tecnico
+                </Link>
+                <a href={ticket.trackingUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#0d6efd] bg-[#0d6efd] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b5ed7]">
+                    Seguimiento
+                </a>
+                {ticket.whatsappUrl ? (
+                    <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#25D366] bg-[#25D366] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#128C7E]">
+                        WhatsApp cliente
+                    </a>
+                ) : null}
+                {allowAddRepair && !readOnly ? (
+                    <button type="button" className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-[#8b5cf6] bg-[#8b5cf6] px-2.5 py-1.5 text-[0.78rem] font-bold text-white transition hover:bg-[#7c3aed]" onClick={() => setAddOpen(true)}>
+                        <FaPlus aria-hidden="true" />Agregar reparacion
+                    </button>
+                ) : null}
             </div>
 
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}

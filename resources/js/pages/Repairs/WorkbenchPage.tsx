@@ -1,5 +1,5 @@
 import { Link, router, useForm } from '@inertiajs/react';
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
@@ -434,7 +434,7 @@ export default function WorkbenchPage({
         q: filters.q ?? '',
         estado: filters.estado ?? '',
         prioridad: filters.prioridad ?? '',
-        summary_range: filters.summary_range ?? 'month',
+        summary_range: filters.summary_range ?? 'quarter',
         summary_from: filters.summary_from ?? '',
         summary_to: filters.summary_to ?? '',
         categoria_filter: filters.categoria_filter ?? '',
@@ -466,8 +466,15 @@ export default function WorkbenchPage({
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
+    const gridFilterSubmitTimeout = useRef<number | null>(null);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const ticketDateGroups = groupTicketsByEntryDate(tickets);
+
+    useEffect(() => () => {
+        if (gridFilterSubmitTimeout.current !== null) {
+            window.clearTimeout(gridFilterSubmitTimeout.current);
+        }
+    }, []);
 
     const toggleDesktopTicket = (ticketId: number): void => {
         setExpandedDesktopTickets((current) => ({
@@ -475,7 +482,7 @@ export default function WorkbenchPage({
             [ticketId]: !current[ticketId],
         }));
     };
-    const summaryRange = filters.summary_range ?? 'month';
+    const summaryRange = filters.summary_range ?? 'quarter';
     const categoryFilter = String(filters.categoria_filter ?? '');
     const periodOptions = [
         { label: 'Total', value: 'all' },
@@ -497,7 +504,7 @@ export default function WorkbenchPage({
         filters.estado,
         filters.prioridad,
         categoryFilter,
-        summaryRange !== 'month' ? summaryRange : '',
+        summaryRange !== 'quarter' ? summaryRange : '',
         filters.ordenar_por && filters.ordenar_por !== 'ticket' ? filters.ordenar_por : '',
         filters.direccion && filters.direccion !== 'desc' ? filters.direccion : '',
         ...columnFilterKeys.map((key) => filters[key]),
@@ -537,11 +544,36 @@ export default function WorkbenchPage({
             { preserveScroll: true },
         );
     };
-    const setSingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string): void => {
+    const applySingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string): void => {
+        if (gridFilterSubmitTimeout.current !== null) {
+            window.clearTimeout(gridFilterSubmitTimeout.current);
+            gridFilterSubmitTimeout.current = null;
+        }
+
+        router.get(
+            route('repairs.workbench'),
+            filterQuery(Object.fromEntries(columnFilterKeys.map((filterKey) => [filterKey, filterKey === key ? value || undefined : undefined])) as Record<string, string | undefined>),
+            { preserveScroll: true },
+        );
+    };
+    const setSingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string, apply: 'debounced' | 'immediate' = 'debounced'): void => {
         filtersForm.setData((current) => ({
             ...current,
             ...Object.fromEntries(columnFilterKeys.map((filterKey) => [filterKey, filterKey === key ? value : ''])),
         }));
+
+        if (apply === 'immediate') {
+            applySingleGridFilter(key, value);
+            return;
+        }
+
+        if (gridFilterSubmitTimeout.current !== null) {
+            window.clearTimeout(gridFilterSubmitTimeout.current);
+        }
+
+        gridFilterSubmitTimeout.current = window.setTimeout(() => {
+            applySingleGridFilter(key, value);
+        }, 450);
     };
     const gridFilterInputClass = 'h-7 w-full min-w-0 rounded-sm border border-[#cbd5e1] bg-white px-1.5 text-[0.68rem] font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb33]';
     const clearGridFilterHref = route(
@@ -1016,42 +1048,42 @@ export default function WorkbenchPage({
                 </form>
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-bold text-[#334155]">
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: undefined }))}
+                        href={route('repairs.workbench')}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', !filters.estado && !filters.prioridad ? 'bg-white text-[#1d4ed8] ring-2 ring-[#bfdbfe]' : 'bg-[#eff6ff] text-[#334155]')}
                     >
                         Todas {summary.active}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'PENDIENTE', prioridad: undefined }))}
+                        href={route('repairs.workbench', { estado: 'PENDIENTE' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'PENDIENTE' ? 'bg-white text-[#d97706] ring-2 ring-[#fed7aa]' : 'bg-[#fff7ed] text-[#334155]')}
                     >
                         Pend. {summary.pending}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'LISTA', prioridad: undefined }))}
+                        href={route('repairs.workbench', { estado: 'LISTA' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'LISTA' ? 'bg-white text-[#15803d] ring-2 ring-[#bbf7d0]' : 'bg-[#ecfdf5] text-[#334155]')}
                     >
                         Listas {summary.ready}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'tareas', ordenar_por: undefined, direccion: undefined }))}
+                        href={route('repairs.workbench', { prioridad: 'tareas' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'tareas' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
                         Tareas {summary.tasks}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'vencidas' }))}
+                        href={route('repairs.workbench', { prioridad: 'vencidas' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
                     >
                         Venc. {summary.overdue}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'hoy' }))}
+                        href={route('repairs.workbench', { prioridad: 'hoy' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'hoy' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
@@ -1072,7 +1104,7 @@ export default function WorkbenchPage({
                                 label={option.label}
                                 href={route(
                                     'repairs.workbench',
-                                    filterQuery({
+                                    cleanQuery({
                                         summary_range: option.value,
                                         summary_from: option.value === 'custom' ? filters.summary_from : undefined,
                                         summary_to: option.value === 'custom' ? filters.summary_to : undefined,
@@ -1088,7 +1120,9 @@ export default function WorkbenchPage({
                             <FilterPill
                                 key={option.value || 'all'}
                                 label={option.label}
-                                href={route('repairs.workbench', filterQuery({ categoria_filter: option.value || undefined }))}
+                                href={option.value === ''
+                                    ? route('repairs.workbench')
+                                    : route('repairs.workbench', { categoria_filter: option.value })}
                                 active={categoryFilter === option.value}
                             />
                         ))}
@@ -1151,14 +1185,14 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <section className="hidden grid-cols-2 gap-2 md:grid-cols-4 xl:grid xl:grid-cols-9">
-                <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: undefined }))} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
-                <SummaryFilterCard label="Tareas" value={summary.tasks} trend="Cola FIFO" tone="brown" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'tareas', ordenar_por: undefined, direccion: undefined }))} active={filters.prioridad === 'tareas'} icon={<FaClipboardCheck aria-hidden="true" />} />
-                <SummaryFilterCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'PENDIENTE', prioridad: undefined }))} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
-                <SummaryFilterCard label="En reparación" value={summary.inRepair} trend="Espera / repuesto" tone="purple" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'EN REPARACION / ESPERA REPUESTO', prioridad: undefined }))} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
-                <SummaryFilterCard label="Listas" value={summary.ready} trend="Para retirar" tone="green" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'LISTA', prioridad: undefined }))} active={filters.estado === 'LISTA'} icon={<FaCheckCircle aria-hidden="true" />} />
-                <SummaryFilterCard label="Vencidas" value={summary.overdue} trend="Prioridad alta" tone="red" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'vencidas' }))} active={filters.prioridad === 'vencidas'} icon={<FaHourglassEnd aria-hidden="true" />} />
-                <SummaryFilterCard label="Retiran hoy" value={summary.today} trend="Agendadas hoy" tone="yellow" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'hoy' }))} active={filters.prioridad === 'hoy'} icon={<FaCalendarDay aria-hidden="true" />} />
-                <SummaryFilterCard label="Canceladas" value={summary.cancelled} trend="No continuadas" tone="red" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'CANCELADA', prioridad: undefined }))} active={filters.estado === 'CANCELADA'} icon={<FaBan aria-hidden="true" />} />
+                <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench')} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
+                <SummaryFilterCard label="Tareas" value={summary.tasks} trend="Cola FIFO" tone="brown" href={route('repairs.workbench', { prioridad: 'tareas' })} active={filters.prioridad === 'tareas'} icon={<FaClipboardCheck aria-hidden="true" />} />
+                <SummaryFilterCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" href={route('repairs.workbench', { estado: 'PENDIENTE' })} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
+                <SummaryFilterCard label="En reparación" value={summary.inRepair} trend="Espera / repuesto" tone="purple" href={route('repairs.workbench', { estado: 'EN REPARACION / ESPERA REPUESTO' })} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
+                <SummaryFilterCard label="Listas" value={summary.ready} trend="Para retirar" tone="green" href={route('repairs.workbench', { estado: 'LISTA' })} active={filters.estado === 'LISTA'} icon={<FaCheckCircle aria-hidden="true" />} />
+                <SummaryFilterCard label="Vencidas" value={summary.overdue} trend="Prioridad alta" tone="red" href={route('repairs.workbench', { prioridad: 'vencidas' })} active={filters.prioridad === 'vencidas'} icon={<FaHourglassEnd aria-hidden="true" />} />
+                <SummaryFilterCard label="Retiran hoy" value={summary.today} trend="Agendadas hoy" tone="yellow" href={route('repairs.workbench', { prioridad: 'hoy' })} active={filters.prioridad === 'hoy'} icon={<FaCalendarDay aria-hidden="true" />} />
+                <SummaryFilterCard label="Canceladas" value={summary.cancelled} trend="No continuadas" tone="red" href={route('repairs.workbench', { estado: 'CANCELADA' })} active={filters.estado === 'CANCELADA'} icon={<FaBan aria-hidden="true" />} />
                 <SummaryFilterCard label="Entregadas" value={summary.delivered} trend="Registradas" tone="cyan" href={route('repairs.delivered')} icon={<FaTruck aria-hidden="true" />} />
             </section>
             ) : null}
@@ -1180,7 +1214,7 @@ export default function WorkbenchPage({
                     submitCleanSearch();
                 }}
             >
-                <div className="grid gap-2 md:grid-cols-[minmax(16rem,0.85fr)_200px_180px_160px_auto] md:items-center">
+                <div className="grid gap-2">
                     <div className="relative min-w-0">
                     <input
                         className="min-h-10 w-full rounded-md border border-[#cbd5e1] bg-white py-2 pl-3 pr-10 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
@@ -1196,47 +1230,6 @@ export default function WorkbenchPage({
                             <FaSearch aria-hidden="true" />
                         </button>
                     </div>
-                    <select
-                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        value={filtersForm.data.estado}
-                        onChange={(event) => {
-                            filtersForm.setData('estado', event.target.value);
-                            filtersForm.setData('prioridad', '');
-                        }}
-                    >
-                        <option value="">Todos menos canceladas</option>
-                        {states.map((state) => (
-                            <option key={state} value={state}>
-                                {state}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        value={filtersForm.data.ordenar_por}
-                        onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}
-                        aria-label="Ordenar por"
-                    >
-                        <option value="ticket">Ordenar: ticket</option>
-                        <option value="ingreso">Ordenar: ingreso</option>
-                        <option value="estimada">Ordenar: estimada</option>
-                        <option value="cliente">Ordenar: cliente</option>
-                        <option value="modelo">Ordenar: modelo</option>
-                        <option value="estado">Ordenar: estado</option>
-                        <option value="saldo">Ordenar: saldo</option>
-                    </select>
-                    <select
-                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        value={filtersForm.data.direccion}
-                        onChange={(event) => filtersForm.setData('direccion', event.target.value)}
-                        aria-label="Direccion del orden"
-                    >
-                        <option value="desc">DESCENDENTE</option>
-                        <option value="asc">ASCENDENTE</option>
-                    </select>
-                    <button className="min-h-10 rounded-md border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]" type="submit">
-                        Buscar
-                    </button>
                 </div>
             </form>
             ) : null}
@@ -1336,6 +1329,7 @@ export default function WorkbenchPage({
                                     <option value="">Todas</option>
                                     <option value="con_senia">Con seña</option>
                                     <option value="sin_senia">Sin seña</option>
+                                    <option value="pagado">Pagado</option>
                                 </select>
                             </label>
                         </div>
@@ -1838,7 +1832,7 @@ export default function WorkbenchPage({
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('ingreso')} preserveScroll className={sortHeaderClass('ingreso')}>Ingreso {sortIndicator('ingreso')}</Link>
-                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_ingreso} onChange={(event) => setSingleGridFilter('filter_ingreso', event.target.value)} aria-label="Filtrar por fecha de ingreso" />
+                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_ingreso} onChange={(event) => setSingleGridFilter('filter_ingreso', event.target.value, 'immediate')} aria-label="Filtrar por fecha de ingreso" />
                                 </label>
                                 <span className="grid content-start gap-1 text-center text-[0.62rem] font-bold text-[#475569]">
                                     Imagen
@@ -1853,19 +1847,20 @@ export default function WorkbenchPage({
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('estimada')} preserveScroll className={sortHeaderClass('estimada')}>Estimada {sortIndicator('estimada')}</Link>
-                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_estimada} onChange={(event) => setSingleGridFilter('filter_estimada', event.target.value)} aria-label="Filtrar por fecha estimada" />
+                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_estimada} onChange={(event) => setSingleGridFilter('filter_estimada', event.target.value, 'immediate')} aria-label="Filtrar por fecha estimada" />
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('saldo')} preserveScroll className={sortHeaderClass('saldo')}>Saldo {sortIndicator('saldo')}</Link>
-                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_saldo} onChange={(event) => setSingleGridFilter('filter_saldo', event.target.value)} aria-label="Filtrar por saldo o seña">
+                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_saldo} onChange={(event) => setSingleGridFilter('filter_saldo', event.target.value, 'immediate')} aria-label="Filtrar por saldo o seña">
                                         <option value="">Saldo</option>
                                         <option value="con_senia">Con seña</option>
                                         <option value="sin_senia">Sin seña</option>
+                                        <option value="pagado">Pagado</option>
                                     </select>
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('estado')} preserveScroll className={cn(sortHeaderClass('estado'), 'justify-center')}>Estado {sortIndicator('estado')}</Link>
-                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_estado} onChange={(event) => setSingleGridFilter('filter_estado', event.target.value)} aria-label="Filtrar por estado">
+                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_estado} onChange={(event) => setSingleGridFilter('filter_estado', event.target.value, 'immediate')} aria-label="Filtrar por estado">
                                         <option value="">Estado</option>
                                         {states.map((state) => <option key={state} value={state}>{state}</option>)}
                                     </select>
