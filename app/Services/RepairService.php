@@ -38,6 +38,17 @@ class RepairService
         'EN REPARACION / ESPERA REPUESTO',
     ];
 
+    private const GLOBAL_SEARCH_FIELDS = [
+        'id',
+        'cliente',
+        'dni',
+        'contacto',
+        'ingreso',
+        'estimada',
+        'saldo',
+        'estado',
+    ];
+
     public const SERVICE_TEMPLATES = [
         'revision' => [
             'label' => 'Revision / diagnostico',
@@ -575,8 +586,8 @@ class RepairService
 
             if (Str::upper((string) $order->estado) === 'LISTA') {
                 $this->consumeInventoryReservation($order);
-                $this->syncTaskQueueForState($order, 'LISTA');
             }
+            $this->syncTaskQueueForState($order, (string) $order->estado);
 
             $this->recordEvent($order, $order->entregado === 'si' ? 'ACTUALIZADA_ENTREGADA' : 'ACTUALIZADA', $previousState, $order->estado);
 
@@ -930,8 +941,8 @@ class RepairService
 
         if (Str::upper($state) === 'LISTA') {
             $this->consumeInventoryReservation($order->refresh());
-            $this->syncTaskQueueForState($order, $state);
         }
+        $this->syncTaskQueueForState($order, $state);
 
         $this->recordEvent($order, $event, $previousState, $state);
 
@@ -944,14 +955,34 @@ class RepairService
 
     private function syncTaskQueueForState(RepairOrder $order, string $state): void
     {
-        if (Str::upper($state) !== 'LISTA') {
+        if (! in_array(Str::upper($state), ['LISTA', 'CANCELADA'], true)) {
             return;
         }
 
-        RepairTaskItem::query()
+        $task = RepairTaskItem::query()
             ->where('repair_order_registro_id', $order->registro_id)
             ->whereNull('completed_at')
-            ->update(['completed_at' => now()]);
+            ->oldest('task_date')
+            ->oldest('created_at')
+            ->oldest('id')
+            ->first();
+
+        if ($task === null) {
+            return;
+        }
+
+        $task->delete();
+
+        $newTask = RepairTaskItem::query()->updateOrCreate(
+            [
+                'repair_order_registro_id' => $order->registro_id,
+                'task_date' => now()->toDateString(),
+            ],
+            [
+                'completed_at' => null,
+            ],
+        );
+        $newTask->forceFill(['created_at' => now(), 'updated_at' => now()])->save();
     }
 
     public function addOriginalImages(RepairOrder $order, array $images): RepairOrder
@@ -1267,30 +1298,7 @@ class RepairService
             $query->whereIn(Schema::hasColumn('ordenes', 'registro_id') ? 'registro_id' : 'id', $registroIds !== [] ? $registroIds : [-1]);
         }
 
-        if (($filters['q'] ?? '') !== '') {
-            $term = trim((string) $filters['q']);
-            $search = '%' . $term . '%';
-            $numericTerm = ctype_digit($term) ? (int) $term : null;
-
-            $query->where(function ($subQuery) use ($search, $numericTerm): void {
-                $subQuery
-                    ->where('nombre_cliente', 'like', $search)
-                    ->orWhere('modelo', 'like', $search)
-                    ->orWhere('descripcion', 'like', $search)
-                    ->orWhere('contacto', 'like', $search)
-                    ->orWhere('dni', 'like', $search);
-
-                if ($numericTerm !== null) {
-                    $subQuery
-                        ->orWhere('id', $numericTerm)
-                        ->orWhere('reparacion', $numericTerm);
-
-                    if (Schema::hasColumn('ordenes', 'registro_id')) {
-                        $subQuery->orWhere('registro_id', $numericTerm);
-                    }
-                }
-            });
-        }
+        $this->applyGlobalSearch($query, $filters);
 
         return $query;
     }
@@ -1302,30 +1310,7 @@ class RepairService
 
         $this->applyDeliveredOrderFilters($query, $filters, 'archivado_at');
 
-        if (($filters['q'] ?? '') !== '') {
-            $term = trim((string) $filters['q']);
-            $search = '%' . $term . '%';
-            $numericTerm = ctype_digit($term) ? (int) $term : null;
-
-            $query->where(function ($subQuery) use ($search, $numericTerm): void {
-                $subQuery
-                    ->where('nombre_cliente', 'like', $search)
-                    ->orWhere('modelo', 'like', $search)
-                    ->orWhere('descripcion', 'like', $search)
-                    ->orWhere('contacto', 'like', $search)
-                    ->orWhere('dni', 'like', $search);
-
-                if ($numericTerm !== null) {
-                    $subQuery
-                        ->orWhere('id', $numericTerm)
-                        ->orWhere('reparacion', $numericTerm);
-
-                    if (Schema::hasColumn('ordenes', 'registro_id')) {
-                        $subQuery->orWhere('registro_id', $numericTerm);
-                    }
-                }
-            });
-        }
+        $this->applyGlobalSearch($query, $filters);
 
         if (($filters['estado'] ?? '') !== '') {
             $query->where('estado', (string) $filters['estado']);
@@ -1399,6 +1384,129 @@ class RepairService
         }
     }
 
+    private function applyGlobalSearch(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
+    {
+        $term = trim((string) ($filters['q'] ?? ''));
+
+        if ($term === '') {
+            return;
+        }
+
+        $activeFields = $this->activeGlobalSearchFields($filters);
+
+        if ($activeFields === []) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $search = '%' . $term . '%';
+        $numericTerm = ctype_digit($term) ? (int) $term : null;
+
+        $query->where(function ($subQuery) use ($activeFields, $search, $numericTerm): void {
+            foreach ($activeFields as $field) {
+                switch ($field) {
+                    case 'id':
+                        $this->applyIdGlobalSearch($subQuery, $search, $numericTerm);
+                        break;
+                    case 'cliente':
+                        $subQuery->orWhere('nombre_cliente', 'like', $search);
+                        break;
+                    case 'dni':
+                        $subQuery->orWhere('dni', 'like', $search);
+                        break;
+                    case 'contacto':
+                        $subQuery->orWhere('contacto', 'like', $search);
+                        break;
+                    case 'ingreso':
+                        $this->applyDateGlobalSearch($subQuery, 'fecha', $search);
+                        break;
+                    case 'estimada':
+                        $this->applyDateGlobalSearch($subQuery, 'fecha_estimada', $search);
+                        break;
+                    case 'saldo':
+                        $subQuery->orWhereRaw('CAST((monto - senia) AS CHAR) LIKE ?', [$search]);
+                        break;
+                    case 'estado':
+                        $subQuery->orWhere('estado', 'like', $search);
+                        break;
+                }
+            }
+        });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function activeGlobalSearchFields(array $filters): array
+    {
+        $fields = $filters['q_fields'] ?? self::GLOBAL_SEARCH_FIELDS;
+
+        if (! is_array($fields)) {
+            return self::GLOBAL_SEARCH_FIELDS;
+        }
+
+        return array_values(array_intersect(self::GLOBAL_SEARCH_FIELDS, array_map('strval', $fields)));
+    }
+
+    private function applyIdGlobalSearch(\Illuminate\Database\Eloquent\Builder $query, string $search, ?int $numericTerm): void
+    {
+        if ($numericTerm !== null) {
+            $query
+                ->orWhere('id', $numericTerm)
+                ->orWhere('reparacion', $numericTerm);
+
+            if (Schema::hasColumn('ordenes', 'registro_id')) {
+                $query->orWhere('registro_id', $numericTerm);
+            }
+
+            return;
+        }
+
+        $query
+            ->orWhereRaw('CAST(id AS CHAR) LIKE ?', [$search])
+            ->orWhereRaw('CAST(reparacion AS CHAR) LIKE ?', [$search]);
+
+        if (Schema::hasColumn('ordenes', 'registro_id')) {
+            $query->orWhereRaw('CAST(registro_id AS CHAR) LIKE ?', [$search]);
+        }
+    }
+
+    private function applyDateGlobalSearch(\Illuminate\Database\Eloquent\Builder $query, string $column, string $search): void
+    {
+        foreach ($this->dateGlobalSearchPatterns($search) as $pattern) {
+            $query->orWhere($column, 'like', $pattern);
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function dateGlobalSearchPatterns(string $search): array
+    {
+        $term = trim($search, '% ');
+        $patterns = ['%' . $term . '%'];
+
+        if (preg_match('/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2}|\d{4}))?$/', $term, $matches) === 1) {
+            $day = (int) $matches[1];
+            $month = (int) $matches[2];
+            $year = $matches[3] ?? null;
+
+            if ($day >= 1 && $day <= 31 && $month >= 1 && $month <= 12) {
+                $dayToken = str_pad((string) $day, 2, '0', STR_PAD_LEFT);
+                $monthToken = str_pad((string) $month, 2, '0', STR_PAD_LEFT);
+
+                if ($year !== null) {
+                    $yearToken = strlen($year) === 2 ? '20' . $year : $year;
+                    $patterns[] = '%' . $yearToken . '-' . $monthToken . '-' . $dayToken . '%';
+                } else {
+                    $patterns[] = '%-' . $monthToken . '-' . $dayToken . '%';
+                }
+            }
+        }
+
+        return array_values(array_unique($patterns));
+    }
+
     private function applyDeliveredOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters, string $dateColumn = 'fecha_entregado'): void
     {
         $direction = strtolower((string) ($filters['orden'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
@@ -1439,6 +1547,8 @@ class RepairService
      */
     private function taskQueueRegistroIds(): array
     {
+        $this->completePreviousTerminalTaskItems();
+
         return RepairTaskItem::query()
             ->whereNull('completed_at')
             ->oldest('task_date')
@@ -1448,6 +1558,17 @@ class RepairService
             ->map(fn ($id): int => (int) $id)
             ->values()
             ->all();
+    }
+
+    public function completePreviousTerminalTaskItems(): void
+    {
+        $today = now()->toDateString();
+
+        RepairTaskItem::query()
+            ->whereNull('completed_at')
+            ->whereDate('task_date', '<', $today)
+            ->whereHas('repairOrder', fn ($query) => $query->whereIn('estado', ['LISTA', 'CANCELADA']))
+            ->update(['completed_at' => now()]);
     }
 
     private function summaryQuery(array $filters): \Illuminate\Database\Eloquent\Builder

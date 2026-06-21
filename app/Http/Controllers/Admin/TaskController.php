@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Repairs\WorkbenchController;
+use App\Models\RepairPart;
 use App\Models\RepairOrder;
 use App\Models\RepairTaskItem;
 use App\Services\RepairService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
@@ -15,9 +18,11 @@ use Throwable;
 
 class TaskController extends Controller
 {
-    public function index(): Response
+    public function index(RepairService $repairService, WorkbenchController $workbenchController): Response
     {
         try {
+            $repairService->completePreviousTerminalTaskItems();
+
             $items = RepairTaskItem::query()
                 ->with('repairOrder')
                 ->whereNull('completed_at')
@@ -27,10 +32,21 @@ class TaskController extends Controller
                 ->get()
                 ->filter(fn (RepairTaskItem $item): bool => $item->repairOrder !== null)
                 ->values();
+            $activeItems = $items
+                ->filter(fn (RepairTaskItem $item): bool => ! in_array((string) $item->repairOrder?->estado, ['LISTA', 'CANCELADA'], true))
+                ->values();
+            $completedItems = $items
+                ->filter(fn (RepairTaskItem $item): bool => in_array((string) $item->repairOrder?->estado, ['LISTA', 'CANCELADA'], true))
+                ->values();
 
             return Inertia::render('Admin/TasksPage', [
-                'todayLabel' => 'Cola activa',
-                'items' => $items->map(fn (RepairTaskItem $item): array => $this->serializeTaskItem($item))->all(),
+                'todayLabel' => 'Tareas para hoy',
+                'items' => $this->serializeTaskTickets($activeItems, $workbenchController),
+                'completedItems' => $this->serializeTaskTickets($completedItems, $workbenchController),
+                'states' => $repairService->availableStates(false),
+                'serviceCategories' => $this->serviceCategories(),
+                'serviceTemplates' => $repairService->serviceTemplates(),
+                'partInventory' => $this->partInventoryOptions(),
                 'urls' => [
                     'consultations' => route('repairs.workbench'),
                 ],
@@ -45,8 +61,13 @@ class TaskController extends Controller
             ]);
 
             return Inertia::render('Admin/TasksPage', [
-                'todayLabel' => 'Cola activa',
+                'todayLabel' => 'Tareas para hoy',
                 'items' => [],
+                'completedItems' => [],
+                'states' => $repairService->availableStates(false),
+                'serviceCategories' => $this->serviceCategories(),
+                'serviceTemplates' => $repairService->serviceTemplates(),
+                'partInventory' => $this->partInventoryOptions(),
                 'urls' => [
                     'consultations' => route('repairs.workbench'),
                 ],
@@ -97,9 +118,7 @@ class TaskController extends Controller
             $repairService->markReady($taskItem->repairOrder);
         }
 
-        $taskItem->update(['completed_at' => now()]);
-
-        return back()->with('success', 'Trabajo terminado.');
+        return back()->with('success', 'Trabajo marcado como listo y enviado al final de tareas.');
     }
 
     public function remove(RepairTaskItem $taskItem): RedirectResponse
@@ -109,32 +128,52 @@ class TaskController extends Controller
         return back()->with('success', 'Trabajo quitado de tareas.');
     }
 
-    private function serializeTaskItem(RepairTaskItem $item): array
+    /**
+     * @param Collection<int, RepairTaskItem> $items
+     * @return array<int, array<string, mixed>>
+     */
+    private function serializeTaskTickets(Collection $items, WorkbenchController $workbenchController): array
     {
-        /** @var RepairOrder $repair */
-        $repair = $item->repairOrder;
-        $monto = (float) $repair->monto;
-        $senia = (float) $repair->senia;
+        $orders = $items
+            ->map(fn (RepairTaskItem $item): ?RepairOrder => $item->repairOrder)
+            ->filter()
+            ->values();
 
+        return $workbenchController->groupTickets($orders, false);
+    }
+
+    /**
+     * @return array<int, array{value:int,label:string}>
+     */
+    private function serviceCategories(): array
+    {
         return [
-            'id' => $item->id,
-            'registroId' => $repair->registro_id,
-            'ticketId' => $repair->id,
-            'repairNumber' => $repair->reparacion,
-            'clientName' => $repair->nombre_cliente,
-            'dni' => $repair->dni,
-            'contact' => $repair->contacto,
-            'date' => optional($repair->fecha)->format('Y-m-d'),
-            'estimatedDate' => optional($repair->fecha_estimada)->format('Y-m-d'),
-            'model' => $repair->modelo,
-            'description' => $repair->descripcion,
-            'observations' => $repair->observaciones,
-            'status' => $repair->estado,
-            'balance' => max(0, $monto - $senia),
-            'ticketUrl' => route('repairs.tickets.show', ['orderId' => $repair->id]),
-            'completeAction' => route('tasks.complete', $item),
-            'removeAction' => route('tasks.remove', $item),
+            ['value' => 1, 'label' => 'Celulares'],
+            ['value' => 2, 'label' => 'Computadoras'],
+            ['value' => 3, 'label' => 'Consolas'],
+            ['value' => 4, 'label' => 'Varios'],
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function partInventoryOptions(): array
+    {
+        return RepairPart::query()
+            ->where('quantity', '>', 0)
+            ->whereNull('reserved_order_id')
+            ->oldest('box')
+            ->oldest('sort_order')
+            ->oldest('id')
+            ->get()
+            ->map(fn (RepairPart $part): array => [
+                'id' => $part->id,
+                'quantity' => $part->quantity,
+                'model' => $part->model,
+                'box' => $part->box,
+            ])
+            ->all();
     }
 
     /**

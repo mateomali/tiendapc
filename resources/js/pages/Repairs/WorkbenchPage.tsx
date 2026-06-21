@@ -63,6 +63,7 @@ interface WorkbenchPageProps {
         filter_estimada?: string;
         filter_saldo?: string;
         filter_estado?: string;
+        q_fields?: string[];
     };
     tickets: RepairTicketView[];
     summary: {
@@ -285,8 +286,10 @@ function FilterPill({ label, href, active }: { label: string; href: string; acti
     );
 }
 
-function cleanQuery(query: Record<string, string | number | undefined>): Record<string, string | number> {
-    return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined && value !== '')) as Record<string, string | number>;
+type QueryValue = string | number | string[] | undefined;
+
+function cleanQuery(query: Record<string, QueryValue>): Record<string, string | number | string[]> {
+    return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0))) as Record<string, string | number | string[]>;
 }
 
 const columnFilterKeys = [
@@ -302,6 +305,21 @@ const columnFilterKeys = [
     'filter_saldo',
     'filter_estado',
 ] as const;
+
+const searchFieldOptions = [
+    { key: 'id', label: 'ID' },
+    { key: 'cliente', label: 'Cliente' },
+    { key: 'dni', label: 'DNI' },
+    { key: 'contacto', label: 'Contacto' },
+    { key: 'ingreso', label: 'Fecha ingreso' },
+    { key: 'estimada', label: 'Estimada' },
+    { key: 'saldo', label: 'Saldo' },
+    { key: 'estado', label: 'Estado' },
+] as const;
+
+type SearchFieldKey = (typeof searchFieldOptions)[number]['key'];
+
+const defaultSearchFields = searchFieldOptions.map((option) => option.key);
 
 type SortableRepairColumn = 'ticket' | 'cliente' | 'dni' | 'contacto' | 'ingreso' | 'trabajo' | 'modelo' | 'falla' | 'estimada' | 'saldo' | 'estado';
 
@@ -412,6 +430,26 @@ function groupTicketsByEntryDate(tickets: RepairTicketView[]): TicketDateGroup[]
     return Array.from(groups.values());
 }
 
+function splitTaskTickets(tickets: RepairTicketView[]): { pending: RepairTicketView[]; completed: RepairTicketView[] } {
+    const pending: RepairTicketView[] = [];
+    const completed: RepairTicketView[] = [];
+
+    tickets.forEach((ticket) => {
+        const pendingRepairs = ticket.repairs.filter((repair) => !['LISTA', 'CANCELADA'].includes(repair.estado));
+        const completedRepairs = ticket.repairs.filter((repair) => ['LISTA', 'CANCELADA'].includes(repair.estado));
+
+        if (pendingRepairs.length > 0) {
+            pending.push({ ...ticket, repairs: pendingRepairs });
+        }
+
+        if (completedRepairs.length > 0) {
+            completed.push({ ...ticket, repairs: completedRepairs });
+        }
+    });
+
+    return { pending, completed };
+}
+
 export default function WorkbenchPage({
     filters,
     tickets,
@@ -466,9 +504,16 @@ export default function WorkbenchPage({
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
+    const [activeSearchFields, setActiveSearchFields] = useState<SearchFieldKey[]>(() => {
+        const incoming = filters.q_fields ?? defaultSearchFields;
+
+        return defaultSearchFields.filter((field) => incoming.includes(field));
+    });
     const gridFilterSubmitTimeout = useRef<number | null>(null);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const ticketDateGroups = groupTicketsByEntryDate(tickets);
+    const isTaskQueueView = filters.prioridad === 'tareas';
+    const taskTickets = splitTaskTickets(tickets);
 
     useEffect(() => () => {
         if (gridFilterSubmitTimeout.current !== null) {
@@ -507,12 +552,15 @@ export default function WorkbenchPage({
         summaryRange !== 'quarter' ? summaryRange : '',
         filters.ordenar_por && filters.ordenar_por !== 'ticket' ? filters.ordenar_por : '',
         filters.direccion && filters.direccion !== 'desc' ? filters.direccion : '',
+        activeSearchFields.length !== defaultSearchFields.length ? 'search-fields' : '',
         ...columnFilterKeys.map((key) => filters[key]),
     ].filter((value) => value !== undefined && value !== '').length;
     const columnFilterQuery = Object.fromEntries(columnFilterKeys.map((key) => [key, filters[key]])) as Record<(typeof columnFilterKeys)[number], string | undefined>;
-    const filterQuery = (overrides: Record<string, string | number | undefined> = {}): Record<string, string | number> =>
+    const searchFieldsQuery = activeSearchFields.length === defaultSearchFields.length ? undefined : activeSearchFields;
+    const filterQuery = (overrides: Record<string, QueryValue> = {}): Record<string, string | number | string[]> =>
         cleanQuery({
             q: filters.q,
+            q_fields: filters.q ? searchFieldsQuery : undefined,
             estado: filters.estado,
             prioridad: filters.prioridad,
             summary_range: summaryRange,
@@ -530,7 +578,7 @@ export default function WorkbenchPage({
 
         router.get(
             route('repairs.workbench'),
-            query !== '' ? { q: query } : {},
+            query !== '' ? cleanQuery({ q: query, q_fields: searchFieldsQuery }) : {},
             { preserveScroll },
         );
     };
@@ -540,9 +588,17 @@ export default function WorkbenchPage({
             cleanQuery({
                 ...filtersForm.data,
                 q: filtersForm.data.q.trim(),
+                q_fields: filtersForm.data.q.trim() !== '' ? searchFieldsQuery : undefined,
             }),
             { preserveScroll: true },
         );
+    };
+    const toggleSearchField = (field: SearchFieldKey): void => {
+        setActiveSearchFields((current) => (
+            current.includes(field)
+                ? current.filter((item) => item !== field)
+                : defaultSearchFields.filter((item) => item === field || current.includes(item))
+        ));
     };
     const applySingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string): void => {
         if (gridFilterSubmitTimeout.current !== null) {
@@ -1021,6 +1077,88 @@ export default function WorkbenchPage({
         }
     };
 
+    const renderDesktopDateGroups = (groups: TicketDateGroup[]): JSX.Element[] =>
+        groups.flatMap((group) => [
+            <div key={`desktop-date-group-${group.key}`} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
+                <span>{group.label}</span>
+                <span className="text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'} - {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}</span>
+            </div>,
+            ...group.tickets.flatMap((ticket) => {
+                const expanded = expandedDesktopTickets[ticket.id] ?? false;
+                const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+                return desktopRepairs.map((repair, repairIndex) => (
+                    <RepairDesktopRow
+                        key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                        ticket={ticket}
+                        repair={repair}
+                        serviceCategories={serviceCategories}
+                        serviceTemplates={serviceTemplates}
+                        partInventory={partInventory}
+                        rowIndex={repairIndex}
+                        rowTotal={ticket.repairs.length}
+                        desktopGroupExpanded={expanded}
+                        onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
+                    />
+                ));
+            }),
+        ]);
+
+    const renderMobileDateGroups = (groups: TicketDateGroup[]): JSX.Element[] =>
+        groups.map((group) => (
+            <section key={`mobile-date-group-${group.key}`} className="grid gap-2">
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
+                    <span>{group.label}</span>
+                    <span className="text-xs text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'}</span>
+                </div>
+                {group.tickets.map((ticket) => (
+                    <RepairTicketPanel
+                        key={ticket.id}
+                        ticket={ticket}
+                        states={states}
+                        serviceCategories={serviceCategories}
+                        serviceTemplates={serviceTemplates}
+                        partInventory={partInventory}
+                        allowAddRepair
+                    />
+                ))}
+            </section>
+        ));
+
+    const renderDesktopTaskTickets = (taskTicketsList: RepairTicketView[]): JSX.Element[] =>
+        taskTicketsList.flatMap((ticket) => {
+            const expanded = expandedDesktopTickets[ticket.id] ?? true;
+            const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+            return desktopRepairs.map((repair, repairIndex) => (
+                <RepairDesktopRow
+                    key={`desktop-task-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                    ticket={ticket}
+                    repair={repair}
+                    serviceCategories={serviceCategories}
+                    serviceTemplates={serviceTemplates}
+                    partInventory={partInventory}
+                    rowIndex={repairIndex}
+                    rowTotal={ticket.repairs.length}
+                    desktopGroupExpanded={expanded}
+                    onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
+                />
+            ));
+        });
+
+    const renderMobileTaskTickets = (taskTicketsList: RepairTicketView[]): JSX.Element[] =>
+        taskTicketsList.map((ticket) => (
+            <RepairTicketPanel
+                key={`mobile-task-${ticket.id}`}
+                ticket={ticket}
+                states={states}
+                serviceCategories={serviceCategories}
+                serviceTemplates={serviceTemplates}
+                partInventory={partInventory}
+                allowAddRepair
+            />
+        ));
+
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
@@ -1034,7 +1172,7 @@ export default function WorkbenchPage({
                 >
                     <input
                         className="min-h-10 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        placeholder="Buscar"
+                        placeholder="Buscar en columnas activas"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
@@ -1046,6 +1184,28 @@ export default function WorkbenchPage({
                         {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-md bg-[#ef4444] px-1 text-[0.65rem] font-bold text-white">{activeMobileFilters}</span> : null}
                     </button>
                 </form>
+                <div className="flex flex-wrap gap-1.5">
+                    {searchFieldOptions.map((option) => {
+                        const active = activeSearchFields.includes(option.key);
+
+                        return (
+                            <button
+                                key={option.key}
+                                type="button"
+                                className={cn(
+                                    'min-h-8 rounded-md border px-2 text-[0.68rem] font-bold transition',
+                                    active
+                                        ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                                        : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
+                                )}
+                                onClick={() => toggleSearchField(option.key)}
+                                aria-pressed={active}
+                            >
+                                {option.label}
+                            </button>
+                        );
+                    })}
+                </div>
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-bold text-[#334155]">
                     <Link
                         href={route('repairs.workbench')}
@@ -1136,7 +1296,15 @@ export default function WorkbenchPage({
                     className="hidden gap-2 rounded-lg border border-[#b8d3f7] bg-[#f8fbff] p-3 shadow-sm md:grid-cols-[180px_180px_auto] md:items-end xl:grid"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        filtersForm.get(route('repairs.workbench'), { preserveScroll: true });
+                        router.get(
+                            route('repairs.workbench'),
+                            cleanQuery({
+                                ...filtersForm.data,
+                                q: filtersForm.data.q.trim(),
+                                q_fields: filtersForm.data.q.trim() !== '' ? searchFieldsQuery : undefined,
+                            }),
+                            { preserveScroll: true },
+                        );
                     }}
                 >
                     <input type="hidden" name="summary_range" value="custom" />
@@ -1169,7 +1337,7 @@ export default function WorkbenchPage({
             {isConsultas && deliveredSearchMatches > 0 ? (
                 <div className="rounded-lg border border-[#7dd3fc] bg-[#ecfeff] px-4 py-3 text-sm font-bold text-[#155e75] shadow-sm">
                     Encontrado en entregados: {deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
-                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.delivered', { q: filters.q ?? '' })}>
+                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.delivered', cleanQuery({ q: filters.q ?? '', q_fields: filters.q ? searchFieldsQuery : undefined }))}>
                         Ir a entregados.php
                     </Link>
                 </div>
@@ -1177,7 +1345,7 @@ export default function WorkbenchPage({
             {isConsultas && archivedSearchMatches > 0 ? (
                 <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-4 py-3 text-sm font-bold text-[#334155] shadow-sm">
                     Encontrado en archivados: {archivedSearchMatches} {archivedSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
-                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.archived', { q: filters.q ?? '' })}>
+                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.archived', cleanQuery({ q: filters.q ?? '', q_fields: filters.q ? searchFieldsQuery : undefined }))}>
                         Ir a archivados.php
                     </Link>
                 </div>
@@ -1214,11 +1382,11 @@ export default function WorkbenchPage({
                     submitCleanSearch();
                 }}
             >
-                <div className="grid gap-2">
-                    <div className="relative min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-[360px] flex-[0_1_50%]">
                     <input
                         className="min-h-10 w-full rounded-md border border-[#cbd5e1] bg-white py-2 pl-3 pr-10 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        placeholder="Buscar por cliente, ticket, modelo, descripción, contacto o DNI"
+                        placeholder="Buscar en columnas activas"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
@@ -1230,6 +1398,28 @@ export default function WorkbenchPage({
                             <FaSearch aria-hidden="true" />
                         </button>
                     </div>
+                    <div className="flex min-w-[420px] flex-1 flex-wrap items-center gap-1.5">
+                        {searchFieldOptions.map((option) => {
+                            const active = activeSearchFields.includes(option.key);
+
+                            return (
+                                <button
+                                    key={option.key}
+                                    type="button"
+                                    className={cn(
+                                        'min-h-8 rounded-md border px-2.5 text-[0.72rem] font-bold transition',
+                                        active
+                                            ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                                            : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
+                                    )}
+                                    onClick={() => toggleSearchField(option.key)}
+                                    aria-pressed={active}
+                                >
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             </form>
             ) : null}
@@ -1240,10 +1430,18 @@ export default function WorkbenchPage({
                         className="max-h-[86vh] w-full overflow-y-auto rounded-t-lg bg-white p-4 shadow-lg"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            filtersForm.get(route('repairs.workbench'), {
-                                preserveScroll: true,
-                                onFinish: () => setMobileFiltersOpen(false),
-                            });
+                            router.get(
+                                route('repairs.workbench'),
+                                cleanQuery({
+                                    ...filtersForm.data,
+                                    q: filtersForm.data.q.trim(),
+                                    q_fields: filtersForm.data.q.trim() !== '' ? searchFieldsQuery : undefined,
+                                }),
+                                {
+                                    preserveScroll: true,
+                                    onFinish: () => setMobileFiltersOpen(false),
+                                },
+                            );
                         }}
                     >
                         <div className="mb-3 flex items-center justify-between gap-3">
@@ -1876,31 +2074,26 @@ export default function WorkbenchPage({
                         </form>
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (
-                                ticketDateGroups.flatMap((group) => [
-                                    <div key={`desktop-date-group-${group.key}`} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
-                                        <span>{group.label}</span>
-                                        <span className="text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'} - {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}</span>
-                                    </div>,
-                                    ...group.tickets.flatMap((ticket) => {
-                                        const expanded = expandedDesktopTickets[ticket.id] ?? false;
-                                        const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
-
-                                        return desktopRepairs.map((repair, repairIndex) => (
-                                            <RepairDesktopRow
-                                                key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
-                                                ticket={ticket}
-                                                repair={repair}
-                                                serviceCategories={serviceCategories}
-                                                serviceTemplates={serviceTemplates}
-                                                partInventory={partInventory}
-                                                rowIndex={repairIndex}
-                                                rowTotal={ticket.repairs.length}
-                                                desktopGroupExpanded={expanded}
-                                                onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
-                                            />
-                                        ));
-                                    }),
-                                ])
+                                isTaskQueueView ? (
+                                    <>
+                                        <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[#0f172a] bg-[#f8fafc] px-3 py-2 text-xs font-black text-[#0f172a]">
+                                            <span>Tareas para hoy</span>
+                                            <span>{taskTickets.pending.reduce((total, ticket) => total + ticket.repairs.length, 0)} pendiente{taskTickets.pending.length === 1 ? '' : 's'}</span>
+                                        </div>
+                                        {taskTickets.pending.length > 0 ? renderDesktopTaskTickets(taskTickets.pending) : (
+                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">No quedan tareas pendientes.</div>
+                                        )}
+                                        <div className="bg-[#f1f5f9] py-3">
+                                            <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-xs font-black text-white">
+                                                <span>Completadas</span>
+                                                <span className="text-[#cbd5e1]">{taskTickets.completed.reduce((total, ticket) => total + ticket.repairs.length, 0)} terminada{taskTickets.completed.length === 1 ? '' : 's'}</span>
+                                            </div>
+                                        </div>
+                                        {taskTickets.completed.length > 0 ? renderDesktopTaskTickets(taskTickets.completed) : (
+                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">Todavia no hay tareas listas o canceladas.</div>
+                                        )}
+                                    </>
+                                ) : renderDesktopDateGroups(ticketDateGroups)
                             ) : (
                                 <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets activos para los filtros actuales.</div>
                             )}
@@ -1909,25 +2102,30 @@ export default function WorkbenchPage({
                 </div>
 
                 <div className="grid gap-3 xl:hidden">
-                    {ticketDateGroups.map((group) => (
-                        <section key={`mobile-date-group-${group.key}`} className="grid gap-2">
-                            <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
-                                <span>{group.label}</span>
-                                <span className="text-xs text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'}</span>
+                    {isTaskQueueView ? (
+                        <>
+                            <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-2">
+                                <div className="flex items-center justify-between gap-2 border-b border-[#cbd5e1] px-1 pb-2 text-sm font-black text-[#0f172a]">
+                                    <span>Tareas para hoy</span>
+                                    <span>{taskTickets.pending.reduce((total, ticket) => total + ticket.repairs.length, 0)}</span>
+                                </div>
+                                {taskTickets.pending.length > 0 ? renderMobileTaskTickets(taskTickets.pending) : (
+                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">No quedan tareas pendientes.</div>
+                                )}
+                            </section>
+                            <div className="bg-[#f1f5f9] py-3">
+                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-sm font-black text-white">
+                                    <span>Completadas</span>
+                                    <span className="text-xs text-[#cbd5e1]">{taskTickets.completed.reduce((total, ticket) => total + ticket.repairs.length, 0)}</span>
+                                </div>
                             </div>
-                            {group.tickets.map((ticket) => (
-                                <RepairTicketPanel
-                                    key={ticket.id}
-                                    ticket={ticket}
-                                    states={states}
-                                    serviceCategories={serviceCategories}
-                                    serviceTemplates={serviceTemplates}
-                                    partInventory={partInventory}
-                                    allowAddRepair
-                                />
-                            ))}
-                        </section>
-                    ))}
+                            <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2">
+                                {taskTickets.completed.length > 0 ? renderMobileTaskTickets(taskTickets.completed) : (
+                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">Todavia no hay tareas listas o canceladas.</div>
+                                )}
+                            </section>
+                        </>
+                    ) : renderMobileDateGroups(ticketDateGroups)}
                     {tickets.length === 0 ? <div className="rounded-lg border border-[#cbd5e1] bg-white p-6 text-center font-semibold text-[#475569] shadow-sm">No hay tickets activos para los filtros actuales.</div> : null}
                 </div>
             </section>

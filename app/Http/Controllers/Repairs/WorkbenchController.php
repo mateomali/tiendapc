@@ -73,9 +73,12 @@ class WorkbenchController extends Controller
             'filter_estimada' => ['nullable', 'date'],
             'filter_saldo' => ['nullable', 'string'],
             'filter_estado' => ['nullable', 'string'],
+            'q_fields' => ['nullable', 'array'],
+            'q_fields.*' => ['string'],
         ]);
 
         $searchTerm = trim((string) ($filters['q'] ?? ''));
+        $filters['q_fields'] = $this->normalizeSearchFields($filters['q_fields'] ?? null);
 
         if ($searchTerm !== '') {
             $filters['summary_range'] = 'all';
@@ -118,6 +121,23 @@ class WorkbenchController extends Controller
         ]);
     }
 
+    /**
+     * @param mixed $fields
+     * @return array<int, string>
+     */
+    private function normalizeSearchFields(mixed $fields): array
+    {
+        $allowed = ['id', 'cliente', 'dni', 'contacto', 'ingreso', 'estimada', 'saldo', 'estado'];
+
+        if (! is_array($fields) || $fields === []) {
+            return $allowed;
+        }
+
+        $selected = array_values(array_intersect($allowed, array_map('strval', $fields)));
+
+        return $selected;
+    }
+
     public function delivered(Request $request, RepairService $repairService): Response
     {
         $filters = $request->validate([
@@ -125,7 +145,10 @@ class WorkbenchController extends Controller
             'estado' => ['nullable', 'string'],
             'orden' => ['nullable', 'string'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'q_fields' => ['nullable', 'array'],
+            'q_fields.*' => ['string'],
         ]);
+        $filters['q_fields'] = $this->normalizeSearchFields($filters['q_fields'] ?? null);
 
         $orders = $repairService->deliveredOrders($filters);
         $allTickets = collect($this->groupTickets($orders, true));
@@ -157,7 +180,10 @@ class WorkbenchController extends Controller
             'estado' => ['nullable', 'string'],
             'orden' => ['nullable', 'string'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'q_fields' => ['nullable', 'array'],
+            'q_fields.*' => ['string'],
         ]);
+        $filters['q_fields'] = $this->normalizeSearchFields($filters['q_fields'] ?? null);
 
         $orders = $repairService->archivedOrders($filters);
         $allTickets = collect($this->groupTickets($orders, false));
