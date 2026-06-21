@@ -56,6 +56,8 @@ interface RepairTicketPanelProps {
     allowAddRepair?: boolean;
     readOnly?: boolean;
     archived?: boolean;
+    statusLabel?: (repair: RepairOrderView) => string;
+    highlightTerm?: string;
 }
 
 interface RepairUpdateFormData {
@@ -100,7 +102,15 @@ interface AddRepairFormData {
 
 interface PaymentFormData {
     amount: string;
+    payment_type: string;
     method: string;
+    notes: string;
+    paid_at: string;
+}
+
+interface IncrementFormData {
+    amount: string;
+    payment_type: string;
     notes: string;
     paid_at: string;
 }
@@ -231,6 +241,31 @@ function deliveredDetailLabel(value?: string | null): string {
     if (days === 1) return 'Entregada hace 1 dia';
 
     return `Entregada hace ${days} dias`;
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function HighlightText({ value, term }: { value: string | number | null | undefined; term?: string }): JSX.Element {
+    const text = value === null || value === undefined ? '' : String(value);
+    const query = (term ?? '').trim();
+
+    if (text === '' || query === '') {
+        return <>{text}</>;
+    }
+
+    const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'ig'));
+
+    return (
+        <>
+            {parts.map((part, index) => (
+                part.toLowerCase() === query.toLowerCase()
+                    ? <mark key={`${part}-${index}`} className="rounded-sm bg-[#fde047] px-0.5 font-black text-[#111827]">{part}</mark>
+                    : <span key={`${part}-${index}`}>{part}</span>
+            ))}
+        </>
+    );
 }
 
 function isToday(value?: string | null): boolean {
@@ -967,6 +1002,8 @@ function RepairEditCard({
     desktopGroupExpanded = true,
     onToggleDesktopGroup,
     archived = false,
+    statusLabel,
+    highlightTerm,
 }: {
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
@@ -980,6 +1017,8 @@ function RepairEditCard({
     desktopGroupExpanded?: boolean;
     onToggleDesktopGroup?: () => void;
     archived?: boolean;
+    statusLabel?: (repair: RepairOrderView) => string;
+    highlightTerm?: string;
 }): JSX.Element {
     const initialBrand = inferredRepairBrand(repair);
     const form = useForm<RepairUpdateFormData>({
@@ -1007,7 +1046,14 @@ function RepairEditCard({
     });
     const paymentForm = useForm<PaymentFormData>({
         amount: '',
+        payment_type: 'senia',
         method: '',
+        notes: '',
+        paid_at: todayInputValue(),
+    });
+    const incrementForm = useForm<IncrementFormData>({
+        amount: '',
+        payment_type: 'incremento',
         notes: '',
         paid_at: todayInputValue(),
     });
@@ -1033,6 +1079,7 @@ function RepairEditCard({
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'LISTA'].includes(repair.estado);
     const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
     const nextStatus = nextQuickStatus(repair.estado);
+    const displayStatus = statusLabel?.(repair) ?? compactStatus(repair.estado);
     const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni);
     const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
@@ -1118,9 +1165,18 @@ function RepairEditCard({
         });
     };
 
+    const submitIncrement = (): void => {
+        if (!repair.actions?.addPayment) return;
+
+        incrementForm.post(repair.actions.addPayment, {
+            preserveScroll: true,
+            onSuccess: () => incrementForm.reset('amount', 'notes'),
+        });
+    };
+
     const deletePayment = (action?: string): void => {
         if (!action) return;
-        if (window.confirm('Eliminar esta seña del historial?')) {
+        if (window.confirm('Eliminar este movimiento del historial?')) {
             router.post(action, {}, { preserveScroll: true });
         }
     };
@@ -1496,30 +1552,51 @@ function RepairEditCard({
                                     </select>
                                 </EditField>
                                 <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="grid gap-2">
-                                        <EditField label="Monto ($)">
-                                            <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
-                                        </EditField>
-                                        {!readOnly ? (
+                                    <EditField label="Monto ($)">
+                                        <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
+                                    </EditField>
+                                    <EditField label="Pagado ($)">
+                                        <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
+                                    </EditField>
+                                </div>
+                                {!readOnly ? (
+                                    <div className="grid gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3">
+                                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,0.75fr)_auto] sm:items-end">
                                             <EditField label="Importe de seña">
                                                 <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
                                             </EditField>
-                                        ) : null}
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <EditField label="Pagado ($)">
-                                            <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
-                                        </EditField>
-                                        {!readOnly ? (
                                             <EditField label="Fecha de seña">
                                                 <input className={changedInputClass(paymentForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={paymentForm.data.paid_at} onChange={(event) => paymentForm.setData('paid_at', event.target.value)} />
                                             </EditField>
-                                        ) : null}
+                                            <button type="button" className={buttonClass('primary', 'sm', 'min-h-9 whitespace-nowrap px-4')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
+                                                Registrar seña
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : null}
+                                {!readOnly ? (
+                                    <div className="grid gap-2 rounded-lg border border-[#fed7aa] bg-[#fff7ed] p-3">
+                                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.7fr)]">
+                                            <EditField label="Concepto de incremento">
+                                                <input className={changedInputClass(incrementForm.data.notes, '', undefined, false)} placeholder="Ej: pin de carga" value={incrementForm.data.notes} onChange={(event) => incrementForm.setData('notes', event.target.value)} />
+                                            </EditField>
+                                            <EditField label="Importe ($)">
+                                                <input className={changedInputClass(incrementForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="0" value={incrementForm.data.amount} onChange={(event) => incrementForm.setData('amount', event.target.value)} />
+                                            </EditField>
+                                        </div>
+                                        <div className="grid gap-2 sm:grid-cols-[minmax(9rem,0.65fr)_minmax(11rem,auto)] sm:items-end">
+                                            <EditField label="Fecha de incremento">
+                                                <input className={changedInputClass(incrementForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={incrementForm.data.paid_at} onChange={(event) => incrementForm.setData('paid_at', event.target.value)} />
+                                            </EditField>
+                                            <button type="button" className={buttonClass('soft', 'sm', 'min-h-9 whitespace-nowrap border-[#f59e0b] bg-[#f59e0b] px-3 text-white hover:bg-[#d97706]')} disabled={incrementForm.processing || incrementForm.data.amount.trim() === '' || incrementForm.data.notes.trim() === ''} onClick={submitIncrement}>
+                                                Agregar incremento
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : null}
                                 <details className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
                                     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
-                                        <span className="font-black text-[#0f172a]">Historial de pagos ({payments.length})</span>
+                                        <span className="font-black text-[#0f172a]">Historial de pagos e incrementos ({payments.length})</span>
                                         <span className="flex items-center gap-2 font-black text-[#0f172a]">
                                             {formatCurrency(senia)}
                                             <FaChevronDown className="text-xs text-[#64748b]" aria-hidden="true" />
@@ -1528,43 +1605,37 @@ function RepairEditCard({
                                     <div className="grid gap-3 border-t border-[#e2e8f0] p-3">
                                         {payments.length > 0 ? (
                                             <div className="grid gap-1">
-                                                {payments.map((payment) => (
-                                                    <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
+                                                {payments.map((payment) => {
+                                                    const isIncrement = payment.payment_type === 'incremento';
+                                                    const detail = isIncrement ? payment.notes || 'Sin concepto' : 'Seña registrada';
+
+                                                    return (
+                                                        <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
                                                         <div className="min-w-0">
-                                                            <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - seña</strong>
-                                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{[payment.method, payment.notes].filter(Boolean).join(' - ') || 'Sin detalle'}</span>
+                                                            <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - {isIncrement ? 'incremento' : 'seña'}</strong>
+                                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{detail}</span>
                                                         </div>
-                                                        <span className="font-black text-[#0f172a]">{formatCurrency(payment.amount)}</span>
+                                                        <span className={cn('font-black', isIncrement ? 'text-[#b45309]' : 'text-[#0f172a]')}>{isIncrement ? '+' : ''}{formatCurrency(payment.amount)}</span>
                                                         {!readOnly ? (
                                                             <button
                                                                 type="button"
                                                                 className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md text-xs font-black text-[#dc2626] transition hover:bg-[#fee2e2]"
                                                                 onClick={() => deletePayment(payment.deleteAction)}
-                                                                title="Eliminar seña"
-                                                                aria-label="Eliminar seña"
+                                                                title="Eliminar movimiento"
+                                                                aria-label="Eliminar movimiento"
                                                             >
                                                                 <FaTimes aria-hidden="true" />
                                                             </button>
                                                         ) : null}
                                                     </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
                                             <span className="rounded-md border border-dashed border-[#cbd5e1] bg-white px-3 py-3 text-center text-sm font-semibold text-[#64748b]">Sin pagos registrados.</span>
                                         )}
                                     </div>
                                 </details>
-                                {!readOnly ? (
-                                    <div className="grid gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                                        <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
-                                            <input className={changedInputClass(paymentForm.data.method, '', undefined, false)} placeholder="Metodo" value={paymentForm.data.method} onChange={(event) => paymentForm.setData('method', event.target.value)} />
-                                            <input className={changedInputClass(paymentForm.data.notes, '', undefined, false)} placeholder="Nota" value={paymentForm.data.notes} onChange={(event) => paymentForm.setData('notes', event.target.value)} />
-                                            <button type="button" className={buttonClass('primary', 'sm')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
-                                                Registrar seña
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Fecha de ingreso">
                                         <input className={changedInputClass(form.data.fecha, repair.fecha ?? '')} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} disabled={readOnly} />
@@ -1747,7 +1818,7 @@ function RepairEditCard({
             <>
                 <div className={cn('grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
                     <div className="grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 text-center">
-                        {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">-</span>}
+                        {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#<HighlightText value={repair.id} term={highlightTerm} /></strong> : <span className="text-slate-300">-</span>}
                         {showDesktopTicketData && rowTotal > 1 && onToggleDesktopGroup ? (
                             <button
                                 type="button"
@@ -1760,10 +1831,10 @@ function RepairEditCard({
                             </button>
                         ) : <span className="block h-6 w-[2.35rem]" aria-hidden="true" />}
                     </div>
-                    <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{showDesktopTicketData ? repair.nombre_cliente : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
+                    <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? <HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? <HighlightText value={repair.contacto || '-'} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? <HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} /> : ''}</button>
                     <div className="flex items-center justify-center"><Thumb large /></div>
                     <div className="grid content-center gap-1 text-left">
                         {rowTotal > 1 ? (
@@ -1774,14 +1845,14 @@ function RepairEditCard({
                             </div>
                         ) : null}
                         <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repairDisplayModel || '-'}>
-                            {repairDisplayModel || '-'}
+                            <HighlightText value={repairDisplayModel || '-'} term={highlightTerm} />
                         </button>
                     </div>
                     <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={displayDescription}>
-                        <span className="line-clamp-2">{displayDescription}</span>
+                        <span className="line-clamp-2"><HighlightText value={displayDescription} term={highlightTerm} /></span>
                     </button>
                     <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
-                        <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>
+                        <span className="whitespace-nowrap"><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} /></span>
                         {isToday(repair.fecha_estimada) ? <span className="w-fit rounded bg-[#ffc107] px-1 text-[0.65rem] font-black leading-tight text-[#111827]">Hoy</span> : null}
                         {overdueText ? <span className="w-fit rounded bg-[#dc3545] px-1 text-[0.65rem] font-black leading-tight text-white">{overdueText}</span> : null}
                     </button>
@@ -1795,9 +1866,9 @@ function RepairEditCard({
                             className={cn('rounded-md px-2.5 py-1 text-[0.68rem] font-bold', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
                             onClick={cycleDesktopStatus}
                             disabled={readOnly || !canCycleStatus || form.processing}
-                            title={!readOnly && canCycleStatus ? `Cambiar a ${compactStatus(nextStatus)}` : compactStatus(repair.estado)}
+                            title={!readOnly && canCycleStatus ? `Cambiar a ${compactStatus(nextStatus)}` : displayStatus}
                         >
-                            {compactStatus(repair.estado)}
+                            <HighlightText value={displayStatus} term={highlightTerm} />
                         </button>
                     </div>
                     <div className="flex items-center justify-end">
@@ -1845,10 +1916,10 @@ function RepairEditCard({
                             <div className="mb-1 flex items-center gap-1.5">
                                 <span className="text-[0.68rem] font-bold text-[#0f172a]">#{repair.id}</span>
                                 <span className="text-[0.68rem] font-bold text-[#64748b]">{rowIndex + 1}/{rowTotal}</span>
-                                <span className={cn('rounded-md border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{compactStatus(repair.estado)}</span>
+                                <span className={cn('rounded-md border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
-                            <h4 className="truncate text-[0.96rem] font-black leading-tight">{repairDisplayModel || 'Sin modelo'}</h4>
-                            <p className="truncate text-[0.78rem] font-bold opacity-90">{displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription}</p>
+                            <h4 className="truncate text-[0.96rem] font-black leading-tight"><HighlightText value={repairDisplayModel || 'Sin modelo'} term={highlightTerm} /></h4>
+                            <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>
                                 {isToday(repair.fecha_estimada) ? <span className="rounded-md bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
@@ -1882,11 +1953,11 @@ function RepairEditCard({
                         </div>
                     ) : null}
                     <div className="grid grid-cols-2 gap-1.5">
-                        {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={repair.dni} onClick={openInlineEditor} /> : null}
-                        {repair.contacto ? <FieldSummary label="Contacto" value={repair.contacto} onClick={openInlineEditor} /> : null}
+                        {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={<HighlightText value={repair.dni} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
+                        {repair.contacto ? <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
-                        <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
-                        <FieldSummary label="Estado" value={compactStatus(repair.estado)} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
+                        <FieldSummary label="F. estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
+                        <FieldSummary label="Estado" value={<HighlightText value={displayStatus} term={highlightTerm} />} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                     </div>
@@ -1909,8 +1980,8 @@ function RepairEditCard({
                         <details className="rounded-lg border border-slate-200 bg-slate-50">
                             <summary className="cursor-pointer px-3 py-2 text-sm font-black text-[#1d4ed8]"><FaImages className="mr-1 inline" aria-hidden="true" />Ver mas</summary>
                             <div className="grid gap-2 p-3 text-sm">
-                                <FieldSummary label="F. ingreso" value={formatLegacyDate(repair.fecha)} onClick={openInlineEditor} />
-                                {repair.descripcion ? <FieldSummary label="Descripcion" value={repair.descripcion} onClick={openInlineEditor} /> : null}
+                                <FieldSummary label="F. ingreso" value={<HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} />} onClick={openInlineEditor} />
+                                {repair.descripcion ? <FieldSummary label="Descripcion" value={<HighlightText value={repair.descripcion} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.repuesto ? <FieldSummary label="Repuesto" value={repair.repuesto} onClick={openInlineEditor} /> : null}
                                 {repair.observaciones ? <FieldSummary label="Observaciones" value={repair.observaciones} onClick={openInlineEditor} /> : null}
                             </div>
@@ -1937,6 +2008,8 @@ export function RepairDesktopRow({
     desktopGroupExpanded = true,
     onToggleDesktopGroup,
     archived = false,
+    statusLabel,
+    highlightTerm,
 }: {
     ticket: RepairTicketView;
     repair: RepairOrderView;
@@ -1949,6 +2022,8 @@ export function RepairDesktopRow({
     desktopGroupExpanded?: boolean;
     onToggleDesktopGroup?: () => void;
     archived?: boolean;
+    statusLabel?: (repair: RepairOrderView) => string;
+    highlightTerm?: string;
 }): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
 
@@ -1966,6 +2041,8 @@ export function RepairDesktopRow({
                 desktopGroupExpanded={desktopGroupExpanded}
                 onToggleDesktopGroup={onToggleDesktopGroup}
                 archived={archived}
+                statusLabel={statusLabel}
+                highlightTerm={highlightTerm}
                 onAddRepair={() => setAddOpen(true)}
             />
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
@@ -1982,6 +2059,8 @@ export function RepairTicketPanel({
     allowAddRepair = false,
     readOnly = false,
     archived = false,
+    statusLabel,
+    highlightTerm,
 }: RepairTicketPanelProps): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
     const [desktopGroupExpanded, setDesktopGroupExpanded] = useState(false);
@@ -2055,6 +2134,8 @@ export function RepairTicketPanel({
                                 desktopGroupExpanded={desktopGroupExpanded}
                                 onToggleDesktopGroup={index === 0 && ticket.repairs.length > 1 ? () => setDesktopGroupExpanded((expanded) => !expanded) : undefined}
                                 archived={archived}
+                                statusLabel={statusLabel}
+                                highlightTerm={highlightTerm}
                                 onAddRepair={() => setAddOpen(true)}
                             />
                         ))}
@@ -2075,6 +2156,8 @@ export function RepairTicketPanel({
                         rowIndex={index}
                         rowTotal={ticket.repairs.length}
                         archived={archived}
+                        statusLabel={statusLabel}
+                        highlightTerm={highlightTerm}
                         onAddRepair={() => setAddOpen(true)}
                     />
                 ))}

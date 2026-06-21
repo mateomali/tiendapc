@@ -756,18 +756,26 @@ class RepairService
     public function addPayment(RepairOrder $order, array $payload): RepairOrder
     {
         return DB::transaction(function () use ($order, $payload): RepairOrder {
+            $paymentType = $payload['payment_type'] ?? 'senia';
+            $amount = (float) $payload['amount'];
+
             RepairPayment::query()->create([
                 'orden_id' => $order->id,
                 'reparacion' => $order->reparacion,
-                'amount' => (float) $payload['amount'],
-                'payment_type' => 'senia',
-                'method' => $payload['method'] ?? null,
+                'amount' => $amount,
+                'payment_type' => $paymentType,
+                'method' => $paymentType === 'incremento' ? null : ($payload['method'] ?? null),
                 'notes' => $payload['notes'] ?? null,
                 'paid_at' => $payload['paid_at'] ?? now()->toDateString(),
             ]);
 
-            $this->syncPaymentTotal($order);
-            $this->recordEvent($order, 'PAGO_REGISTRADO', $order->estado, $order->estado);
+            if ($paymentType === 'incremento') {
+                $order->forceFill(['monto' => max(0, (float) $order->monto + $amount)])->save();
+                $this->recordEvent($order, 'INCREMENTO_REGISTRADO', $order->estado, $order->estado);
+            } else {
+                $this->syncPaymentTotal($order);
+                $this->recordEvent($order, 'PAGO_REGISTRADO', $order->estado, $order->estado);
+            }
 
             return $order->refresh();
         });
@@ -780,9 +788,18 @@ class RepairService
         }
 
         return DB::transaction(function () use ($order, $payment): RepairOrder {
+            $isIncrement = $payment->payment_type === 'incremento';
+            $amount = (float) $payment->amount;
+
             $payment->delete();
-            $this->syncPaymentTotal($order);
-            $this->recordEvent($order, 'SENA_ELIMINADA', $order->estado, $order->estado);
+
+            if ($isIncrement) {
+                $order->forceFill(['monto' => max(0, (float) $order->monto - $amount)])->save();
+                $this->recordEvent($order, 'INCREMENTO_ELIMINADO', $order->estado, $order->estado);
+            } else {
+                $this->syncPaymentTotal($order);
+                $this->recordEvent($order, 'SENA_ELIMINADA', $order->estado, $order->estado);
+            }
 
             return $order->refresh();
         });
@@ -903,6 +920,10 @@ class RepairService
     {
         return $payments
             ->filter(function (RepairPayment $payment) use ($since): bool {
+                if ($payment->payment_type !== 'senia') {
+                    return false;
+                }
+
                 if ($since === null) {
                     return true;
                 }
@@ -1652,6 +1673,7 @@ class RepairService
         return (float) RepairPayment::query()
             ->where('orden_id', $order->id)
             ->where('reparacion', $order->reparacion)
+            ->where('payment_type', 'senia')
             ->sum('amount');
     }
 

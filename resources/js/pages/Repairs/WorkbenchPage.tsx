@@ -66,6 +66,7 @@ interface WorkbenchPageProps {
         q_fields?: string[];
     };
     tickets: RepairTicketView[];
+    deliveredSearchTickets: RepairTicketView[];
     summary: {
         active: number;
         delivered: number;
@@ -450,9 +451,34 @@ function splitTaskTickets(tickets: RepairTicketView[]): { pending: RepairTicketV
     return { pending, completed };
 }
 
+function daysSinceDate(value?: string | null): number | null {
+    if (!value) return null;
+
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+
+    const delivered = new Date(year, month - 1, day);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const difference = today.getTime() - delivered.getTime();
+
+    return Math.max(0, Math.floor(difference / 86_400_000));
+}
+
+function deliveredStatusLabel(value?: string | null): string {
+    const days = daysSinceDate(value);
+
+    if (days === null) return 'Entregado';
+    if (days === 0) return 'Entregado hoy';
+    if (days === 1) return 'Entregado hace 1 dia';
+
+    return `Entregado hace ${days} dias`;
+}
+
 export default function WorkbenchPage({
     filters,
     tickets,
+    deliveredSearchTickets,
     summary,
     deliveredSearchMatches,
     states,
@@ -468,6 +494,7 @@ export default function WorkbenchPage({
 }: WorkbenchPageProps): JSX.Element {
     const isConsultas = pageMode === 'consultas';
     const isIngreso = pageMode === 'ingreso';
+    const highlightTerm = (filters.q ?? '').trim();
     const filtersForm = useForm({
         q: filters.q ?? '',
         estado: filters.estado ?? '',
@@ -1097,6 +1124,7 @@ export default function WorkbenchPage({
                         serviceCategories={serviceCategories}
                         serviceTemplates={serviceTemplates}
                         partInventory={partInventory}
+                        highlightTerm={highlightTerm}
                         rowIndex={repairIndex}
                         rowTotal={ticket.repairs.length}
                         desktopGroupExpanded={expanded}
@@ -1121,6 +1149,7 @@ export default function WorkbenchPage({
                         serviceCategories={serviceCategories}
                         serviceTemplates={serviceTemplates}
                         partInventory={partInventory}
+                        highlightTerm={highlightTerm}
                         allowAddRepair
                     />
                 ))}
@@ -1140,6 +1169,7 @@ export default function WorkbenchPage({
                     serviceCategories={serviceCategories}
                     serviceTemplates={serviceTemplates}
                     partInventory={partInventory}
+                    highlightTerm={highlightTerm}
                     rowIndex={repairIndex}
                     rowTotal={ticket.repairs.length}
                     desktopGroupExpanded={expanded}
@@ -1157,7 +1187,43 @@ export default function WorkbenchPage({
                 serviceCategories={serviceCategories}
                 serviceTemplates={serviceTemplates}
                 partInventory={partInventory}
+                highlightTerm={highlightTerm}
                 allowAddRepair
+            />
+        ));
+
+    const renderDesktopDeliveredSearchTickets = (): JSX.Element[] =>
+        deliveredSearchTickets.flatMap((ticket) => (
+            ticket.repairs.map((repair, repairIndex) => (
+                <RepairDesktopRow
+                    key={`desktop-delivered-search-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                    ticket={ticket}
+                    repair={repair}
+                    serviceCategories={serviceCategories}
+                    serviceTemplates={serviceTemplates}
+                    partInventory={partInventory}
+                    readOnly
+                    highlightTerm={highlightTerm}
+                    rowIndex={repairIndex}
+                    rowTotal={ticket.repairs.length}
+                    desktopGroupExpanded
+                    statusLabel={(item) => deliveredStatusLabel(item.fecha_entregado)}
+                />
+            ))
+        ));
+
+    const renderMobileDeliveredSearchTickets = (): JSX.Element[] =>
+        deliveredSearchTickets.map((ticket) => (
+            <RepairTicketPanel
+                key={`mobile-delivered-search-${ticket.id}`}
+                ticket={ticket}
+                states={states}
+                serviceCategories={serviceCategories}
+                serviceTemplates={serviceTemplates}
+                partInventory={partInventory}
+                readOnly
+                highlightTerm={highlightTerm}
+                statusLabel={(repair) => deliveredStatusLabel(repair.fecha_entregado)}
             />
         ));
 
@@ -1336,14 +1402,6 @@ export default function WorkbenchPage({
                 </form>
             ) : null}
 
-            {isConsultas && deliveredSearchMatches > 0 ? (
-                <div className="rounded-lg border border-[#7dd3fc] bg-[#ecfeff] px-4 py-3 text-sm font-bold text-[#155e75] shadow-sm">
-                    Encontrado en entregados: {deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
-                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.delivered', cleanQuery({ q: filters.q ?? '', q_fields: filters.q ? searchFieldsQuery : undefined }))}>
-                        Ir a entregados.php
-                    </Link>
-                </div>
-            ) : null}
             {isConsultas && archivedSearchMatches > 0 ? (
                 <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-4 py-3 text-sm font-bold text-[#334155] shadow-sm">
                     Encontrado en archivados: {archivedSearchMatches} {archivedSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
@@ -2099,6 +2157,17 @@ export default function WorkbenchPage({
                             ) : (
                                 <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets activos para los filtros actuales.</div>
                             )}
+                            {isConsultas && deliveredSearchTickets.length > 0 ? (
+                                <>
+                                    <div className="bg-[#f1f5f9] py-3">
+                                        <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-xs font-black text-white">
+                                            <span>Encontrado en entregados</span>
+                                            <span className="text-[#cbd5e1]">{deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}</span>
+                                        </div>
+                                    </div>
+                                    {renderDesktopDeliveredSearchTickets()}
+                                </>
+                            ) : null}
                         </div>
                     </div>
                 </div>
@@ -2129,6 +2198,19 @@ export default function WorkbenchPage({
                         </>
                     ) : renderMobileDateGroups(ticketDateGroups)}
                     {tickets.length === 0 ? <div className="rounded-lg border border-[#cbd5e1] bg-white p-6 text-center font-semibold text-[#475569] shadow-sm">No hay tickets activos para los filtros actuales.</div> : null}
+                    {isConsultas && deliveredSearchTickets.length > 0 ? (
+                        <>
+                            <div className="bg-[#f1f5f9] py-3">
+                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-sm font-black text-white">
+                                    <span>Encontrado en entregados</span>
+                                    <span className="text-xs text-[#cbd5e1]">{deliveredSearchMatches}</span>
+                                </div>
+                            </div>
+                            <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2">
+                                {renderMobileDeliveredSearchTickets()}
+                            </section>
+                        </>
+                    ) : null}
                 </div>
             </section>
             ) : null}

@@ -222,7 +222,7 @@ it('stores successive repair payments as history and updates paid total', functi
     $this->withSession(['repair_tech_authenticated' => true])
         ->post(route('repairs.orders.payments.store', $order), [
             'amount' => 15000,
-            'payment_type' => 'pago',
+            'payment_type' => 'senia',
             'paid_at' => '2026-05-31',
         ])
         ->assertRedirect();
@@ -238,6 +238,59 @@ it('stores successive repair payments as history and updates paid total', functi
 
     expect(RepairPayment::query()->where('orden_id', 801)->where('reparacion', 1)->count())->toBe(1);
     expect((float) $order->fresh()?->senia)->toBe(15000.0);
+});
+
+it('stores repair increments as ticket additions without counting them as payments', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 802,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Incremento',
+        'dni' => 33444222,
+        'modelo' => 'Moto E32',
+        'descripcion' => 'Cambio de modulo',
+        'monto' => 35000,
+        'senia' => 0,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.payments.store', $order), [
+            'amount' => 5000,
+            'payment_type' => 'incremento',
+            'notes' => 'Pin de carga',
+            'paid_at' => '2026-06-21',
+        ])
+        ->assertRedirect();
+
+    $order->refresh();
+    expect((float) $order->monto)->toBe(40000.0);
+    expect((float) $order->senia)->toBe(0.0);
+
+    $increment = RepairPayment::query()
+        ->where('orden_id', 802)
+        ->where('reparacion', 1)
+        ->where('payment_type', 'incremento')
+        ->firstOrFail();
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.tickets.show', ['orderId' => 802]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/TicketPage')
+            ->where('ticket.repairs.0.monto', '40000.00')
+            ->where('ticket.repairs.0.senia', '0.00')
+            ->where('ticket.repairs.0.payments.0.payment_type', 'incremento')
+            ->where('ticket.repairs.0.payments.0.notes', 'Pin de carga'));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.payments.delete', [$order, $increment]))
+        ->assertRedirect();
+
+    $order->refresh();
+    expect((float) $order->monto)->toBe(35000.0);
+    expect((float) $order->senia)->toBe(0.0);
 });
 
 it('generates a verifier token for tickets without dni and uses it for public tracking', function (): void {

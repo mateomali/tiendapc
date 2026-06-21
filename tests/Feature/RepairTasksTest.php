@@ -260,3 +260,35 @@ it('returns no consultations when search has no active global fields', function 
             ->component('Repairs/WorkbenchPage')
             ->has('tickets', 0));
 });
+
+it('returns delivered tickets alongside consultation search results', function (): void {
+    RepairOrder::query()->create([
+        'id' => 995,
+        'reparacion' => 1,
+        'fecha' => now()->subDays(6)->toDateString(),
+        'nombre_cliente' => 'Cliente Entregado Busqueda',
+        'dni' => 30111229,
+        'contacto' => '1122334462',
+        'modelo' => 'Notebook',
+        'descripcion' => 'Equipo entregado',
+        'monto' => 15000,
+        'senia' => 15000,
+        'fecha_estimada' => now()->subDays(5)->toDateString(),
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'fecha_entregado' => now()->subDays(3)->toDateString(),
+        'categorias_reparacion' => 2,
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => '995']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 0)
+            ->where('deliveredSearchMatches', 1)
+            ->has('deliveredSearchTickets', 1)
+            ->where('deliveredSearchTickets.0.id', 995)
+            ->where('deliveredSearchTickets.0.repairs.0.entregado', 'si')
+            ->where('deliveredSearchTickets.0.repairs.0.fecha_entregado', now()->subDays(3)->toDateString()));
+});

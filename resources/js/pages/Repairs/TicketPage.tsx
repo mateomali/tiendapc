@@ -23,6 +23,7 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
     const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, minute: '2-digit' });
     const hasClientDni = ticket.hasClientDni ?? (Number(ticket.dni) > 0 && Number(ticket.dni) !== 12345678);
     const trackingVerifier = ticket.trackingVerifier || String(ticket.dni);
+    const hasIncrements = ticket.repairs.some((repair) => (repair.payments ?? []).some((payment) => payment.payment_type === 'incremento'));
 
     useEffect(() => {
         let cancelled = false;
@@ -76,7 +77,7 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                     <div className="my-[5px] border-t border-dashed border-black" />
 
                     <section>
-                        <div className="mb-[3px] text-[12px]">COMPROBANTE DE INGRESO</div>
+                        <div className="mb-[3px] text-[12px]">{hasIncrements ? 'TICKET ACTUALIZADO' : 'COMPROBANTE DE INGRESO'}</div>
                         <TicketLine label="ORDEN N:" value={`#${ticket.id}`} />
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
                         {hasClientDni ? <TicketLine label="DNI:" value={String(ticket.dni)} /> : <TicketLine label="CODIGO:" value={trackingVerifier} />}
@@ -95,6 +96,7 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                             const deliveredLabel = repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null;
                             const modelLabel = ticketRepairModel(repair);
                             const failureLabel = ticketRepairFailure(repair, modelLabel);
+                            const increments = (repair.payments ?? []).filter((payment) => payment.payment_type === 'incremento');
 
                             return (
                                 <div key={`${repair.registro_id}-${repair.reparacion}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
@@ -104,6 +106,13 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                                         <span className="block">FALLA:</span>
                                         <strong className="mt-px block break-words text-left">{failureLabel}</strong>
                                     </div>
+                                    {increments.map((payment) => (
+                                        <TicketLine
+                                            key={payment.id}
+                                            label="INCREMENTO:"
+                                            value={`${ticketIncrementLabel(payment.notes)} + ${formatCurrency(payment.amount)}`}
+                                        />
+                                    ))}
                                     {senia > 0 ? (
                                         <>
                                             <TicketLine label="PRESUPUESTO:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
@@ -211,6 +220,12 @@ function ticketRepairFailure(repair: RepairOrderView, displayModel: string): str
     });
 
     return failure || 'SIN DESCRIPCION';
+}
+
+function ticketIncrementLabel(value?: string | null): string {
+    const label = (value ?? '').trim();
+
+    return label !== '' ? label.toUpperCase() : 'ADICIONAL';
 }
 
 function formatDeliveredTicketDate(value?: string | null): string {

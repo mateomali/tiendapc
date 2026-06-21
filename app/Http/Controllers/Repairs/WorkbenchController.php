@@ -88,13 +88,14 @@ class WorkbenchController extends Controller
         }
 
         $orders = $repairService->activeOrders($filters);
-        $deliveredSearchMatches = $searchTerm !== ''
+        $deliveredSearchOrders = $searchTerm !== ''
             ? $repairService->deliveredOrders([
                 ...$filters,
                 'estado' => '',
                 'prioridad' => '',
-            ])->count()
-            : 0;
+            ])
+            : collect();
+        $deliveredSearchMatches = $deliveredSearchOrders->count();
         $archivedSearchMatches = $searchTerm !== ''
             ? $repairService->archivedOrders([
                 ...$filters,
@@ -106,6 +107,7 @@ class WorkbenchController extends Controller
         return Inertia::render('Repairs/WorkbenchPage', [
             'filters' => $filters,
             'tickets' => $this->groupTickets($orders, false),
+            'deliveredSearchTickets' => $this->groupTickets($deliveredSearchOrders, true),
             'summary' => $repairService->summary($filters),
             'deliveredSearchMatches' => $deliveredSearchMatches,
             'archivedSearchMatches' => $archivedSearchMatches,
@@ -936,12 +938,17 @@ class WorkbenchController extends Controller
     {
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:0.01'],
+            'payment_type' => ['nullable', 'string', 'in:senia,incremento'],
             'method' => ['nullable', 'string', 'max:40'],
             'notes' => ['nullable', 'string', 'max:500'],
             'paid_at' => ['nullable', 'date'],
         ]);
 
         $repairService->addPayment($repairOrder, $validated);
+
+        if (($validated['payment_type'] ?? 'senia') === 'incremento') {
+            return back()->with('success', 'Incremento registrado.');
+        }
 
         return back()->with('success', 'Seña registrada.');
     }
@@ -952,6 +959,10 @@ class WorkbenchController extends Controller
             $repairService->deletePayment($repairOrder, $repairPayment);
         } catch (RuntimeException $exception) {
             return back()->with('error', $exception->getMessage());
+        }
+
+        if ($repairPayment->payment_type === 'incremento') {
+            return back()->with('success', 'Incremento eliminado.');
         }
 
         return back()->with('success', 'Seña eliminada.');
