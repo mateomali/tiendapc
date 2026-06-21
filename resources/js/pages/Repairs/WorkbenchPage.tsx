@@ -556,7 +556,9 @@ export default function WorkbenchPage({
         ...columnFilterKeys.map((key) => filters[key]),
     ].filter((value) => value !== undefined && value !== '').length;
     const columnFilterQuery = Object.fromEntries(columnFilterKeys.map((key) => [key, filters[key]])) as Record<(typeof columnFilterKeys)[number], string | undefined>;
-    const searchFieldsQuery = activeSearchFields.length === defaultSearchFields.length ? undefined : activeSearchFields;
+    const searchFieldsQuery = activeSearchFields.length === defaultSearchFields.length
+        ? undefined
+        : (activeSearchFields.length === 0 ? ['__none'] : activeSearchFields);
     const filterQuery = (overrides: Record<string, QueryValue> = {}): Record<string, string | number | string[]> =>
         cleanQuery({
             q: filters.q,

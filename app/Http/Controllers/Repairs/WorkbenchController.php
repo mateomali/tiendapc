@@ -1124,9 +1124,13 @@ class WorkbenchController extends Controller
      */
     public function groupTickets(Collection $orders, bool $delivered): array
     {
+        $eventsByRepair = $this->eventsForOrders($orders);
+        $paymentsByRepair = $this->paymentsForOrders($orders);
+        $availableStates = app(RepairService::class)->availableStates($delivered);
+
         return $orders
             ->groupBy('id')
-            ->map(function (Collection $ticketOrders) use ($delivered): array {
+            ->map(function (Collection $ticketOrders) use ($delivered, $eventsByRepair, $paymentsByRepair, $availableStates): array {
                 /** @var RepairOrder $base */
                 $base = $ticketOrders->sortBy('reparacion')->first();
                 $ticketInfo = $ticketOrders
@@ -1156,7 +1160,13 @@ class WorkbenchController extends Controller
                     'addRepairAction' => route('repairs.orders.add_repair', $base),
                     'repairs' => $ticketOrders
                         ->sortBy('reparacion')
-                        ->map(fn (RepairOrder $order): array => $this->serializeRepair($order, $delivered))
+                        ->map(fn (RepairOrder $order): array => $this->serializeRepair(
+                            $order,
+                            $delivered,
+                            $eventsByRepair->get($this->repairCollectionKey($order), collect()),
+                            $paymentsByRepair->get($this->repairCollectionKey($order), collect()),
+                            $availableStates,
+                        ))
                         ->values()
                         ->all(),
                 ];
@@ -1168,8 +1178,11 @@ class WorkbenchController extends Controller
     /**
      * @return array<string, mixed>
      */
-    public function serializeRepair(RepairOrder $order, bool $delivered): array
+    public function serializeRepair(RepairOrder $order, bool $delivered, ?Collection $events = null, ?Collection $payments = null, ?array $availableStates = null): array
     {
+        $events ??= $order->events()->get();
+        $availableStates ??= app(RepairService::class)->availableStates($delivered);
+
         return [
             'registro_id' => $order->registro_id,
             'id' => $order->id,
@@ -1202,7 +1215,7 @@ class WorkbenchController extends Controller
             'taskQueuePosition' => $this->taskQueuePosition($order),
             'imagenes' => $this->serializeImages($order->originalImages(), $order, false),
             'imagenes_finales' => $this->serializeImages($order->finalImages(), $order, true),
-            'events' => $order->events()->get()->map(fn (RepairEvent $event): array => [
+            'events' => $events->map(fn (RepairEvent $event): array => [
                 'id' => $event->id,
                 'evento' => $event->evento,
                 'estado_anterior' => $event->estado_anterior,
@@ -1210,7 +1223,7 @@ class WorkbenchController extends Controller
                 'created_at' => optional($event->created_at)->format('Y-m-d H:i'),
                 'usuario' => $event->usuario,
             ])->all(),
-            'payments' => $this->serializePayments($order),
+            'payments' => $this->serializePayments($order, $payments),
             'actions' => [
                 'update' => route('repairs.orders.update', $order),
                 'info' => route('repairs.orders.info', $order),
@@ -1228,8 +1241,60 @@ class WorkbenchController extends Controller
                 'removeFinalImage' => route('repairs.orders.final_images.remove', $order),
                 'addToTasks' => route('tasks.add_repair', $order),
             ],
-            'availableStates' => app(RepairService::class)->availableStates($delivered),
+            'availableStates' => $availableStates,
         ];
+    }
+
+    /**
+     * @return Collection<string, Collection<int, RepairEvent>>
+     */
+    private function eventsForOrders(Collection $orders): Collection
+    {
+        $ids = $orders->pluck('id')->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $keys = $orders
+            ->map(fn (RepairOrder $order): string => $this->repairCollectionKey($order))
+            ->flip();
+
+        return RepairEvent::query()
+            ->whereIn('orden_id', $ids)
+            ->orderByDesc('created_at')
+            ->get()
+            ->filter(fn (RepairEvent $event): bool => $keys->has($event->orden_id . ':' . $event->reparacion))
+            ->groupBy(fn (RepairEvent $event): string => $event->orden_id . ':' . $event->reparacion);
+    }
+
+    /**
+     * @return Collection<string, Collection<int, RepairPayment>>
+     */
+    private function paymentsForOrders(Collection $orders): Collection
+    {
+        $ids = $orders->pluck('id')->unique()->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $keys = $orders
+            ->map(fn (RepairOrder $order): string => $this->repairCollectionKey($order))
+            ->flip();
+
+        return RepairPayment::query()
+            ->whereIn('orden_id', $ids)
+            ->orderByDesc('paid_at')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn (RepairPayment $payment): bool => $keys->has($payment->orden_id . ':' . $payment->reparacion))
+            ->groupBy(fn (RepairPayment $payment): string => $payment->orden_id . ':' . $payment->reparacion);
+    }
+
+    private function repairCollectionKey(RepairOrder $order): string
+    {
+        return ((int) $order->id) . ':' . ((int) $order->reparacion);
     }
 
     private function taskQueuePosition(RepairOrder $order): ?int
@@ -1270,14 +1335,16 @@ class WorkbenchController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function serializePayments(RepairOrder $order): array
+    private function serializePayments(RepairOrder $order, ?Collection $payments = null): array
     {
-        return RepairPayment::query()
-            ->where('orden_id', $order->id)
-            ->where('reparacion', $order->reparacion)
-            ->orderByDesc('paid_at')
-            ->orderByDesc('id')
-            ->get()
+        $payments ??= RepairPayment::query()
+                ->where('orden_id', $order->id)
+                ->where('reparacion', $order->reparacion)
+                ->orderByDesc('paid_at')
+                ->orderByDesc('id')
+                ->get();
+
+        return $payments
             ->map(fn (RepairPayment $payment): array => [
                 'id' => $payment->id,
                 'amount' => $payment->amount,
