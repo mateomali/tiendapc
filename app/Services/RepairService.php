@@ -43,6 +43,7 @@ class RepairService
         'cliente',
         'dni',
         'contacto',
+        'modelo',
         'ingreso',
         'estimada',
         'saldo',
@@ -277,6 +278,7 @@ class RepairService
                     'contacto' => $payload['contacto'] ?? null,
                     'marca' => $this->detectDeviceBrandFromRepairText((string) ($job['modelo'] ?? ''), (string) $job['descripcion'], (string) ($job['marca'] ?? '')),
                     'modelo' => $model,
+                    'color' => $job['color'],
                     'descripcion' => $this->uppercaseFailure((string) $job['descripcion']),
                     'observaciones' => $job['observaciones'],
                     'info' => $info !== '' ? $info : null,
@@ -335,6 +337,7 @@ class RepairService
                 'contacto' => $order->contacto,
                 'marca' => $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? '')),
                 'modelo' => $model,
+                'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
                 'descripcion' => $this->uppercaseFailure((string) $payload['descripcion']),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $order->info,
@@ -563,6 +566,7 @@ class RepairService
                 'fecha' => $payload['fecha'] ?? $order->fecha,
                 'marca' => $brand,
                 'modelo' => $model,
+                'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
                 'descripcion' => $this->uppercaseFailure((string) ($payload['descripcion'] ?? '')),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $info !== '' ? $info : null,
@@ -1438,6 +1442,9 @@ class RepairService
                     case 'contacto':
                         $subQuery->orWhere('contacto', 'like', $search);
                         break;
+                    case 'modelo':
+                        $subQuery->orWhere('modelo', 'like', $search);
+                        break;
                     case 'ingreso':
                         $this->applyDateGlobalSearch($subQuery, 'fecha', $search);
                         break;
@@ -2008,6 +2015,7 @@ class RepairService
      * @return array<int, array{
      *     modelo:?string,
      *     marca:?string,
+     *     color:?string,
      *     descripcion:string,
      *     observaciones:string,
      *     monto:float|int,
@@ -2024,6 +2032,7 @@ class RepairService
     {
         $jobs = collect($payload['jobs'] ?? [Arr::only($payload, [
             'modelo',
+            'color',
             'tipo_servicio',
             'descripcion',
             'observaciones',
@@ -2059,6 +2068,7 @@ class RepairService
                 return [
                     'modelo' => $model !== '' ? $model : null,
                     'marca' => $brand !== '' ? $brand : null,
+                    'color' => trim((string) ($job['color'] ?? '')) !== '' ? trim((string) $job['color']) : null,
                     'descripcion' => $this->uppercaseFailure($description),
                     'observaciones' => trim((string) ($job['observaciones'] ?? '')) !== '' ? trim((string) ($job['observaciones'] ?? '')) : 'sin observaciones',
                     'monto' => $job['monto'] ?? 0,
@@ -2089,6 +2099,7 @@ class RepairService
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
                 'marca' => $this->normalizeDeviceModel((string) ($payload['marca'] ?? '')) ?: null,
+                'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
                 'descripcion' => $this->uppercaseFailure($description),
                 'observaciones' => trim((string) ($payload['observaciones'] ?? '')) !== '' ? trim((string) $payload['observaciones']) : 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,

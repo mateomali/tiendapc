@@ -187,6 +187,7 @@ export interface RepairOrderView {
     contacto?: string | null;
     marca?: string | null;
     modelo?: string | null;
+    color?: string | null;
     descripcion?: string | null;
     observaciones?: string | null;
     info?: string | null;
@@ -320,6 +321,11 @@ export interface PublicRepairStatusView {
     variant: string;
     message: string;
     announcedAt?: string | null;
+    queue?: {
+        position: number;
+        total: number;
+        message: string;
+    } | null;
     pickup?: {
         title: string;
         address: string;

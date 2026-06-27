@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Repairs;
 
 use App\Http\Controllers\Controller;
 use App\Models\RepairOrder;
+use App\Models\RepairTaskItem;
 use App\Models\SiteContactConfig;
 use App\Models\SiteGlobalConfig;
 use App\Services\RepairService;
@@ -55,9 +56,11 @@ class PublicTrackingController extends Controller
      */
     private function groupPublicTickets(Collection $orders): array
     {
+        $queuePositions = $this->activeQueuePositions();
+
         return $orders
             ->groupBy('id')
-            ->map(function (Collection $ticketOrders): array {
+            ->map(function (Collection $ticketOrders) use ($queuePositions): array {
                 /** @var RepairOrder $base */
                 $base = $ticketOrders->sortBy('reparacion')->first();
 
@@ -69,7 +72,7 @@ class PublicTrackingController extends Controller
                     'totalSenia' => $ticketOrders->sum(fn (RepairOrder $order): float => (float) $order->senia),
                     'repairs' => $ticketOrders
                         ->sortBy('reparacion')
-                        ->map(fn (RepairOrder $order): array => $this->serializePublicOrderRepair($order))
+                        ->map(fn (RepairOrder $order): array => $this->serializePublicOrderRepair($order, $queuePositions))
                         ->values()
                         ->all(),
                 ];
@@ -79,10 +82,41 @@ class PublicTrackingController extends Controller
     }
 
     /**
+     * @return array{total:int, positions:array<int, int>}
+     */
+    private function activeQueuePositions(): array
+    {
+        $items = RepairTaskItem::query()
+            ->with('repairOrder')
+            ->whereNull('completed_at')
+            ->oldest('task_date')
+            ->oldest('created_at')
+            ->oldest('id')
+            ->get()
+            ->filter(fn (RepairTaskItem $item): bool => $item->repairOrder !== null)
+            ->filter(fn (RepairTaskItem $item): bool => ! in_array((string) $item->repairOrder?->estado, ['LISTA', 'CANCELADA'], true))
+            ->values();
+
+        $positions = [];
+
+        foreach ($items as $index => $item) {
+            $positions[(int) $item->repair_order_registro_id] = $index + 1;
+        }
+
+        return [
+            'total' => $items->count(),
+            'positions' => $positions,
+        ];
+    }
+
+    /**
+     * @param array{total:int, positions:array<int, int>} $queuePositions
      * @return array<string, mixed>
      */
-    private function serializePublicOrderRepair(RepairOrder $order): array
+    private function serializePublicOrderRepair(RepairOrder $order, array $queuePositions): array
     {
+        $queuePosition = $queuePositions['positions'][(int) $order->registro_id] ?? null;
+
         return [
             'registro_id' => (int) $order->registro_id,
             'id' => (int) $order->id,
@@ -102,6 +136,10 @@ class PublicTrackingController extends Controller
                 (string) ($order->getRawOriginal('imagen3') ?? ''),
                 (string) ($order->getRawOriginal('imagen4') ?? ''),
             ])), true),
+            'queue' => $queuePosition !== null ? [
+                'position' => $queuePosition,
+                'total' => $queuePositions['total'],
+            ] : null,
             'events' => [],
         ];
     }
@@ -417,11 +455,26 @@ class PublicTrackingController extends Controller
         }
 
         if (in_array($state, ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'], true)) {
-            return [
+            $status = [
                 'variant' => 'waiting',
                 'message' => 'Tu equipo está en proceso de reparación.',
                 'announcedAt' => $this->stateAnnouncementDate($repair),
             ];
+
+            if (is_array($repair['queue'] ?? null)) {
+                $position = (int) ($repair['queue']['position'] ?? 0);
+                $total = (int) ($repair['queue']['total'] ?? 0);
+
+                if ($position > 0 && $total > 0) {
+                    $status['queue'] = [
+                        'position' => $position,
+                        'total' => $total,
+                        'message' => sprintf('Tu equipo está en el puesto %d de %d en la cola de trabajo.', $position, $total),
+                    ];
+                }
+            }
+
+            return $status;
         }
 
         if ($state === 'PENDIENTE') {

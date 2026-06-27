@@ -191,6 +191,16 @@ function StatusTracking({ status }: { status: PublicRepairStatusView }): JSX.Ele
                     ) : null}
                     <h4 className="text-xl font-black text-[#102146] md:text-2xl">{trackingTitle(status.variant)}</h4>
                     <p className="text-base font-bold leading-7">{status.message}</p>
+                    {status.queue ? (
+                        <div className="mt-1 grid gap-1 rounded-md border border-fuchsia-200 bg-white px-3 py-2.5 text-sm text-[#102146]">
+                            <span className="font-black">
+                                Puesto {status.queue.position} de {status.queue.total}
+                            </span>
+                            <span className="font-semibold leading-6">
+                                {status.queue.message}
+                            </span>
+                        </div>
+                    ) : null}
                 </div>
             </div>
 

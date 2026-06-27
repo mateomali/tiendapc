@@ -64,6 +64,29 @@ it('finds active repairs by ticket id from consultations search', function (): v
             ->where('tickets.0.repairs.0.modelo', 'Joystick PS4'));
 });
 
+it('finds active repairs by model from consultations search', function (): void {
+    RepairOrder::query()->create([
+        'id' => 1907,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Lautaro',
+        'dni' => 12345678,
+        'modelo' => 'Moto Edge 40',
+        'descripcion' => 'No enciende',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => 'Edge 40', 'q_fields' => ['modelo']]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 1)
+            ->where('tickets.0.id', 1907)
+            ->where('tickets.0.repairs.0.modelo', 'Moto Edge 40'));
+});
+
 it('creates multi-job repair orders and redirects to the technical ticket', function (): void {
     $response = $this->withSession(['repair_tech_authenticated' => true])
         ->post(route('repairs.orders.store'), [
@@ -74,6 +97,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
                 [
                     'marca' => 'MOTOROLA',
                     'modelo' => 'Moto G54',
+                    'color' => 'Azul',
                     'tipo_servicio' => 'modulo',
                     'descripcion' => '',
                     'observaciones' => 'Pantalla partida',
@@ -113,6 +137,8 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
         ]);
     expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('marca')->all())
         ->toBe(['MOTOROLA', 'MOTOROLA']);
+    expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('color')->all())
+        ->toBe(['Azul', null]);
     expect(RepairDeviceModel::query()->where('model', 'MOTO G54')->value('usage_count'))->toBe(2);
 
     $this->withSession(['repair_tech_authenticated' => true])

@@ -68,6 +68,7 @@ interface RepairUpdateFormData {
     contacto: string;
     marca: string;
     modelo: string;
+    color: string;
     descripcion: string;
     observaciones: string;
     info: string;
@@ -87,6 +88,7 @@ interface RepairUpdateFormData {
 interface AddRepairFormData {
     marca: string;
     modelo: string;
+    color: string;
     tipo_servicio: string;
     descripcion: string;
     observaciones: string;
@@ -352,15 +354,17 @@ function modelWithoutKnownBrand(model: string): string {
 function displayRepairModel(repair: RepairOrderView): string {
     const model = (repair.modelo ?? '').trim();
     const brand = inferredRepairBrand(repair);
+    const color = (repair.color ?? '').trim();
+    const withColor = (value: string): string => color !== '' ? `${value} - ${color}` : value;
 
-    if (model === '') return brand || '-';
+    if (model === '') return withColor(brand || '-');
 
     const normalizedModel = normalizeRepairText(model);
     if (brand === '' || normalizedModel === brand || normalizedModel.startsWith(`${brand} `)) {
-        return model;
+        return withColor(model);
     }
 
-    return `${brand} ${model}`.trim();
+    return withColor(`${brand} ${model}`.trim());
 }
 
 function descriptionWithoutRepeatedModel(description?: string | null, model?: string | null, brand?: string | null): string {
@@ -705,6 +709,7 @@ function AddRepairModal({
     const form = useForm<AddRepairFormData>({
         marca: '',
         modelo: '',
+        color: '',
         tipo_servicio: '',
         descripcion: '',
         observaciones: 'sin observaciones',
@@ -866,6 +871,9 @@ function AddRepairModal({
                         ) : null}
                         <EditField label="Modelo">
                             <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
+                        </EditField>
+                        <EditField label="Color">
+                            <input className={ui.input} placeholder="Opcional" value={form.data.color} onChange={(event) => form.setData('color', event.target.value)} />
                         </EditField>
                         <EditField label="Tipo de servicio">
                             <select className={ui.input} value="" onChange={(event) => applyDescriptionOption(event.target.value)}>
@@ -1029,6 +1037,7 @@ function RepairEditCard({
         contacto: repair.contacto ?? '',
         marca: initialBrand,
         modelo: repair.modelo ?? '',
+        color: repair.color ?? '',
         descripcion: repair.descripcion ?? '',
         observaciones: repair.observaciones ?? '',
         info: ticket.info ?? '',
@@ -1329,7 +1338,7 @@ function RepairEditCard({
         <form
             className={cn(
                 'grid gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3',
-                mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(150px,1fr)_96px_128px_126px_124px_124px_minmax(160px,1.05fr)_138px_112px_142px]',
+                mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(150px,1fr)_96px_128px_126px_124px_124px_minmax(150px,1fr)_106px_138px_112px_142px]',
             )}
             onSubmit={submitEdit}
         >
@@ -1354,6 +1363,7 @@ function RepairEditCard({
                 <input className={ui.repairDenseInput} value={form.data.marca} onChange={(event) => form.setData('marca', event.target.value.toUpperCase())} placeholder="Marca" />
             )}
             <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} placeholder="Modelo" />
+            <input className={ui.repairDenseInput} value={form.data.color} onChange={(event) => form.setData('color', event.target.value)} placeholder="Color" />
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
             <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
             <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
@@ -1545,6 +1555,9 @@ function RepairEditCard({
                                 </EditField>
                                 <EditField label="Modelo">
                                     <input className={changedInputClass(form.data.modelo, repair.modelo ?? '')} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} disabled={readOnly} />
+                                </EditField>
+                                <EditField label="Color">
+                                    <input className={changedInputClass(form.data.color, repair.color ?? '')} value={form.data.color} onChange={(event) => form.setData('color', event.target.value)} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Categoria">
                                     <select className={changedInputClass(form.data.categorias_reparacion, String(repair.categorias_reparacion ?? 4))} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)} disabled={readOnly}>

@@ -35,6 +35,7 @@ class RepairOrder extends Model
         'contacto',
         'marca',
         'modelo',
+        'color',
         'descripcion',
         'observaciones',
         'info',

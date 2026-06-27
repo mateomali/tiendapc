@@ -95,6 +95,7 @@ interface WorkbenchPageProps {
 interface RepairJobFormData {
     marca: string;
     modelo: string;
+    color: string;
     tipo_servicio: string;
     descripcion: string;
     observaciones: string;
@@ -125,6 +126,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
     return {
         marca: '',
         modelo: '',
+        color: '',
         tipo_servicio: '',
         descripcion: '',
         observaciones: 'sin observaciones',
@@ -312,6 +314,7 @@ const searchFieldOptions = [
     { key: 'cliente', label: 'Cliente' },
     { key: 'dni', label: 'DNI' },
     { key: 'contacto', label: 'Contacto' },
+    { key: 'modelo', label: 'Modelo' },
     { key: 'ingreso', label: 'Fecha ingreso' },
     { key: 'estimada', label: 'Estimada' },
     { key: 'saldo', label: 'Saldo' },
@@ -1712,6 +1715,9 @@ export default function WorkbenchPage({
                                             <label className={repairLabelClass}>Modelo / equipo<input className={guidedInputClass(`job-${index}-model`)} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} /></label>
                                             {renderDeviceModelSuggestions(index)}
                                         </div>
+                                        <div className={fieldPanelBlue}>
+                                            <label className={repairLabelClass}>Color<input className={compactInputClass} value={job.color} onChange={(event) => updateJob(index, (current) => ({ ...current, color: event.target.value }))} /></label>
+                                        </div>
                                         <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'md:col-span-2')}>
                                             <label className={repairLabelClass}>Tipo de servicio / descripcion de la falla *</label>
                                             <select className={guidedInputClass(`job-${index}-description`)} value="" onChange={(event) => applyDescriptionOption(index, event.target.value)}>
@@ -1966,6 +1972,12 @@ export default function WorkbenchPage({
                                             placeholder="Modelo"
                                             value={job.modelo}
                                             onChange={(event) => changeJobModel(index, event.target.value)}
+                                        />
+                                        <input
+                                            className={ui.input}
+                                            placeholder="Color"
+                                            value={job.color}
+                                            onChange={(event) => updateJob(index, (current) => ({ ...current, color: event.target.value }))}
                                         />
                                         {renderDeviceModelSuggestions(index)}
                                         <textarea

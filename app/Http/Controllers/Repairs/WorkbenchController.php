@@ -129,7 +129,7 @@ class WorkbenchController extends Controller
      */
     private function normalizeSearchFields(mixed $fields): array
     {
-        $allowed = ['id', 'cliente', 'dni', 'contacto', 'ingreso', 'estimada', 'saldo', 'estado'];
+        $allowed = ['id', 'cliente', 'dni', 'contacto', 'modelo', 'ingreso', 'estimada', 'saldo', 'estado'];
 
         if (! is_array($fields) || $fields === []) {
             return $allowed;
@@ -781,6 +781,7 @@ class WorkbenchController extends Controller
         $validated = $request->validate([
             'modelo' => ['nullable', 'string', 'max:255'],
             'marca' => ['nullable', 'string', 'max:80'],
+            'color' => ['nullable', 'string', 'max:80'],
             'descripcion' => ['required', 'string'],
             'observaciones' => ['nullable', 'string'],
             'monto' => ['nullable', 'numeric', 'min:0'],
@@ -1205,6 +1206,7 @@ class WorkbenchController extends Controller
             'contacto' => $order->contacto,
             'marca' => $order->marca,
             'modelo' => $order->modelo,
+            'color' => $order->color,
             'descripcion' => $order->descripcion,
             'observaciones' => $order->observaciones,
             'info' => $order->info,
@@ -1407,6 +1409,10 @@ class WorkbenchController extends Controller
             trim((string) $order->nombre_cliente),
             (int) $order->id,
         );
+
+        if (Str::upper((string) $order->estado) === 'LISTA') {
+            $message .= ' Ya está lista para retirar por el local. te esperamos!';
+        }
 
         return 'https://wa.me/' . $phone . '?text=' . rawurlencode($message);
     }
