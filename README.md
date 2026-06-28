@@ -2,6 +2,8 @@
 
 ## Desarrollo local
 
+- `powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1`: levanta la pagina local en `http://127.0.0.1:8090`.
+- `powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1 -Restart`: reinicia Laravel y Vite si quedaron procesos viejos.
 - `composer dev`: levanta el entorno solo para la PC local.
 - `composer run dev:lan`: expone Laravel y Vite para acceder desde otra PC de la misma red.
 

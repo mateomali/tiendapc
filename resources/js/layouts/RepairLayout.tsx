@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { FaArchive, FaChartBar, FaClipboardCheck, FaDatabase, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
+import { FaArchive, FaChartBar, FaClipboardCheck, FaDatabase, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaStickyNote, FaTools } from 'react-icons/fa';
 import { FlashMessages } from '../components/FlashMessages';
 import type { SharedPageProps } from '../types';
 import { cn } from '../utils';
@@ -50,6 +50,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     const directNavItems: NavItem[] = [
         { href: route('repairs.workbench'), label: 'Consultas', shortLabel: 'Cons.', match: '/consulta', icon: <FaSearch aria-hidden="true" /> },
         { href: route('repairs.ingress'), label: 'Nueva Orden', shortLabel: 'Ingreso', match: '/ingreso', icon: <FaInbox aria-hidden="true" /> },
+        ...(hasZiggyRoute('repairs.annotations') ? [{ href: route('repairs.annotations'), label: 'Anotaciones', shortLabel: 'Notas', match: '/anotaciones', icon: <FaStickyNote aria-hidden="true" /> }] : []),
         ...(hasZiggyRoute('tasks.index') ? [{ href: route('tasks.index'), label: 'Tareas', shortLabel: 'Tareas', match: '/tareas', icon: <FaClipboardCheck aria-hidden="true" /> }] : []),
     ];
 

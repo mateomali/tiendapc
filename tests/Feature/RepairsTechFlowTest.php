@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\RepairEvent;
+use App\Models\RepairAnnotation;
 use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
@@ -740,6 +741,8 @@ it('stores internal info notes for the whole repair order', function (): void {
 
     expect($first->fresh()?->info)->toBe('Avisar antes de cambiar pin.')
         ->and($second->fresh()?->info)->toBe('Avisar antes de cambiar pin.');
+    expect(RepairAnnotation::query()->where('source', 'order_info')->where('repair_order_id', 930)->value('body'))
+        ->toBe('Avisar antes de cambiar pin.');
 
     $this->withSession(['repair_tech_authenticated' => true])
         ->get(route('repairs.workbench', ['q' => '930']))
@@ -747,6 +750,48 @@ it('stores internal info notes for the whole repair order', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/WorkbenchPage')
             ->where('tickets.0.info', 'Avisar antes de cambiar pin.'));
+});
+
+it('manages repair annotations as a dated log', function (): void {
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.annotations'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/AnnotationsPage')
+            ->has('annotations', 0));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.annotations.store'), [
+            'body' => 'Llego proveedor con repuestos.',
+        ])
+        ->assertRedirect();
+
+    $annotation = RepairAnnotation::query()->firstOrFail();
+
+    expect($annotation->body)->toBe('Llego proveedor con repuestos.')
+        ->and($annotation->source)->toBe('manual');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.annotations.update', $annotation), [
+            'body' => 'Llego proveedor con repuestos y facturas.',
+        ])
+        ->assertRedirect();
+
+    expect($annotation->fresh()?->body)->toBe('Llego proveedor con repuestos y facturas.');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.annotations'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/AnnotationsPage')
+            ->has('annotations', 1)
+            ->where('annotations.0.body', 'Llego proveedor con repuestos y facturas.'));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.annotations.delete', $annotation))
+        ->assertRedirect();
+
+    expect(RepairAnnotation::query()->count())->toBe(0);
 });
 
 it('reads internal order info from any job in the ticket', function (): void {

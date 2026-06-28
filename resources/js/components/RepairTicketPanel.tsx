@@ -120,6 +120,24 @@ interface IncrementFormData {
 type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
 
 const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
+const repairColorOptions = [
+    { value: '', label: 'Sin color', hex: '#f8fafc' },
+    { value: 'NEGRO', label: 'Negro', hex: '#111827' },
+    { value: 'BLANCO', label: 'Blanco', hex: '#ffffff' },
+    { value: 'GRIS', label: 'Gris', hex: '#6b7280' },
+    { value: 'PLATA', label: 'Plata', hex: '#c0c0c0' },
+    { value: 'AZUL', label: 'Azul', hex: '#2563eb' },
+    { value: 'CELESTE', label: 'Celeste', hex: '#38bdf8' },
+    { value: 'ROJO', label: 'Rojo', hex: '#dc2626' },
+    { value: 'VERDE', label: 'Verde', hex: '#16a34a' },
+    { value: 'AMARILLO', label: 'Amarillo', hex: '#facc15' },
+    { value: 'DORADO', label: 'Dorado', hex: '#d97706' },
+    { value: 'ROSA', label: 'Rosa', hex: '#f472b6' },
+    { value: 'VIOLETA', label: 'Violeta', hex: '#7c3aed' },
+    { value: 'NARANJA', label: 'Naranja', hex: '#f97316' },
+    { value: 'MARRON', label: 'Marron', hex: '#7c2d12' },
+    { value: 'BEIGE', label: 'Beige', hex: '#d6b48c' },
+] as const;
 
 function isPhoneCategoryValue(serviceCategories: ServiceCategoryOption[], value: string | number | null | undefined): boolean {
     const category = serviceCategories.find((item) => String(item.value) === String(value));
@@ -354,17 +372,170 @@ function modelWithoutKnownBrand(model: string): string {
 function displayRepairModel(repair: RepairOrderView): string {
     const model = (repair.modelo ?? '').trim();
     const brand = inferredRepairBrand(repair);
-    const color = (repair.color ?? '').trim();
-    const withColor = (value: string): string => color !== '' ? `${value} - ${color}` : value;
 
-    if (model === '') return withColor(brand || '-');
+    if (model === '') return brand || '-';
 
     const normalizedModel = normalizeRepairText(model);
     if (brand === '' || normalizedModel === brand || normalizedModel.startsWith(`${brand} `)) {
-        return withColor(model);
+        return model;
     }
 
-    return withColor(`${brand} ${model}`.trim());
+    return `${brand} ${model}`.trim();
+}
+
+function repairColorHex(color?: string | null): string {
+    const normalized = normalizeRepairText(color);
+    const option = repairColorOptions.find((item) => item.value === normalized);
+
+    return option?.hex ?? '#94a3b8';
+}
+
+function RepairColorSwatch({ color }: { color?: string | null }): JSX.Element | null {
+    const label = (color ?? '').trim();
+
+    if (label === '') {
+        return null;
+    }
+
+    return (
+        <span
+            className="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]"
+            style={{ backgroundColor: repairColorHex(label) }}
+            title={label}
+            aria-label={`Color ${label}`}
+        />
+    );
+}
+
+function RepairModelLabel({ repair, term }: { repair: RepairOrderView; term?: string }): JSX.Element {
+    const model = displayRepairModel(repair);
+
+    return (
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate"><HighlightText value={model || '-'} term={term} /></span>
+            {(repair.color ?? '').trim() !== '' ? <span className="shrink-0 text-[#64748b]">-</span> : null}
+            <RepairColorSwatch color={repair.color} />
+        </span>
+    );
+}
+
+function repairColorLabel(color?: string | null): string {
+    const normalized = normalizeRepairText(color);
+    const option = repairColorOptions.find((item) => item.value === normalized);
+
+    return option?.label ?? (color ?? '');
+}
+
+function RepairColorCombobox({
+    className,
+    value,
+    onChange,
+    disabled,
+}: {
+    className: string;
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+}): JSX.Element {
+    const [open, setOpen] = useState(false);
+    const [showAllColors, setShowAllColors] = useState(false);
+    const [query, setQuery] = useState(repairColorLabel(value));
+    const normalizedQuery = normalizeRepairText(query);
+    const selectedColor = repairColorHex(value);
+    const filteredOptions = showAllColors || normalizedQuery === ''
+        ? repairColorOptions
+        : repairColorOptions.filter((option) => normalizeRepairText(option.label).includes(normalizedQuery) || option.value.includes(normalizedQuery));
+
+    const selectColor = (nextValue: string): void => {
+        onChange(nextValue);
+        setQuery(repairColorLabel(nextValue));
+        setShowAllColors(false);
+        setOpen(false);
+    };
+
+    return (
+        <div className="relative">
+            <span
+                className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]"
+                style={{ backgroundColor: normalizeRepairText(value) === '' ? '#f8fafc' : selectedColor }}
+                aria-hidden="true"
+            />
+            <input
+                className={cn(className, 'pl-9 pr-9')}
+                value={open ? query : repairColorLabel(value)}
+                placeholder="Color"
+                disabled={disabled}
+                onFocus={() => {
+                    setQuery(repairColorLabel(value));
+                    setShowAllColors(false);
+                }}
+                onChange={(event) => {
+                    setQuery(event.target.value);
+                    setShowAllColors(false);
+                    setOpen(true);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' && filteredOptions[0]) {
+                        event.preventDefault();
+                        selectColor(filteredOptions[0].value);
+                    }
+                    if (event.key === 'Escape') {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        setQuery(repairColorLabel(value));
+                    }
+                }}
+                onBlur={() => {
+                    window.setTimeout(() => {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        setQuery(repairColorLabel(value));
+                    }, 120);
+                }}
+            />
+            <button
+                type="button"
+                className="absolute right-2 top-1/2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[#475569] hover:bg-[#e2e8f0] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                aria-label="Mostrar colores"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                    if (open && showAllColors) {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        return;
+                    }
+
+                    setQuery(repairColorLabel(value));
+                    setShowAllColors(true);
+                    setOpen(true);
+                }}
+            >
+                <FaChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+            </button>
+            {open && !disabled ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto rounded-md border border-[#cbd5e1] bg-white py-1 shadow-[0_8px_18px_rgba(15,23,42,0.14)]">
+                    {filteredOptions.length > 0 ? filteredOptions.map((option) => (
+                        <button
+                            key={option.value || 'empty'}
+                            type="button"
+                            className={cn(
+                                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-[#0f172a] hover:bg-[#eff6ff]',
+                                normalizeRepairText(value) === option.value && 'bg-[#dbeafe]',
+                            )}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => selectColor(option.value)}
+                        >
+                            <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]" style={{ backgroundColor: option.hex }} aria-hidden="true" />
+                            <span>{option.label}</span>
+                        </button>
+                    )) : (
+                        <div className="px-3 py-2 text-sm font-semibold text-[#64748b]">Sin coincidencias</div>
+                    )}
+                </div>
+            ) : null}
+        </div>
+    );
 }
 
 function descriptionWithoutRepeatedModel(description?: string | null, model?: string | null, brand?: string | null): string {
@@ -873,7 +1044,7 @@ function AddRepairModal({
                             <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
                         </EditField>
                         <EditField label="Color">
-                            <input className={ui.input} placeholder="Opcional" value={form.data.color} onChange={(event) => form.setData('color', event.target.value)} />
+                            <RepairColorCombobox className={ui.input} value={form.data.color} onChange={(value) => form.setData('color', value)} />
                         </EditField>
                         <EditField label="Tipo de servicio">
                             <select className={ui.input} value="" onChange={(event) => applyDescriptionOption(event.target.value)}>
@@ -1363,7 +1534,7 @@ function RepairEditCard({
                 <input className={ui.repairDenseInput} value={form.data.marca} onChange={(event) => form.setData('marca', event.target.value.toUpperCase())} placeholder="Marca" />
             )}
             <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} placeholder="Modelo" />
-            <input className={ui.repairDenseInput} value={form.data.color} onChange={(event) => form.setData('color', event.target.value)} placeholder="Color" />
+            <RepairColorCombobox className={ui.repairDenseInput} value={form.data.color} onChange={(value) => form.setData('color', value)} />
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
             <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
             <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
@@ -1557,7 +1728,7 @@ function RepairEditCard({
                                     <input className={changedInputClass(form.data.modelo, repair.modelo ?? '')} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Color">
-                                    <input className={changedInputClass(form.data.color, repair.color ?? '')} value={form.data.color} onChange={(event) => form.setData('color', event.target.value)} disabled={readOnly} />
+                                    <RepairColorCombobox className={changedInputClass(form.data.color, repair.color ?? '')} value={form.data.color} onChange={(value) => form.setData('color', value)} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Categoria">
                                     <select className={changedInputClass(form.data.categorias_reparacion, String(repair.categorias_reparacion ?? 4))} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)} disabled={readOnly}>
@@ -1858,7 +2029,7 @@ function RepairEditCard({
                             </div>
                         ) : null}
                         <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repairDisplayModel || '-'}>
-                            <HighlightText value={repairDisplayModel || '-'} term={highlightTerm} />
+                            <RepairModelLabel repair={repair} term={highlightTerm} />
                         </button>
                     </div>
                     <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={displayDescription}>
@@ -1931,7 +2102,7 @@ function RepairEditCard({
                                 <span className="text-[0.68rem] font-bold text-[#64748b]">{rowIndex + 1}/{rowTotal}</span>
                                 <span className={cn('rounded-md border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
-                            <h4 className="truncate text-[0.96rem] font-black leading-tight"><HighlightText value={repairDisplayModel || 'Sin modelo'} term={highlightTerm} /></h4>
+                            <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
                             <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>

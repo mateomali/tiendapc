@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Repairs;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Repairs\RepairOrderRequest;
 use App\Models\RepairEvent;
+use App\Models\RepairAnnotation;
 use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
@@ -996,6 +997,17 @@ class WorkbenchController extends Controller
         RepairOrder::query()
             ->where('id', $repairOrder->id)
             ->update(['info' => $info !== '' ? $info : null]);
+
+        if ($info !== '') {
+            RepairAnnotation::query()->create([
+                'body' => $info,
+                'source' => 'order_info',
+                'repair_order_id' => $repairOrder->id,
+                'repair_order_registro_id' => $repairOrder->registro_id,
+                'customer_name' => $repairOrder->nombre_cliente,
+                'occurred_at' => now(),
+            ]);
+        }
 
         return back()->with('success', 'Info interna actualizada.');
     }
