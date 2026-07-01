@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { FaArchive, FaChartBar, FaClipboardCheck, FaDatabase, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaStickyNote, FaTools } from 'react-icons/fa';
+import { FaArchive, FaChartBar, FaClipboardCheck, FaDatabase, FaExternalLinkAlt, FaHistory, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaStickyNote, FaTools } from 'react-icons/fa';
 import { FlashMessages } from '../components/FlashMessages';
 import type { SharedPageProps } from '../types';
 import { cn } from '../utils';
@@ -67,6 +67,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
             label: 'Control',
             items: [
                 ...(hasZiggyRoute('repairs.metrics') ? [{ href: route('repairs.metrics'), label: 'Metricas', shortLabel: 'Met.', match: '/metricas', icon: <FaChartBar aria-hidden="true" /> }] : []),
+                ...(hasZiggyRoute('repairs.log') ? [{ href: route('repairs.log'), label: 'Log', shortLabel: 'Log', match: '/log', icon: <FaHistory aria-hidden="true" /> }] : []),
                 { href: route('repairs.delivered'), label: 'Entregados', shortLabel: 'Entreg.', match: '/entregados', icon: <FaTools aria-hidden="true" /> },
                 ...(hasZiggyRoute('repairs.archived') ? [{ href: route('repairs.archived'), label: 'Archivados', shortLabel: 'Arch.', match: '/archivados', icon: <FaArchive aria-hidden="true" /> }] : []),
             ],

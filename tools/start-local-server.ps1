@@ -3,6 +3,7 @@ param(
     [int]$AppPort = 8090,
     [int]$VitePort = 5173,
     [switch]$Restart,
+    [switch]$WithVite,
     [switch]$OpenBrowser
 )
 
@@ -15,6 +16,7 @@ $phpLog = Join-Path $tmpPath 'local-php-router.log'
 $phpErr = Join-Path $tmpPath 'local-php-router.err.log'
 $viteLog = Join-Path $tmpPath 'local-vite.log'
 $viteErr = Join-Path $tmpPath 'local-vite.err.log'
+$hotFile = Join-Path $repoRoot 'public\hot'
 
 function Ensure-Directory {
     param([string]$Path)
@@ -150,9 +152,6 @@ Ensure-Directory -Path $tmpPath
 
 $php = Find-Php
 $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
-if (-not $npm) {
-    throw 'No encontre npm.cmd. Instala Node.js o revisa el PATH.'
-}
 
 $appUrl = "http://${HostName}:${AppPort}"
 $viteUrl = "http://${HostName}:${VitePort}"
@@ -163,15 +162,27 @@ if ($Restart) {
     Start-Sleep -Seconds 1
 }
 
+if (-not $WithVite) {
+    Remove-Item -LiteralPath $hotFile -Force -ErrorAction SilentlyContinue
+    Stop-ProjectListener -Port $VitePort
+}
+
 $appUp = Test-Url -Url $appUrl
-$viteUp = Test-Url -Url "$viteUrl/@vite/client"
+$viteUp = $false
+if ($WithVite) {
+    if (-not $npm) {
+        throw 'No encontre npm.cmd. Instala Node.js o revisa el PATH.'
+    }
+
+    $viteUp = Test-Url -Url "$viteUrl/@vite/client"
+}
 
 if (-not $appUp) {
     Assert-Port-FreeOrProject -Port $AppPort
     Start-LocalPhpServer
 }
 
-if (-not $viteUp) {
+if ($WithVite -and -not $viteUp) {
     Assert-Port-FreeOrProject -Port $VitePort
     Start-LocalViteServer
 }
@@ -180,10 +191,12 @@ $deadline = (Get-Date).AddSeconds(30)
 do {
     Start-Sleep -Milliseconds 750
     $appUp = Test-Url -Url $appUrl
-    $viteUp = Test-Url -Url "$viteUrl/@vite/client"
-} until (($appUp -and $viteUp) -or (Get-Date) -gt $deadline)
+    if ($WithVite) {
+        $viteUp = Test-Url -Url "$viteUrl/@vite/client"
+    }
+} until (($appUp -and (-not $WithVite -or $viteUp)) -or (Get-Date) -gt $deadline)
 
-if ($appUp -and -not $viteUp) {
+if ($WithVite -and $appUp -and -not $viteUp) {
     Stop-ProjectListener -Port $VitePort
     Start-Sleep -Seconds 1
     Start-LocalViteServer
@@ -195,12 +208,14 @@ if ($appUp -and -not $viteUp) {
     } until ($viteUp -or (Get-Date) -gt $deadline)
 }
 
-if (-not $appUp -or -not $viteUp) {
+if (-not $appUp -or ($WithVite -and -not $viteUp)) {
     Write-Output "No se pudo confirmar el arranque completo."
     Write-Output "Laravel log: $phpLog"
     Write-Output "Laravel error log: $phpErr"
-    Write-Output "Vite log: $viteLog"
-    Write-Output "Vite error log: $viteErr"
+    if ($WithVite) {
+        Write-Output "Vite log: $viteLog"
+        Write-Output "Vite error log: $viteErr"
+    }
     exit 1
 }
 
@@ -210,7 +225,13 @@ if ($OpenBrowser) {
 
 Write-Output "Servidor local listo:"
 Write-Output "Laravel: $appUrl"
-Write-Output "Vite:    $viteUrl"
+if ($WithVite) {
+    Write-Output "Vite:    $viteUrl"
+} else {
+    Write-Output "Assets:  public/build (Vite desactivado; public/hot removido)"
+}
 Write-Output "Logs:"
 Write-Output "- $phpLog"
-Write-Output "- $viteLog"
+if ($WithVite) {
+    Write-Output "- $viteLog"
+}

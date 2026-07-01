@@ -410,7 +410,7 @@ function DeliveredTicketList({
                                                 rowTotal={ticket.repairs.length}
                                                 desktopGroupExpanded={expanded}
                                                 onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => onToggleDesktopTicket(ticket.id) : undefined}
-                                                readOnly
+                                                readOnly={!archived}
                                                 archived={archived}
                                             />
                                         ));
@@ -438,7 +438,7 @@ function DeliveredTicketList({
                                 ticket={ticket}
                                 states={states}
                                 serviceCategories={serviceCategories}
-                                readOnly
+                                readOnly={!archived}
                                 archived={archived}
                             />
                         ))}

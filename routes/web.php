@@ -62,6 +62,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/archivados.php', [WorkbenchController::class, 'archived']);
     Route::get('/metricas', [WorkbenchController::class, 'metrics'])->name('repairs.metrics');
     Route::post('/metricas/ganancia-estimada', [WorkbenchController::class, 'saveMetricsSettings'])->name('repairs.metrics.settings.save');
+    Route::get('/log', [WorkbenchController::class, 'log'])->name('repairs.log');
     Route::get('/anotaciones', [AnnotationController::class, 'index'])->name('repairs.annotations');
     Route::post('/anotaciones', [AnnotationController::class, 'store'])->name('repairs.annotations.store');
     Route::post('/anotaciones/{repairAnnotation}', [AnnotationController::class, 'update'])->name('repairs.annotations.update');

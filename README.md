@@ -2,10 +2,13 @@
 
 ## Desarrollo local
 
-- `powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1`: levanta la pagina local en `http://127.0.0.1:8090`.
-- `powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1 -Restart`: reinicia Laravel y Vite si quedaron procesos viejos.
+- `powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1`: levanta la pagina local en `http://127.0.0.1:8090` usando los assets compilados de `public/build`.
+- `powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1 -Restart`: reinicia Laravel y apaga Vite si quedo un proceso viejo.
+- `powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1 -WithVite`: levanta tambien Vite/HMR solo si necesitas desarrollo frontend en vivo.
 - `composer dev`: levanta el entorno solo para la PC local.
 - `composer run dev:lan`: expone Laravel y Vite para acceder desde otra PC de la misma red.
+
+Nota: para uso local normal no usar Vite. Si existe `public/hot`, Laravel intenta cargar `http://...:5173` y puede aparecer el error `WebSocket closed without opened`. El script local borra `public/hot` automaticamente cuando no se pasa `-WithVite`.
 
 ## Acceso desde otra PC
 

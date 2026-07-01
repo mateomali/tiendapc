@@ -277,7 +277,7 @@ it('stores repair increments as ticket additions without counting them as paymen
         'modelo' => 'Moto E32',
         'descripcion' => 'Cambio de modulo',
         'monto' => 35000,
-        'senia' => 0,
+        'senia' => 10000,
         'estado' => 'PENDIENTE',
         'entregado' => 'no',
     ]);
@@ -293,7 +293,7 @@ it('stores repair increments as ticket additions without counting them as paymen
 
     $order->refresh();
     expect((float) $order->monto)->toBe(40000.0);
-    expect((float) $order->senia)->toBe(0.0);
+    expect((float) $order->senia)->toBe(10000.0);
 
     $increment = RepairPayment::query()
         ->where('orden_id', 802)
@@ -306,10 +306,16 @@ it('stores repair increments as ticket additions without counting them as paymen
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/TicketPage')
+            ->where('summary.totalMonto', 40000)
+            ->where('summary.totalSenia', 10000)
+            ->where('summary.saldo', 30000)
+            ->where('ticket.totalMonto', 40000)
+            ->where('ticket.totalSenia', 10000)
             ->where('ticket.repairs.0.monto', '40000.00')
-            ->where('ticket.repairs.0.senia', '0.00')
+            ->where('ticket.repairs.0.senia', '10000.00')
             ->where('ticket.repairs.0.payments.0.payment_type', 'incremento')
-            ->where('ticket.repairs.0.payments.0.notes', 'Pin de carga'));
+            ->where('ticket.repairs.0.payments.0.notes', 'Pin de carga')
+            ->where('ticket.repairs.0.payments.0.amount', '5000.00'));
 
     $this->withSession(['repair_tech_authenticated' => true])
         ->post(route('repairs.orders.payments.delete', [$order, $increment]))
@@ -317,7 +323,79 @@ it('stores repair increments as ticket additions without counting them as paymen
 
     $order->refresh();
     expect((float) $order->monto)->toBe(35000.0);
-    expect((float) $order->senia)->toBe(0.0);
+    expect((float) $order->senia)->toBe(10000.0);
+});
+
+it('renders daily repair log without intake events', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 803,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Log',
+        'dni' => 33444333,
+        'modelo' => 'Moto G52',
+        'descripcion' => 'Cambio de pantalla',
+        'monto' => 45000,
+        'senia' => 10000,
+        'estado' => 'LISTA',
+        'entregado' => 'no',
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'CREADA',
+        'estado_anterior' => null,
+        'estado_nuevo' => 'PENDIENTE',
+        'created_at' => now()->setTime(8, 0),
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'ACTUALIZADA',
+        'estado_anterior' => 'PENDIENTE',
+        'estado_nuevo' => 'LISTA',
+        'created_at' => now()->setTime(9, 30),
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'ENTREGADA',
+        'estado_anterior' => 'LISTA',
+        'estado_nuevo' => 'ENTREGADA',
+        'created_at' => now()->setTime(10, 15),
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'CANCELADA',
+        'estado_anterior' => 'PENDIENTE',
+        'estado_nuevo' => 'CANCELADA',
+        'created_at' => now()->subDay()->setTime(11, 0),
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.log'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/LogPage')
+            ->where('date', now()->toDateString())
+            ->where('summary.total', 2)
+            ->where('summary.delivered', 1)
+            ->where('summary.cancelled', 0)
+            ->where('summary.updated', 1)
+            ->has('events', 2)
+            ->where('events.0.event', 'ENTREGADA')
+            ->where('events.0.customerName', 'Cliente Log')
+            ->where('events.0.model', 'Moto G52')
+            ->where('events.1.event', 'ACTUALIZADA'));
 });
 
 it('generates a verifier token for tickets without dni and uses it for public tracking', function (): void {

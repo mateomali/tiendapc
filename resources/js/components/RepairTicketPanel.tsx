@@ -1281,6 +1281,11 @@ function RepairEditCard({
         ? partInventory.find((part) => String(part.id) === form.data.inventory_part_id) ?? null
         : null;
     const payments = repair.payments ?? [];
+    const incrementAmountText = incrementForm.data.amount.trim();
+    const incrementConceptText = incrementForm.data.notes.trim();
+    const incrementAmount = Number(incrementAmountText || 0);
+    const hasPendingIncrementInput = incrementAmountText !== '' || incrementConceptText !== '';
+    const hasCompletePendingIncrement = incrementAmountText !== '' && incrementConceptText !== '' && Number.isFinite(incrementAmount) && incrementAmount > 0;
     const assignedInventoryModel = form.data.inventory_part_id !== ''
         ? selectedInventoryPart?.model ?? repair.inventory_part_model ?? null
         : null;
@@ -1308,21 +1313,64 @@ function RepairEditCard({
         setPartSearch('');
     };
 
-    const submitEdit = (event: FormEvent<HTMLFormElement>): void => {
-        event.preventDefault();
+    const postEdit = (overrideMonto?: number): void => {
         if (!repair.actions?.update) return;
+
+        form.transform((data) => overrideMonto === undefined
+            ? data
+            : ({
+                ...data,
+                monto: formatAmountInput(overrideMonto),
+            }));
 
         form.post(repair.actions.update, {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {
+                if (overrideMonto !== undefined) {
+                    form.setData('monto', formatAmountInput(overrideMonto));
+                }
                 form.reset('images', 'final_images');
                 setImagePreviews([]);
                 setFinalImagePreviews([]);
                 setEditOpen(false);
                 setInlineOpen(false);
             },
+            onFinish: () => {
+                form.transform((data) => data);
+            },
         });
+    };
+
+    const submitEdit = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        if (!repair.actions?.update) return;
+
+        if (hasPendingIncrementInput) {
+            if (!hasCompletePendingIncrement) {
+                window.alert('Para guardar el incremento, completa concepto e importe mayor a 0.');
+                return;
+            }
+
+            if (!repair.actions?.addPayment) {
+                window.alert('No se encontro la accion para registrar incrementos.');
+                return;
+            }
+
+            const nextAmount = monto + incrementAmount;
+
+            incrementForm.post(repair.actions.addPayment, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    incrementForm.reset('amount', 'notes');
+                    postEdit(nextAmount);
+                },
+            });
+
+            return;
+        }
+
+        postEdit();
     };
 
     const submitInfo = (event: FormEvent<HTMLFormElement>): void => {
@@ -1348,9 +1396,14 @@ function RepairEditCard({
     const submitIncrement = (): void => {
         if (!repair.actions?.addPayment) return;
 
+        const nextAmount = Number.isFinite(incrementAmount) ? monto + incrementAmount : monto;
+
         incrementForm.post(repair.actions.addPayment, {
             preserveScroll: true,
-            onSuccess: () => incrementForm.reset('amount', 'notes'),
+            onSuccess: () => {
+                incrementForm.reset('amount', 'notes');
+                form.setData('monto', formatAmountInput(nextAmount));
+            },
         });
     };
 
@@ -1540,9 +1593,39 @@ function RepairEditCard({
             <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
                 {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
             </select>
+            <div className={cn('grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2', mobile ? 'col-span-2 grid-cols-1' : 'col-span-full grid-cols-[minmax(180px,1fr)_120px_140px_auto] items-end')}>
+                <input
+                    className={ui.repairDenseInput}
+                    placeholder="Concepto de incremento"
+                    value={incrementForm.data.notes}
+                    onChange={(event) => incrementForm.setData('notes', event.target.value)}
+                />
+                <input
+                    className={ui.repairDenseInput}
+                    inputMode="decimal"
+                    placeholder="Importe"
+                    value={incrementForm.data.amount}
+                    onFocus={() => incrementForm.data.amount.trim() === '0' ? incrementForm.setData('amount', '') : undefined}
+                    onChange={(event) => incrementForm.setData('amount', event.target.value)}
+                />
+                <input
+                    className={ui.repairDenseInput}
+                    type="date"
+                    value={incrementForm.data.paid_at}
+                    onChange={(event) => incrementForm.setData('paid_at', event.target.value)}
+                />
+                <button
+                    type="button"
+                    className={buttonClass('soft', 'sm', 'min-h-9 whitespace-nowrap border-[#f59e0b] bg-[#f59e0b] px-3 text-white hover:bg-[#d97706]')}
+                    disabled={incrementForm.processing || incrementForm.data.amount.trim() === '' || incrementForm.data.notes.trim() === ''}
+                    onClick={submitIncrement}
+                >
+                    Registrar incremento
+                </button>
+            </div>
             <div className={cn('flex gap-2', mobile ? 'col-span-2' : 'col-span-full justify-end')}>
                 <button type="button" className={buttonClass('soft', 'sm')} onClick={cancelInlineEdit}>Cancelar</button>
-                <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>
+                <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing || incrementForm.processing}>
                     <FaSave aria-hidden="true" /> Guardar
                 </button>
             </div>
@@ -1765,7 +1848,7 @@ function RepairEditCard({
                                                 <input className={changedInputClass(incrementForm.data.notes, '', undefined, false)} placeholder="Ej: pin de carga" value={incrementForm.data.notes} onChange={(event) => incrementForm.setData('notes', event.target.value)} />
                                             </EditField>
                                             <EditField label="Importe ($)">
-                                                <input className={changedInputClass(incrementForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="0" value={incrementForm.data.amount} onChange={(event) => incrementForm.setData('amount', event.target.value)} />
+                                                <input className={changedInputClass(incrementForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="0" value={incrementForm.data.amount} onFocus={() => incrementForm.data.amount.trim() === '0' ? incrementForm.setData('amount', '') : undefined} onChange={(event) => incrementForm.setData('amount', event.target.value)} />
                                             </EditField>
                                         </div>
                                         <div className="grid gap-2 sm:grid-cols-[minmax(9rem,0.65fr)_minmax(11rem,auto)] sm:items-end">
@@ -1773,7 +1856,7 @@ function RepairEditCard({
                                                 <input className={changedInputClass(incrementForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={incrementForm.data.paid_at} onChange={(event) => incrementForm.setData('paid_at', event.target.value)} />
                                             </EditField>
                                             <button type="button" className={buttonClass('soft', 'sm', 'min-h-9 whitespace-nowrap border-[#f59e0b] bg-[#f59e0b] px-3 text-white hover:bg-[#d97706]')} disabled={incrementForm.processing || incrementForm.data.amount.trim() === '' || incrementForm.data.notes.trim() === ''} onClick={submitIncrement}>
-                                                Agregar incremento
+                                                Registrar incremento
                                             </button>
                                         </div>
                                     </div>
@@ -1935,7 +2018,7 @@ function RepairEditCard({
                         ) : null}
                         <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setEditOpen(false)}>Cerrar</button>
-                            <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>
+                            <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing || incrementForm.processing}>
                                 <FaSave aria-hidden="true" /> Guardar Cambios
                             </button>
                         </div>

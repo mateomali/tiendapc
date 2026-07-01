@@ -46,6 +46,38 @@ class WorkbenchController extends Controller
         return $this->workbenchResponse($request, $repairService, 'consultas');
     }
 
+    public function log(Request $request): Response
+    {
+        $validated = $request->validate([
+            'date' => ['nullable', 'date'],
+        ]);
+        $date = (string) ($validated['date'] ?? now()->toDateString());
+        $events = RepairEvent::query()
+            ->whereDate('created_at', $date)
+            ->where('evento', '!=', 'CREADA')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+        $orders = RepairOrder::query()
+            ->whereIn('id', $events->pluck('orden_id')->unique()->values())
+            ->get()
+            ->keyBy(fn (RepairOrder $order): string => $this->repairCollectionKey($order));
+
+        return Inertia::render('Repairs/LogPage', [
+            'date' => $date,
+            'events' => $events
+                ->map(fn (RepairEvent $event): array => $this->serializeLogEvent($event, $orders->get($event->orden_id . ':' . $event->reparacion)))
+                ->values()
+                ->all(),
+            'summary' => [
+                'total' => $events->count(),
+                'delivered' => $events->where('evento', 'ENTREGADA')->count(),
+                'cancelled' => $events->filter(fn (RepairEvent $event): bool => str_contains((string) $event->evento, 'CANCEL'))->count(),
+                'updated' => $events->filter(fn (RepairEvent $event): bool => in_array((string) $event->evento, ['ACTUALIZADA', 'ACTUALIZADA_ENTREGADA', 'CAMBIO_ESTADO', 'RENUMERADA', 'COMENTARIO_TECNICO'], true))->count(),
+            ],
+        ]);
+    }
+
     public function index(Request $request, RepairService $repairService): Response
     {
         return $this->workbenchResponse($request, $repairService, 'ingreso');
@@ -986,13 +1018,14 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Orden actualizada.');
     }
 
-    public function updateInfo(Request $request, RepairOrder $repairOrder): RedirectResponse
+    public function updateInfo(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
         $validated = $request->validate([
             'info' => ['nullable', 'string'],
         ]);
 
         $info = trim((string) ($validated['info'] ?? ''));
+        $previousState = $repairOrder->estado;
 
         RepairOrder::query()
             ->where('id', $repairOrder->id)
@@ -1008,6 +1041,8 @@ class WorkbenchController extends Controller
                 'occurred_at' => now(),
             ]);
         }
+
+        $repairService->recordEvent($repairOrder, 'COMENTARIO_TECNICO', $previousState, $repairOrder->estado);
 
         return back()->with('success', 'Info interna actualizada.');
     }
@@ -1268,6 +1303,73 @@ class WorkbenchController extends Controller
             ],
             'availableStates' => $availableStates,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeLogEvent(RepairEvent $event, ?RepairOrder $order): array
+    {
+        return [
+            'id' => $event->id,
+            'time' => optional($event->created_at)->format('H:i'),
+            'createdAt' => optional($event->created_at)->format('Y-m-d H:i'),
+            'event' => $event->evento,
+            'label' => $this->logEventLabel((string) $event->evento),
+            'tone' => $this->logEventTone((string) $event->evento),
+            'orderId' => $event->orden_id,
+            'repairNumber' => $event->reparacion,
+            'customerName' => $order?->nombre_cliente,
+            'model' => $order?->modelo,
+            'description' => $order?->descripcion,
+            'previousState' => $event->estado_anterior,
+            'nextState' => $event->estado_nuevo,
+            'user' => $event->usuario,
+            'ticketUrl' => route('repairs.tickets.show', ['orderId' => $event->orden_id]),
+        ];
+    }
+
+    private function logEventLabel(string $event): string
+    {
+        return match ($event) {
+            'ACTUALIZADA' => 'Orden actualizada',
+            'ACTUALIZADA_ENTREGADA' => 'Orden entregada actualizada',
+            'CAMBIO_ESTADO' => 'Cambio de estado',
+            'CANCELADA' => 'Orden cancelada',
+            'ENTREGADA' => 'Orden entregada',
+            'INCREMENTO_REGISTRADO' => 'Incremento registrado',
+            'INCREMENTO_ELIMINADO' => 'Incremento eliminado',
+            'PAGO_REGISTRADO' => 'Pago registrado',
+            'SENA_ELIMINADA' => 'Seña eliminada',
+            'RENUMERADA' => 'Orden renumerada',
+            'COMENTARIO_TECNICO' => 'Comentario tecnico',
+            'MOVER_A_CONSULTAS' => 'Devuelta a consultas',
+            'REPUESTO_ASIGNADO_DESDE_CAJA' => 'Repuesto asignado',
+            'REPUESTO_DEVUELTO_A_CAJA' => 'Repuesto devuelto',
+            'REPUESTO_CONSUMIDO_EN_LISTA' => 'Repuesto consumido',
+            default => Str::headline(str_replace('_', ' ', Str::lower($event))),
+        };
+    }
+
+    private function logEventTone(string $event): string
+    {
+        if ($event === 'ENTREGADA' || str_starts_with($event, 'ENTREGA_VIA_')) {
+            return 'success';
+        }
+
+        if (str_contains($event, 'CANCEL') || str_contains($event, 'ELIMIN')) {
+            return 'danger';
+        }
+
+        if (str_contains($event, 'INCREMENTO') || str_contains($event, 'PAGO') || str_contains($event, 'SENA')) {
+            return 'money';
+        }
+
+        if (str_contains($event, 'ACTUALIZ') || str_contains($event, 'CAMBIO') || str_contains($event, 'RENUMERADA')) {
+            return 'update';
+        }
+
+        return 'default';
     }
 
     /**
