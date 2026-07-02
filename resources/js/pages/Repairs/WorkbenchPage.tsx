@@ -90,6 +90,11 @@ interface WorkbenchPageProps {
     deviceModels: DeviceModelOption[];
     nextOrderId: number;
     pageMode?: 'consultas' | 'ingreso';
+    initialCreateClient?: {
+        nombre_cliente: string;
+        dni: number | string;
+        contacto?: string | null;
+    } | null;
 }
 
 interface RepairJobFormData {
@@ -101,6 +106,7 @@ interface RepairJobFormData {
     observaciones: string;
     monto: string;
     senia: string;
+    senia_method: string;
     fecha_estimada: string;
     estado: string;
     repuesto: string;
@@ -132,6 +138,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         observaciones: 'sin observaciones',
         monto: '0',
         senia: '0',
+        senia_method: 'efectivo',
         fecha_estimada: today,
         estado: defaultState,
         repuesto: '',
@@ -633,6 +640,7 @@ export default function WorkbenchPage({
     nextOrderId,
     pageMode = 'consultas',
     archivedSearchMatches,
+    initialCreateClient = null,
 }: WorkbenchPageProps): JSX.Element {
     const isConsultas = pageMode === 'consultas';
     const isIngreso = pageMode === 'ingreso';
@@ -661,9 +669,9 @@ export default function WorkbenchPage({
     });
     const createForm = useForm<WorkbenchCreateFormData>({
         id_orden: String(nextOrderId),
-        nombre_cliente: '',
-        dni: '',
-        contacto: '',
+        nombre_cliente: initialCreateClient?.nombre_cliente ?? '',
+        dni: initialCreateClient ? String(initialCreateClient.dni ?? '') : '',
+        contacto: initialCreateClient?.contacto ?? '',
         jobs: [createEmptyJob(states[0] ?? 'PENDIENTE')],
     });
     const [lookupFeedback, setLookupFeedback] = useState<string>('');
@@ -1879,6 +1887,9 @@ export default function WorkbenchPage({
                                         <div className={fieldPanelGreen}>
                                             <label className={repairLabelClass}>Seña ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
                                         </div>
+                                        <div className={fieldPanelGreen}>
+                                            <label className={repairLabelClass}>Medio de seña<select className={compactInputClass} value={job.senia_method} onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
+                                        </div>
                                         <div className={guidedPanelClass(fieldPanelAmber, `job-${index}-date`)}>
                                             <label className={repairLabelClass}>Fecha estimada<input className={guidedInputClass(`job-${index}-date`)} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
                                         </div>
@@ -2145,6 +2156,14 @@ export default function WorkbenchPage({
                                             onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))}
                                         />
+                                        <select
+                                            className={ui.input}
+                                            value={job.senia_method}
+                                            onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}
+                                        >
+                                            <option value="efectivo">Seña en efectivo</option>
+                                            <option value="transferencia">Seña por transferencia</option>
+                                        </select>
                                         <input
                                             className={ui.input}
                                             type="date"

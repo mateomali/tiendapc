@@ -302,7 +302,7 @@ class RepairService
                     $this->consumeInventoryReservation($order);
                 }
 
-                $this->addInitialPayment($order, $job['senia']);
+                $this->addInitialPayment($order, $job['senia'], $job['senia_method'] ?? null);
                 $this->recordEvent($order, 'CREADA', null, $order->estado);
                 $firstOrder ??= $order;
             }
@@ -357,7 +357,7 @@ class RepairService
                 'imagen' => implode('|', $storedImages),
             ]);
 
-            $this->addInitialPayment($repair, $payload['senia'] ?? 0);
+            $this->addInitialPayment($repair, $payload['senia'] ?? 0, $payload['senia_method'] ?? null);
             $this->recordEvent($repair, 'CREADA', null, $repair->estado);
 
             return $repair;
@@ -595,10 +595,6 @@ class RepairService
 
             $this->recordEvent($order, $order->entregado === 'si' ? 'ACTUALIZADA_ENTREGADA' : 'ACTUALIZADA', $previousState, $order->estado);
 
-            if ($previousState !== $order->estado) {
-                $this->recordEvent($order, 'CAMBIO_ESTADO', $previousState, $order->estado);
-            }
-
             if ($oldOrderId !== $newOrderId) {
                 $this->recordEvent($order, 'RENUMERADA', $previousState, $order->estado);
             }
@@ -768,7 +764,7 @@ class RepairService
                 'reparacion' => $order->reparacion,
                 'amount' => $amount,
                 'payment_type' => $paymentType,
-                'method' => $paymentType === 'incremento' ? null : ($payload['method'] ?? null),
+                'method' => $paymentType === 'incremento' ? null : ($payload['method'] ?? 'efectivo'),
                 'notes' => $payload['notes'] ?? null,
                 'paid_at' => $payload['paid_at'] ?? now()->toDateString(),
             ]);
@@ -969,10 +965,8 @@ class RepairService
         }
         $this->syncTaskQueueForState($order, $state);
 
-        $this->recordEvent($order, $event, $previousState, $state);
-
-        if ($previousState !== $state) {
-            $this->recordEvent($order, 'CAMBIO_ESTADO', $previousState, $state);
+        if ($event !== 'CAMBIO_ESTADO_DIRECTO') {
+            $this->recordEvent($order, $event, $previousState, $state);
         }
 
         return $order->refresh();
@@ -1654,9 +1648,13 @@ class RepairService
         return str_pad((string) random_int(0, 99999), 5, '0', STR_PAD_LEFT);
     }
 
-    private function addInitialPayment(RepairOrder $order, mixed $amount): void
+    private function addInitialPayment(RepairOrder $order, mixed $amount, ?string $method = null): void
     {
-        $amount = min((float) $amount, (float) $order->monto);
+        $normalizedMethod = in_array($method, ['efectivo', 'transferencia'], true) ? $method : 'efectivo';
+        $maxAmount = $normalizedMethod === 'transferencia'
+            ? round((float) $order->monto * 1.1, 2)
+            : (float) $order->monto;
+        $amount = min((float) $amount, $maxAmount);
 
         if ($amount <= 0) {
             return;
@@ -1667,7 +1665,7 @@ class RepairService
             'reparacion' => $order->reparacion,
             'amount' => $amount,
             'payment_type' => 'senia',
-            'method' => null,
+            'method' => $normalizedMethod,
             'notes' => 'Sena inicial',
             'paid_at' => now()->toDateString(),
         ]);
@@ -2020,6 +2018,7 @@ class RepairService
      *     observaciones:string,
      *     monto:float|int,
      *     senia:float|int,
+     *     senia_method:?string,
      *     fecha_estimada:?string,
      *     estado:string,
      *     repuesto:?string,
@@ -2038,6 +2037,7 @@ class RepairService
             'observaciones',
             'monto',
             'senia',
+            'senia_method',
             'fecha_estimada',
             'estado',
             'repuesto',
@@ -2073,6 +2073,7 @@ class RepairService
                     'observaciones' => trim((string) ($job['observaciones'] ?? '')) !== '' ? trim((string) ($job['observaciones'] ?? '')) : 'sin observaciones',
                     'monto' => $job['monto'] ?? 0,
                     'senia' => $job['senia'] ?? 0,
+                    'senia_method' => $job['senia_method'] ?? null,
                     'fecha_estimada' => $job['fecha_estimada'] ?? null,
                     'estado' => $state,
                     'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
@@ -2104,6 +2105,7 @@ class RepairService
                 'observaciones' => trim((string) ($payload['observaciones'] ?? '')) !== '' ? trim((string) $payload['observaciones']) : 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => $payload['senia'] ?? 0,
+                'senia_method' => $payload['senia_method'] ?? null,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => ! $shouldRequestPart && ($payload['estado'] ?? null) === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : ($payload['estado'] ?? 'PENDIENTE'),
                 'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,

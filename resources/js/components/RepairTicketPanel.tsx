@@ -94,6 +94,7 @@ interface AddRepairFormData {
     observaciones: string;
     monto: string;
     senia: string;
+    senia_method: string;
     fecha_estimada: string;
     repuesto: string;
     repuesto_pedido: boolean;
@@ -886,6 +887,7 @@ function AddRepairModal({
         observaciones: 'sin observaciones',
         monto: '0',
         senia: '0',
+        senia_method: 'efectivo',
         fecha_estimada: today,
         repuesto: '',
         repuesto_pedido: false,
@@ -1061,7 +1063,7 @@ function AddRepairModal({
                 </EditSection>
 
                 <EditSection title="Agenda e importes">
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-4">
                         <EditField label="Fecha estimada">
                             <input className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                         </EditField>
@@ -1070,6 +1072,12 @@ function AddRepairModal({
                         </EditField>
                         <EditField label="Seña">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
+                        </EditField>
+                        <EditField label="Medio de seña">
+                            <select className={ui.input} value={form.data.senia_method} onChange={(event) => form.setData('senia_method', event.target.value)}>
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                            </select>
                         </EditField>
                     </div>
                 </EditSection>
@@ -1227,7 +1235,7 @@ function RepairEditCard({
     const paymentForm = useForm<PaymentFormData>({
         amount: '',
         payment_type: 'senia',
-        method: '',
+        method: 'efectivo',
         notes: '',
         paid_at: todayInputValue(),
     });
@@ -1828,9 +1836,15 @@ function RepairEditCard({
                                 </div>
                                 {!readOnly ? (
                                     <div className="grid gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3">
-                                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(9rem,0.75fr)_auto] sm:items-end">
+                                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(8.5rem,0.7fr)_minmax(9rem,0.75fr)_auto] sm:items-end">
                                             <EditField label="Importe de seña">
                                                 <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
+                                            </EditField>
+                                            <EditField label="Medio">
+                                                <select className={changedInputClass(paymentForm.data.method, 'efectivo', undefined, false)} value={paymentForm.data.method || 'efectivo'} onChange={(event) => paymentForm.setData('method', event.target.value)}>
+                                                    <option value="efectivo">Efectivo</option>
+                                                    <option value="transferencia">Transferencia</option>
+                                                </select>
                                             </EditField>
                                             <EditField label="Fecha de seña">
                                                 <input className={changedInputClass(paymentForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={paymentForm.data.paid_at} onChange={(event) => paymentForm.setData('paid_at', event.target.value)} />
@@ -2153,6 +2167,11 @@ function RepairEditCard({
                                         A consultas
                                     </button>
                                 ) : null}
+                                {rowIndex === 0 && ticket.newOrderUrl ? (
+                                    <Link href={ticket.newOrderUrl} className="rounded-md border border-[#111827] bg-[#111827] px-2 py-1 text-[0.66rem] font-black uppercase text-white no-underline transition hover:bg-[#0b1220]">
+                                        Nueva orden
+                                    </Link>
+                                ) : null}
                                 {archived && repair.actions?.delete ? (
                                     <button type="button" className="rounded-md border border-[#fecdd3] bg-[#fff1f2] px-2 py-1 text-[0.66rem] font-black uppercase text-[#be123c] transition hover:bg-[#ffe4e6]" onClick={deleteRepair}>
                                         Eliminar
@@ -2237,6 +2256,11 @@ function RepairEditCard({
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={moveBackToConsultas}>
                             Devolver a consultas
                         </button>
+                    ) : null}
+                    {readOnly && rowIndex === 0 && ticket.newOrderUrl ? (
+                        <Link href={ticket.newOrderUrl} className={buttonClass('primary', 'sm', 'w-full')}>
+                            <FaPlus aria-hidden="true" /> Agregar a nueva orden
+                        </Link>
                     ) : null}
                     {readOnly && archived && repair.actions?.delete ? (
                         <button type="button" className={buttonClass('danger', 'sm', 'w-full')} onClick={deleteRepair}>

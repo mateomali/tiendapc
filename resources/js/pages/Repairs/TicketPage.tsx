@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toDataURL } from 'qrcode';
-import type { RepairOrderView, RepairTicketView } from '../../types';
+import type { RepairOrderView, RepairPaymentView, RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass } from '../../repairUi';
 import { formatCurrency } from '../../utils';
 
@@ -16,7 +16,7 @@ interface TicketPageProps {
     returnUrl: string;
 }
 
-export default function TicketPage({ ticket, summary, businessHours, returnUrl }: TicketPageProps): JSX.Element {
+export default function TicketPage({ ticket, businessHours, returnUrl }: TicketPageProps): JSX.Element {
     const [qrUrl, setQrUrl] = useState<string>('');
     const now = new Date();
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -24,6 +24,17 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
     const hasClientDni = ticket.hasClientDni ?? (Number(ticket.dni) > 0 && Number(ticket.dni) !== 12345678);
     const trackingVerifier = ticket.trackingVerifier || String(ticket.dni);
     const hasIncrements = ticket.repairs.some((repair) => (repair.payments ?? []).some((payment) => payment.payment_type === 'incremento'));
+    const generalFinancial = ticket.repairs.reduce(
+        (carry, repair) => {
+            const financial = repairFinancialSummary(repair);
+
+            return {
+                cashDue: carry.cashDue + financial.cashDue,
+                paidActual: carry.paidActual + financial.paidActual,
+            };
+        },
+        { cashDue: 0, paidActual: 0 },
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -90,13 +101,14 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                     <section>
                         {ticket.repairs.map((repair, index) => {
                             const monto = Number(repair.monto ?? 0);
-                            const senia = Number(repair.senia ?? 0);
-                            const saldo = Math.max(0, monto - senia);
-                            const saldoLabel = monto > 0 && senia >= monto ? 'PAGADO' : formatCurrency(saldo);
+                            const financial = repairFinancialSummary(repair);
                             const deliveredLabel = repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null;
                             const modelLabel = ticketRepairModel(repair);
                             const failureLabel = ticketRepairFailure(repair, modelLabel);
                             const increments = (repair.payments ?? []).filter((payment) => payment.payment_type === 'incremento');
+                            const deposits = (repair.payments ?? []).filter((payment) => payment.payment_type === 'senia' && Number(payment.amount ?? 0) > 0);
+                            const hasDeposits = deposits.length > 0;
+                            const cashDueLabel = financial.cashDue <= 0 ? 'PAGADO' : formatCurrency(financial.cashDue);
 
                             return (
                                 <div key={`${repair.registro_id}-${repair.reparacion}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
@@ -113,15 +125,17 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                                             value={`${ticketIncrementLabel(payment.notes)} + ${formatCurrency(payment.amount)}`}
                                         />
                                     ))}
-                                    {senia > 0 ? (
+                                    <TicketLine label={hasDeposits ? 'PRESUPUESTO EFECTIVO:' : 'PRECIO EFECTIVO:'} value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
+                                    {deposits.map((payment) => (
+                                        <TicketLine key={payment.id} label={`SEÑA ${paymentMethodLabel(payment)}:`} value={formatCurrency(payment.amount)} />
+                                    ))}
+                                    {hasDeposits ? <TicketLine label="SALDO EFECTIVO:" value={monto > 0 ? cashDueLabel : 'A DEFINIR'} /> : null}
+                                    {monto > 0 ? (
                                         <>
-                                            <TicketLine label="PRESUPUESTO:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
-                                            <TicketLine label="SEÑA:" value={formatCurrency(senia)} />
-                                            <TicketLine label="SALDO:" value={monto > 0 ? saldoLabel : 'A DEFINIR'} />
+                                            <TicketNote>Aclaracion: transferencia incluye 10% de recargo.</TicketNote>
+                                            <TicketLine label={hasDeposits ? 'SALDO TRANSF.:' : 'PRECIO TRANSF.:'} value={formatCurrency(financial.transferDue)} />
                                         </>
-                                    ) : (
-                                        <TicketLine label="TOTAL:" value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
-                                    )}
+                                    ) : null}
                                     {deliveredLabel !== null ? (
                                         <TicketLine label="ENTREGA:" value={deliveredLabel} />
                                     ) : null}
@@ -134,8 +148,13 @@ export default function TicketPage({ ticket, summary, businessHours, returnUrl }
                         <>
                             <div className="my-[5px] border-t border-dashed border-black" />
                             <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
-                                <span>TOTAL GENERAL:</span>
-                                <strong>{formatCurrency(summary.totalMonto)}</strong>
+                                <span>{generalFinancial.paidActual > 0 ? 'SALDO GRAL. EFECTIVO:' : 'TOTAL GRAL. EFECTIVO:'}</span>
+                                <strong>{formatCurrency(generalFinancial.cashDue)}</strong>
+                            </div>
+                            <TicketNote>Aclaracion: transferencia incluye 10% de recargo.</TicketNote>
+                            <div className="mt-[2px] flex justify-between gap-[5px] text-[13px]">
+                                <span>{generalFinancial.paidActual > 0 ? 'SALDO GRAL. TRANSF.:' : 'TOTAL GRAL. TRANSF.:'}</span>
+                                <strong>{formatCurrency(transferAmount(generalFinancial.cashDue))}</strong>
                             </div>
                         </>
                     ) : null}
@@ -165,6 +184,40 @@ function normalizeTicketText(value?: string | null): string {
         .replace(/[^A-Z0-9]+/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function transferAmount(cashAmount: number): number {
+    return Math.round(Math.max(0, cashAmount) * 1.1);
+}
+
+function paymentMethod(payment: RepairPaymentView): 'efectivo' | 'transferencia' {
+    return payment.method === 'transferencia' ? 'transferencia' : 'efectivo';
+}
+
+function paymentMethodLabel(payment: RepairPaymentView): string {
+    return paymentMethod(payment) === 'transferencia' ? 'TRANSF.' : 'EFECTIVO';
+}
+
+function paymentCashEquivalent(payment: RepairPaymentView): number {
+    const amount = Number(payment.amount ?? 0);
+
+    return paymentMethod(payment) === 'transferencia' ? amount / 1.1 : amount;
+}
+
+function repairFinancialSummary(repair: RepairOrderView): { originalCashTotal: number; paidActual: number; paidCashEquivalent: number; cashDue: number; transferDue: number } {
+    const originalCashTotal = Math.max(0, Number(repair.monto ?? 0));
+    const deposits = (repair.payments ?? []).filter((payment) => payment.payment_type === 'senia');
+    const paidActual = deposits.reduce((total, payment) => total + Math.max(0, Number(payment.amount ?? 0)), 0);
+    const paidCashEquivalent = deposits.reduce((total, payment) => total + paymentCashEquivalent(payment), 0);
+    const cashDue = Math.max(0, originalCashTotal - paidCashEquivalent);
+
+    return {
+        originalCashTotal,
+        paidActual,
+        paidCashEquivalent,
+        cashDue,
+        transferDue: transferAmount(cashDue),
+    };
 }
 
 const ticketKnownBrands = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'];
@@ -247,6 +300,14 @@ function TicketLine({ label, value }: { label: string; value: string }): JSX.Ele
         <div className="mb-px flex justify-between gap-[5px]">
             <span className="shrink-0">{label}</span>
             <strong className="break-words text-right">{value}</strong>
+        </div>
+    );
+}
+
+function TicketNote({ children }: { children: string }): JSX.Element {
+    return (
+        <div className="my-[3px] border-y border-dashed border-black py-[3px] text-center text-[9.5px] leading-[1.1]">
+            {children}
         </div>
     );
 }

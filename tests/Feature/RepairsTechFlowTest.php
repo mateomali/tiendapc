@@ -42,6 +42,40 @@ it('shows delivered repairs in the dedicated technical view', function (): void 
             ->has('tickets', 1));
 });
 
+it('prefills a new repair order from a delivered search result', function (): void {
+    RepairOrder::query()->create([
+        'id' => 502,
+        'reparacion' => 1,
+        'fecha' => now()->subDays(10)->toDateString(),
+        'nombre_cliente' => 'Maria Perez',
+        'dni' => 27888999,
+        'contacto' => '1155667788',
+        'modelo' => 'Moto E',
+        'descripcion' => 'Cambio de bateria',
+        'estado' => 'ENTREGADA',
+        'entregado' => 'si',
+        'fecha_entregado' => now()->subDay()->toDateString(),
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => 'Maria']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('deliveredSearchTickets', 1)
+            ->where('deliveredSearchTickets.0.newOrderUrl', route('repairs.ingress', ['from_order' => 502])));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.ingress', ['from_order' => 502]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('pageMode', 'ingreso')
+            ->where('initialCreateClient.nombre_cliente', 'Maria Perez')
+            ->where('initialCreateClient.dni', 27888999)
+            ->where('initialCreateClient.contacto', '1155667788'));
+});
+
 it('finds active repairs by ticket id from consultations search', function (): void {
     RepairOrder::query()->create([
         'id' => 1906,
@@ -104,6 +138,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
                     'observaciones' => 'Pantalla partida',
                     'monto' => 120000,
                     'senia' => 40000,
+                    'senia_method' => 'transferencia',
                     'fecha_estimada' => now()->addDays(2)->toDateString(),
                     'estado' => 'PENDIENTE',
                     'repuesto' => '',
@@ -131,6 +166,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
 
     expect(RepairOrder::query()->where('id', $orderId)->count())->toBe(2);
     expect(RepairPayment::query()->where('orden_id', $orderId)->count())->toBe(2);
+    expect(RepairPayment::query()->where('orden_id', $orderId)->where('reparacion', 1)->value('method'))->toBe('transferencia');
     expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('descripcion')->all())
         ->toBe([
             'CAMBIO DE MODULO',

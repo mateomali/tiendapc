@@ -55,6 +55,7 @@ class WorkbenchController extends Controller
         $events = RepairEvent::query()
             ->whereDate('created_at', $date)
             ->where('evento', '!=', 'CREADA')
+            ->whereNotIn('evento', ['CAMBIO_ESTADO', 'CAMBIO_ESTADO_DIRECTO'])
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->get();
@@ -73,7 +74,7 @@ class WorkbenchController extends Controller
                 'total' => $events->count(),
                 'delivered' => $events->where('evento', 'ENTREGADA')->count(),
                 'cancelled' => $events->filter(fn (RepairEvent $event): bool => str_contains((string) $event->evento, 'CANCEL'))->count(),
-                'updated' => $events->filter(fn (RepairEvent $event): bool => in_array((string) $event->evento, ['ACTUALIZADA', 'ACTUALIZADA_ENTREGADA', 'CAMBIO_ESTADO', 'RENUMERADA', 'COMENTARIO_TECNICO'], true))->count(),
+                'updated' => $events->filter(fn (RepairEvent $event): bool => in_array((string) $event->evento, ['ACTUALIZADA', 'ACTUALIZADA_ENTREGADA', 'RENUMERADA', 'COMENTARIO_TECNICO'], true))->count(),
             ],
         ]);
     }
@@ -106,10 +107,17 @@ class WorkbenchController extends Controller
             'filter_estimada' => ['nullable', 'date'],
             'filter_saldo' => ['nullable', 'string'],
             'filter_estado' => ['nullable', 'string'],
+            'from_order' => ['nullable', 'integer', 'min:1'],
             'q_fields' => ['nullable', 'array'],
             'q_fields.*' => ['string'],
         ]);
 
+        $prefillOrder = $pageMode === 'ingreso' && isset($filters['from_order'])
+            ? RepairOrder::query()
+                ->where('id', (int) $filters['from_order'])
+                ->orderBy('reparacion')
+                ->first()
+            : null;
         $searchTerm = trim((string) ($filters['q'] ?? ''));
         $filters['q_fields'] = $this->normalizeSearchFields($filters['q_fields'] ?? null);
 
@@ -153,6 +161,11 @@ class WorkbenchController extends Controller
             'deviceModels' => $repairService->deviceModelOptions(),
             'nextOrderId' => $repairService->nextOrderId(),
             'pageMode' => $pageMode,
+            'initialCreateClient' => $prefillOrder instanceof RepairOrder ? [
+                'nombre_cliente' => $prefillOrder->nombre_cliente,
+                'dni' => $prefillOrder->dni,
+                'contacto' => $prefillOrder->contacto,
+            ] : null,
         ]);
     }
 
@@ -819,6 +832,7 @@ class WorkbenchController extends Controller
             'observaciones' => ['nullable', 'string'],
             'monto' => ['nullable', 'numeric', 'min:0'],
             'senia' => ['nullable', 'numeric', 'min:0'],
+            'senia_method' => ['nullable', 'string', 'in:efectivo,transferencia'],
             'fecha_estimada' => ['nullable', 'date'],
             'repuesto' => ['nullable', 'string', 'max:255'],
             'repuesto_pedido' => ['nullable', 'boolean'],
@@ -1217,6 +1231,7 @@ class WorkbenchController extends Controller
                     'ticketUrl' => route('repairs.tickets.show', ['orderId' => $base->id]),
                     'whatsappUrl' => $this->customerWhatsappUrl($base),
                     'addRepairAction' => route('repairs.orders.add_repair', $base),
+                    'newOrderUrl' => route('repairs.ingress', ['from_order' => $base->id]),
                     'repairs' => $ticketOrders
                         ->sortBy('reparacion')
                         ->map(fn (RepairOrder $order): array => $this->serializeRepair(
