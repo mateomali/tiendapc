@@ -1067,7 +1067,18 @@ export default function WorkbenchPage({
     );
 
     const formatMoney = (value: number): string => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-    const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-semibold text-[#334155]';
+    const transferPriceLabel = (value: string): string => {
+        const amount = Number(value || 0);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return 'Transferencia: sin monto';
+        }
+
+        return amount > 30000
+            ? `Transferencia: ${formatMoney(Math.round(amount * 1.1))}`
+            : 'Transferencia: mismo importe';
+    };
+    const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-semibold leading-tight text-[#334155]';
     const compactInputClass = ui.repairDenseInput;
     const guidedFieldClass = 'border-[#2563eb] bg-[#eff6ff] ring-1 ring-[#2563eb33]';
     const guidedLabelClass = 'rounded-md border border-[#2563eb] bg-[#eff6ff] p-2 ring-1 ring-[#2563eb33]';
@@ -1882,12 +1893,12 @@ export default function WorkbenchPage({
                                             <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
                                         </div>
                                         <div className={guidedPanelClass(fieldPanelGreen, `job-${index}-amount`)}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(job.monto)}</span></label>
                                         </div>
-                                        <div className={fieldPanelGreen}>
+                                        <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
                                             <label className={repairLabelClass}>Seña ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
                                         </div>
-                                        <div className={fieldPanelGreen}>
+                                        <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
                                             <label className={repairLabelClass}>Medio de seña<select className={compactInputClass} value={job.senia_method} onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
                                         </div>
                                         <div className={guidedPanelClass(fieldPanelAmber, `job-${index}-date`)}>
@@ -2148,6 +2159,9 @@ export default function WorkbenchPage({
                                             onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))}
                                         />
+                                        <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-[#475569]">
+                                            {transferPriceLabel(job.monto)}
+                                        </div>
                                         <input
                                             className={ui.input}
                                             placeholder="Seña"

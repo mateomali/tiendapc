@@ -1651,7 +1651,7 @@ class RepairService
     private function addInitialPayment(RepairOrder $order, mixed $amount, ?string $method = null): void
     {
         $normalizedMethod = in_array($method, ['efectivo', 'transferencia'], true) ? $method : 'efectivo';
-        $maxAmount = $normalizedMethod === 'transferencia'
+        $maxAmount = $normalizedMethod === 'transferencia' && (float) $order->monto > 30000
             ? round((float) $order->monto * 1.1, 2)
             : (float) $order->monto;
         $amount = min((float) $amount, $maxAmount);

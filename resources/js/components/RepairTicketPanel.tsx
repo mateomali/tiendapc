@@ -223,6 +223,18 @@ function formatLegacyDate(value?: string | null): string {
     return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
+function transferPriceLabel(value: string | number | null | undefined): string {
+    const amount = Number(value || 0);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+        return 'Transferencia: sin monto';
+    }
+
+    return amount > 30000
+        ? `Transferencia: ${formatCurrency(Math.round(amount * 1.1))}`
+        : 'Transferencia: mismo importe';
+}
+
 function seniaBadgeLabel(monto: number, senia: number): string | null {
     if (senia <= 0) return null;
     if (monto > 0 && senia >= monto) return null;
@@ -681,7 +693,7 @@ function EditField({
 }): JSX.Element {
     return (
         <label className="grid min-w-0 gap-1.5">
-            <span className="text-[0.83rem] font-black text-[#0f172a]">{label}</span>
+            <span className="text-[0.83rem] font-black leading-tight text-[#0f172a]">{label}</span>
             {children}
             {note ? <span className="text-[0.75rem] font-semibold text-slate-500">{note}</span> : null}
         </label>
@@ -1063,12 +1075,13 @@ function AddRepairModal({
                 </EditSection>
 
                 <EditSection title="Agenda e importes">
-                    <div className="grid gap-3 sm:grid-cols-4">
+                    <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]">
                         <EditField label="Fecha estimada">
                             <input className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                         </EditField>
                         <EditField label="Monto">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                            <span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
                         </EditField>
                         <EditField label="Seña">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
@@ -1597,7 +1610,10 @@ function RepairEditCard({
             <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} placeholder="Modelo" />
             <RepairColorCombobox className={ui.repairDenseInput} value={form.data.color} onChange={(value) => form.setData('color', value)} />
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
-            <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
+            <label className="grid min-w-0 gap-1">
+                <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
+                <span className="text-[0.68rem] font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
+            </label>
             <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
                 {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
             </select>
@@ -1829,6 +1845,7 @@ function RepairEditCard({
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Monto ($)">
                                         <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
+                                        <span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
                                     </EditField>
                                     <EditField label="Pagado ($)">
                                         <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
@@ -1836,7 +1853,7 @@ function RepairEditCard({
                                 </div>
                                 {!readOnly ? (
                                     <div className="grid gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3">
-                                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(8.5rem,0.7fr)_minmax(9rem,0.75fr)_auto] sm:items-end">
+                                        <div className="grid items-end gap-2 [grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr))]">
                                             <EditField label="Importe de seña">
                                                 <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
                                             </EditField>
@@ -1849,7 +1866,7 @@ function RepairEditCard({
                                             <EditField label="Fecha de seña">
                                                 <input className={changedInputClass(paymentForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={paymentForm.data.paid_at} onChange={(event) => paymentForm.setData('paid_at', event.target.value)} />
                                             </EditField>
-                                            <button type="button" className={buttonClass('primary', 'sm', 'min-h-9 whitespace-nowrap px-4')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
+                                            <button type="button" className={buttonClass('primary', 'sm', 'min-h-9 w-full whitespace-nowrap px-4')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
                                                 Registrar seña
                                             </button>
                                         </div>

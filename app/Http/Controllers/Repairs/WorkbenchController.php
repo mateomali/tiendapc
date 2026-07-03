@@ -1533,14 +1533,26 @@ class WorkbenchController extends Controller
             $phone = '54' . $phone;
         }
 
+        $customerName = Str::upper(trim((string) $order->nombre_cliente) ?: 'cliente');
+
         $message = sprintf(
             'Hola %s, te escribimos por la orden de reparacion #%d.',
-            trim((string) $order->nombre_cliente),
+            $customerName,
             (int) $order->id,
         );
 
         if (Str::upper((string) $order->estado) === 'LISTA') {
-            $message .= ' Ya está lista para retirar por el local. te esperamos!';
+            $brand = Str::upper(trim((string) $order->marca) ?: 'equipo');
+            $model = Str::upper(trim((string) $order->modelo));
+            $description = Str::upper(trim((string) $order->descripcion) ?: 'la reparacion solicitada');
+            $message = sprintf(
+                "Hola, %s. ¡Tu equipo ya está listo!\nOrden #%d.\nFinalizamos la reparación de tu %s %s. El trabajo realizado fue: %s, y se completó exitosamente.\nTe esperamos por el local. ¡Ya podés pasar a retirarlo!",
+                $customerName,
+                (int) $order->id,
+                $brand,
+                $model,
+                $description,
+            );
         }
 
         return 'https://wa.me/' . $phone . '?text=' . rawurlencode($message);

@@ -30,10 +30,12 @@ export default function TicketPage({ ticket, businessHours, returnUrl }: TicketP
 
             return {
                 cashDue: carry.cashDue + financial.cashDue,
+                listDue: carry.listDue + financial.listDue,
                 paidActual: carry.paidActual + financial.paidActual,
+                discountApplies: carry.discountApplies || financial.discountApplies,
             };
         },
-        { cashDue: 0, paidActual: 0 },
+        { cashDue: 0, listDue: 0, paidActual: 0, discountApplies: false },
     );
 
     useEffect(() => {
@@ -125,17 +127,18 @@ export default function TicketPage({ ticket, businessHours, returnUrl }: TicketP
                                             value={`${ticketIncrementLabel(payment.notes)} + ${formatCurrency(payment.amount)}`}
                                         />
                                     ))}
-                                    <TicketLine label={hasDeposits ? 'PRESUPUESTO EFECTIVO:' : 'PRECIO EFECTIVO:'} value={monto > 0 ? formatCurrency(monto) : 'A PRESUPUESTAR'} />
+                                    <TicketLine label={hasDeposits ? 'PRESUPUESTO:' : 'PRECIO:'} value={monto > 0 ? formatCurrency(financial.listTotal) : 'A PRESUPUESTAR'} />
+                                    {financial.discountApplies ? (
+                                        <>
+                                            <TicketNote>Abonando en efectivo tenes 10% de descuento.</TicketNote>
+                                            <TicketLine label={hasDeposits ? 'PRESUP. EFECTIVO:' : 'PRECIO EFECTIVO:'} value={formatCurrency(financial.cashTotal)} />
+                                        </>
+                                    ) : null}
                                     {deposits.map((payment) => (
                                         <TicketLine key={payment.id} label={`SEÑA ${paymentMethodLabel(payment)}:`} value={formatCurrency(payment.amount)} />
                                     ))}
-                                    {hasDeposits ? <TicketLine label="SALDO EFECTIVO:" value={monto > 0 ? cashDueLabel : 'A DEFINIR'} /> : null}
-                                    {monto > 0 ? (
-                                        <>
-                                            <TicketNote>Aclaracion: transferencia incluye 10% de recargo.</TicketNote>
-                                            <TicketLine label={hasDeposits ? 'SALDO TRANSF.:' : 'PRECIO TRANSF.:'} value={formatCurrency(financial.transferDue)} />
-                                        </>
-                                    ) : null}
+                                    {hasDeposits ? <TicketLine label="SALDO:" value={monto > 0 ? listDueLabel(financial) : 'A DEFINIR'} /> : null}
+                                    {hasDeposits && financial.discountApplies ? <TicketLine label="SALDO EFECTIVO:" value={monto > 0 ? cashDueLabel : 'A DEFINIR'} /> : null}
                                     {deliveredLabel !== null ? (
                                         <TicketLine label="ENTREGA:" value={deliveredLabel} />
                                     ) : null}
@@ -148,14 +151,18 @@ export default function TicketPage({ ticket, businessHours, returnUrl }: TicketP
                         <>
                             <div className="my-[5px] border-t border-dashed border-black" />
                             <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
-                                <span>{generalFinancial.paidActual > 0 ? 'SALDO GRAL. EFECTIVO:' : 'TOTAL GRAL. EFECTIVO:'}</span>
-                                <strong>{formatCurrency(generalFinancial.cashDue)}</strong>
+                                <span>{generalFinancial.paidActual > 0 ? 'SALDO GENERAL:' : 'TOTAL GENERAL:'}</span>
+                                <strong>{formatCurrency(generalFinancial.listDue)}</strong>
                             </div>
-                            <TicketNote>Aclaracion: transferencia incluye 10% de recargo.</TicketNote>
-                            <div className="mt-[2px] flex justify-between gap-[5px] text-[13px]">
-                                <span>{generalFinancial.paidActual > 0 ? 'SALDO GRAL. TRANSF.:' : 'TOTAL GRAL. TRANSF.:'}</span>
-                                <strong>{formatCurrency(transferAmount(generalFinancial.cashDue))}</strong>
-                            </div>
+                            {generalFinancial.discountApplies ? (
+                                <>
+                                    <TicketNote>Abonando en efectivo tenes 10% de descuento.</TicketNote>
+                                    <div className="mt-[2px] flex justify-between gap-[5px] text-[13px]">
+                                        <span>{generalFinancial.paidActual > 0 ? 'SALDO GRAL. EFECTIVO:' : 'TOTAL GRAL. EFECTIVO:'}</span>
+                                        <strong>{formatCurrency(generalFinancial.cashDue)}</strong>
+                                    </div>
+                                </>
+                            ) : null}
                         </>
                     ) : null}
 
@@ -186,8 +193,18 @@ function normalizeTicketText(value?: string | null): string {
         .trim();
 }
 
-function transferAmount(cashAmount: number): number {
-    return Math.round(Math.max(0, cashAmount) * 1.1);
+const CASH_DISCOUNT_THRESHOLD = 30000;
+
+function cashDiscountApplies(cashAmount: number): boolean {
+    return cashAmount > CASH_DISCOUNT_THRESHOLD;
+}
+
+function listAmount(cashAmount: number, discountApplies: boolean): number {
+    return discountApplies ? Math.round(Math.max(0, cashAmount) * 1.1) : Math.max(0, cashAmount);
+}
+
+function listDueLabel(financial: ReturnType<typeof repairFinancialSummary>): string {
+    return financial.listDue <= 0 ? 'PAGADO' : formatCurrency(financial.listDue);
 }
 
 function paymentMethod(payment: RepairPaymentView): 'efectivo' | 'transferencia' {
@@ -198,25 +215,27 @@ function paymentMethodLabel(payment: RepairPaymentView): string {
     return paymentMethod(payment) === 'transferencia' ? 'TRANSF.' : 'EFECTIVO';
 }
 
-function paymentCashEquivalent(payment: RepairPaymentView): number {
-    const amount = Number(payment.amount ?? 0);
+function paymentCashEquivalent(payment: RepairPaymentView, discountApplies: boolean): number {
+    const amount = Math.max(0, Number(payment.amount ?? 0));
 
-    return paymentMethod(payment) === 'transferencia' ? amount / 1.1 : amount;
+    return discountApplies && paymentMethod(payment) === 'transferencia' ? amount / 1.1 : amount;
 }
 
-function repairFinancialSummary(repair: RepairOrderView): { originalCashTotal: number; paidActual: number; paidCashEquivalent: number; cashDue: number; transferDue: number } {
-    const originalCashTotal = Math.max(0, Number(repair.monto ?? 0));
+function repairFinancialSummary(repair: RepairOrderView): { cashTotal: number; listTotal: number; paidActual: number; cashDue: number; listDue: number; discountApplies: boolean } {
+    const cashTotal = Math.max(0, Number(repair.monto ?? 0));
+    const discountApplies = cashDiscountApplies(cashTotal);
     const deposits = (repair.payments ?? []).filter((payment) => payment.payment_type === 'senia');
     const paidActual = deposits.reduce((total, payment) => total + Math.max(0, Number(payment.amount ?? 0)), 0);
-    const paidCashEquivalent = deposits.reduce((total, payment) => total + paymentCashEquivalent(payment), 0);
-    const cashDue = Math.max(0, originalCashTotal - paidCashEquivalent);
+    const paidCashEquivalent = deposits.reduce((total, payment) => total + paymentCashEquivalent(payment, discountApplies), 0);
+    const cashDue = Math.max(0, cashTotal - paidCashEquivalent);
 
     return {
-        originalCashTotal,
+        cashTotal,
+        listTotal: listAmount(cashTotal, discountApplies),
         paidActual,
-        paidCashEquivalent,
         cashDue,
-        transferDue: transferAmount(cashDue),
+        listDue: listAmount(cashDue, discountApplies),
+        discountApplies,
     };
 }
 

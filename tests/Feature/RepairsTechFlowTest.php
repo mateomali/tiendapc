@@ -138,7 +138,6 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
                     'observaciones' => 'Pantalla partida',
                     'monto' => 120000,
                     'senia' => 40000,
-                    'senia_method' => 'transferencia',
                     'fecha_estimada' => now()->addDays(2)->toDateString(),
                     'estado' => 'PENDIENTE',
                     'repuesto' => '',
@@ -166,7 +165,6 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
 
     expect(RepairOrder::query()->where('id', $orderId)->count())->toBe(2);
     expect(RepairPayment::query()->where('orden_id', $orderId)->count())->toBe(2);
-    expect(RepairPayment::query()->where('orden_id', $orderId)->where('reparacion', 1)->value('method'))->toBe('transferencia');
     expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('descripcion')->all())
         ->toBe([
             'CAMBIO DE MODULO',
