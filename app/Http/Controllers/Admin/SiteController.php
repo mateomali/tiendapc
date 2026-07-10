@@ -155,6 +155,10 @@ class SiteController extends Controller
             'settings.catalog_new_days' => ['nullable', 'integer', 'min:1', 'max:90'],
             'settings.catalog_product_image_rotation_ms' => ['nullable', 'integer', 'min:2000', 'max:20000'],
             'settings.product_detail_description_word_limit' => ['nullable', 'integer', 'min:40', 'max:1000'],
+            'settings.repair_cash_discount_enabled' => ['nullable', 'boolean'],
+            'settings.repair_cash_discount_threshold' => ['nullable', 'integer', 'min:0', 'max:999999999'],
+            'settings.repair_cash_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'settings.repair_cash_discount_note' => ['nullable', 'string', 'max:255'],
         ]);
 
         $settings = $validated['settings'];
@@ -370,6 +374,10 @@ class SiteController extends Controller
             'catalog_new_days' => SiteGlobalConfig::value('catalog_new_days', '10'),
             'catalog_product_image_rotation_ms' => SiteGlobalConfig::value('catalog_product_image_rotation_ms', '10000'),
             'product_detail_description_word_limit' => SiteGlobalConfig::value('product_detail_description_word_limit', '100'),
+            'repair_cash_discount_enabled' => SiteGlobalConfig::value('repair_cash_discount_enabled', '1'),
+            'repair_cash_discount_threshold' => SiteGlobalConfig::value('repair_cash_discount_threshold', '30000'),
+            'repair_cash_discount_percentage' => SiteGlobalConfig::value('repair_cash_discount_percentage', '10'),
+            'repair_cash_discount_note' => SiteGlobalConfig::value('repair_cash_discount_note', 'Abonando en efectivo tenes 10% de descuento.'),
         ];
     }
 

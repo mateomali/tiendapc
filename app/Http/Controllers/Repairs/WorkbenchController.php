@@ -1087,6 +1087,7 @@ class WorkbenchController extends Controller
                 'saldo' => max(0, (float) $ticket['totalMonto'] - (float) $ticket['totalSenia']),
             ],
             'businessHours' => $this->businessHours(),
+            'ticketPricing' => $this->ticketPricingSettings(),
             'returnUrl' => route('repairs.workbench'),
         ]);
     }
@@ -1519,6 +1520,24 @@ class WorkbenchController extends Controller
             'footer_hours',
             'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30',
         );
+    }
+
+    /**
+     * @return array{cashDiscountEnabled:bool,cashDiscountThreshold:int,cashDiscountPercentage:float,cashDiscountNote:string}
+     */
+    private function ticketPricingSettings(): array
+    {
+        $enabled = filter_var(SiteGlobalConfig::value('repair_cash_discount_enabled', '1'), FILTER_VALIDATE_BOOL);
+        $threshold = max(0, (int) SiteGlobalConfig::value('repair_cash_discount_threshold', '30000'));
+        $percentage = max(0, min(100, (float) SiteGlobalConfig::value('repair_cash_discount_percentage', '10')));
+        $note = trim((string) SiteGlobalConfig::value('repair_cash_discount_note', 'Abonando en efectivo tenes 10% de descuento.'));
+
+        return [
+            'cashDiscountEnabled' => $enabled,
+            'cashDiscountThreshold' => $threshold,
+            'cashDiscountPercentage' => $percentage,
+            'cashDiscountNote' => $note !== '' ? $note : 'Abonando en efectivo tenes descuento.',
+        ];
     }
 
     private function customerWhatsappUrl(RepairOrder $order): ?string

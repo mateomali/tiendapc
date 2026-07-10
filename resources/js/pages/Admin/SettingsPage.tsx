@@ -58,6 +58,23 @@ const labels: Record<string, { label: string; hint: string; multiline?: boolean 
         label: 'Limite descripcion detalle',
         hint: 'Cantidad de palabras antes de truncar la descripcion larga.',
     },
+    repair_cash_discount_enabled: {
+        label: 'Precio efectivo en reparaciones',
+        hint: 'Activa el calculo de precio lista y precio efectivo en tickets tecnicos.',
+    },
+    repair_cash_discount_threshold: {
+        label: 'Aplicar desde',
+        hint: 'Monto minimo de reparacion para mostrar precio lista y efectivo.',
+    },
+    repair_cash_discount_percentage: {
+        label: 'Diferencia porcentual',
+        hint: 'Porcentaje usado para calcular el precio lista desde el precio efectivo.',
+    },
+    repair_cash_discount_note: {
+        label: 'Texto del ticket tecnico',
+        hint: 'Mensaje que se imprime cuando aplica el precio efectivo.',
+        multiline: true,
+    },
 };
 
 export default function SettingsPage({ settings, whatsappDisplay }: SettingsPageProps): JSX.Element {
@@ -65,7 +82,77 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
         settings,
     });
 
-    const orderedKeys = Object.keys(labels);
+    const siteKeys = [
+        'whatsapp_number',
+        'reparaciones_url',
+        'footer_address',
+        'footer_hours',
+        'footer_map_url',
+        'footer_cta_title',
+        'footer_cta_text',
+        'catalog_empty_text',
+        'catalog_new_days',
+        'catalog_product_image_rotation_ms',
+        'product_detail_description_word_limit',
+    ];
+    const repairTicketKeys = [
+        'repair_cash_discount_enabled',
+        'repair_cash_discount_threshold',
+        'repair_cash_discount_percentage',
+        'repair_cash_discount_note',
+    ];
+
+    const renderSettingField = (key: string): JSX.Element => {
+        const meta = labels[key];
+        const value = form.data.settings[key] ?? '';
+
+        return (
+            <label key={key} className={ui.field}>
+                <span className={ui.fieldLabel}>{meta.label}</span>
+                {key === 'repair_cash_discount_enabled' ? (
+                    <select
+                        className={ui.input}
+                        value={value}
+                        onChange={(event) =>
+                            form.setData('settings', {
+                                ...form.data.settings,
+                                [key]: event.target.value,
+                            })
+                        }
+                    >
+                        <option value="1">Activado</option>
+                        <option value="0">Desactivado</option>
+                    </select>
+                ) : meta.multiline ? (
+                    <textarea
+                        className={ui.textarea}
+                        value={value}
+                        onChange={(event) =>
+                            form.setData('settings', {
+                                ...form.data.settings,
+                                [key]: event.target.value,
+                            })
+                        }
+                    />
+                ) : (
+                    <input
+                        className={ui.input}
+                        type={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' ? 'number' : 'text'}
+                        min={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' ? '0' : undefined}
+                        step={key === 'repair_cash_discount_percentage' ? '0.1' : undefined}
+                        value={value}
+                        onChange={(event) =>
+                            form.setData('settings', {
+                                ...form.data.settings,
+                                [key]: event.target.value,
+                            })
+                        }
+                    />
+                )}
+                <small className={ui.fieldHint}>{meta.hint}</small>
+            </label>
+        );
+    };
 
     return (
         <AdminLayout title="Configuracion">
@@ -101,40 +188,18 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
                         </div>
                     </div>
                     <div className={ui.settingsGrid}>
-                        {orderedKeys.map((key) => {
-                            const meta = labels[key];
-                            const value = form.data.settings[key] ?? '';
-
-                            return (
-                                <label key={key} className={ui.field}>
-                                    <span className={ui.fieldLabel}>{meta.label}</span>
-                                    {meta.multiline ? (
-                                        <textarea
-                                            className={ui.textarea}
-                                            value={value}
-                                            onChange={(event) =>
-                                                form.setData('settings', {
-                                                    ...form.data.settings,
-                                                    [key]: event.target.value,
-                                                })
-                                            }
-                                        />
-                                    ) : (
-                                        <input
-                                            className={ui.input}
-                                            value={value}
-                                            onChange={(event) =>
-                                                form.setData('settings', {
-                                                    ...form.data.settings,
-                                                    [key]: event.target.value,
-                                                })
-                                            }
-                                        />
-                                    )}
-                                    <small className={ui.fieldHint}>{meta.hint}</small>
-                                </label>
-                            );
-                        })}
+                        {siteKeys.map(renderSettingField)}
+                    </div>
+                    <div className="mt-5 border-t border-sky-100 pt-5">
+                        <div className={ui.cardHeading}>
+                            <div className={ui.cardTitleWrap}>
+                                <p className={ui.eyebrow}>Ticket tecnico</p>
+                                <h3 className={ui.cardTitle}>Precio lista y efectivo</h3>
+                            </div>
+                        </div>
+                        <div className={ui.settingsGrid}>
+                            {repairTicketKeys.map(renderSettingField)}
+                        </div>
                     </div>
                     <div className={ui.inlineActions}>
                         <button className={buttonClass('primary')} type="submit" disabled={form.processing}>

@@ -302,6 +302,11 @@ it('stores successive repair payments as history and updates paid total', functi
 });
 
 it('stores repair increments as ticket additions without counting them as payments', function (): void {
+    SiteGlobalConfig::putValue('repair_cash_discount_enabled', '1');
+    SiteGlobalConfig::putValue('repair_cash_discount_threshold', '25000');
+    SiteGlobalConfig::putValue('repair_cash_discount_percentage', '15');
+    SiteGlobalConfig::putValue('repair_cash_discount_note', 'Precio efectivo configurado para reparaciones.');
+
     $order = RepairOrder::query()->create([
         'id' => 802,
         'reparacion' => 1,
@@ -343,6 +348,10 @@ it('stores repair increments as ticket additions without counting them as paymen
             ->where('summary.totalMonto', 40000)
             ->where('summary.totalSenia', 10000)
             ->where('summary.saldo', 30000)
+            ->where('ticketPricing.cashDiscountEnabled', true)
+            ->where('ticketPricing.cashDiscountThreshold', 25000)
+            ->where('ticketPricing.cashDiscountPercentage', 15)
+            ->where('ticketPricing.cashDiscountNote', 'Precio efectivo configurado para reparaciones.')
             ->where('ticket.totalMonto', 40000)
             ->where('ticket.totalSenia', 10000)
             ->where('ticket.repairs.0.monto', '40000.00')
