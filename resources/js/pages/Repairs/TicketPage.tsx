@@ -86,7 +86,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     <div className="hidden print:block print:h-[4mm]" />
 
                     <header className="text-center">
-                        <div className="text-[17px] font-black leading-[1.05] tracking-[0.04em]">SUDOKU</div>
+                        <div className="text-[21px] font-black leading-[1.02] tracking-[0.06em]">SUDOKU</div>
                         <div className="text-[11px] leading-[1.15]">AV. JOSE DE SAN MARTIN 2658 - MERLO</div>
                         <div className="mx-auto my-[3px] w-full border-t border-dashed border-black pt-[3px]">
                             <span className="text-[10px] leading-[1.05]">WHATSAPP: </span>
@@ -99,7 +99,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
 
                     <section>
                         <div className="mb-[3px] text-[12px]">{hasIncrements ? 'TICKET ACTUALIZADO' : 'COMPROBANTE DE INGRESO'}</div>
-                        <TicketLine label="ORDEN N:" value={`#${ticket.id}`} strongClassName="text-[16px] leading-[1.05]" />
+                        <TicketLine label="ORDEN N:" value={`#${ticket.id}`} variant="highlight" />
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
                         {hasClientDni ? <TicketLine label="DNI:" value={String(ticket.dni)} /> : <TicketLine label="CODIGO:" value={trackingVerifier} />}
                         <TicketLine label="FECHA:" value={fecha} />
@@ -320,7 +320,16 @@ function formatDeliveredTicketDate(value?: string | null): string {
     return `Entregado el ${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}`;
 }
 
-function TicketLine({ label, value, strongClassName = '' }: { label: string; value: string; strongClassName?: string }): JSX.Element {
+function TicketLine({ label, value, strongClassName = '', variant = 'default' }: { label: string; value: string; strongClassName?: string; variant?: 'default' | 'highlight' }): JSX.Element {
+    if (variant === 'highlight') {
+        return (
+            <div className="my-[4px] flex items-center justify-between gap-[5px] border border-black bg-black px-[5px] py-[4px] text-white print:border-black print:bg-black print:text-white">
+                <span className="shrink-0 text-[18px] leading-none">ORDEN:</span>
+                <strong className="break-words text-right text-[18px] leading-none">{value}</strong>
+            </div>
+        );
+    }
+
     return (
         <div className="mb-px flex items-baseline justify-between gap-[5px]">
             <span className="shrink-0">{label}</span>
