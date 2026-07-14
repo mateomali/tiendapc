@@ -99,7 +99,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
 
                     <section>
                         <div className="mb-[3px] text-[12px]">{hasIncrements ? 'TICKET ACTUALIZADO' : 'COMPROBANTE DE INGRESO'}</div>
-                        <TicketLine label="ORDEN N:" value={`#${ticket.id}`} />
+                        <TicketLine label="ORDEN N:" value={`#${ticket.id}`} strongClassName="text-[16px] leading-[1.05]" />
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
                         {hasClientDni ? <TicketLine label="DNI:" value={String(ticket.dni)} /> : <TicketLine label="CODIGO:" value={trackingVerifier} />}
                         <TicketLine label="FECHA:" value={fecha} />
@@ -320,11 +320,11 @@ function formatDeliveredTicketDate(value?: string | null): string {
     return `Entregado el ${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}`;
 }
 
-function TicketLine({ label, value }: { label: string; value: string }): JSX.Element {
+function TicketLine({ label, value, strongClassName = '' }: { label: string; value: string; strongClassName?: string }): JSX.Element {
     return (
-        <div className="mb-px flex justify-between gap-[5px]">
+        <div className="mb-px flex items-baseline justify-between gap-[5px]">
             <span className="shrink-0">{label}</span>
-            <strong className="break-words text-right">{value}</strong>
+            <strong className={`break-words text-right ${strongClassName}`}>{value}</strong>
         </div>
     );
 }

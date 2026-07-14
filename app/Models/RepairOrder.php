@@ -36,6 +36,8 @@ class RepairOrder extends Model
         'marca',
         'modelo',
         'color',
+        'unlock_type',
+        'unlock_value',
         'descripcion',
         'observaciones',
         'info',

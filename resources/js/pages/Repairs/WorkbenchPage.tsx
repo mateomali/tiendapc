@@ -1,6 +1,7 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
@@ -113,6 +114,8 @@ interface RepairJobFormData {
     pedir_repuesto: boolean;
     inventory_part_id: string;
     categorias_reparacion: string;
+    unlock_type: string;
+    unlock_value: string;
     images: File[] | null;
 }
 
@@ -145,6 +148,8 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         pedir_repuesto: false,
         inventory_part_id: '',
         categorias_reparacion: '4',
+        unlock_type: '',
+        unlock_value: '',
         images: null,
     };
 }
@@ -862,10 +867,14 @@ export default function WorkbenchPage({
     };
 
     const changeJobCategory = (index: number, value: string): void => {
+        const phoneCategory = isPhoneCategory(value);
+
         updateJob(index, (current) => ({
             ...current,
             categorias_reparacion: value,
-            marca: isPhoneCategory(value) ? current.marca : '',
+            marca: phoneCategory ? current.marca : '',
+            unlock_type: phoneCategory ? current.unlock_type : '',
+            unlock_value: phoneCategory ? current.unlock_value : '',
         }));
     };
 
@@ -1869,6 +1878,20 @@ export default function WorkbenchPage({
                                                 </label>
                                             </div>
                                         ) : null}
+                                        {isPhoneCategory(job.categorias_reparacion) ? (
+                                            <div className={fieldPanelPurple}>
+                                                <label className={repairLabelClass}>
+                                                    Desbloqueo
+                                                    <PhoneUnlockFields
+                                                        unlockType={job.unlock_type}
+                                                        unlockValue={job.unlock_value}
+                                                        onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                                        selectClassName={compactInputClass}
+                                                        inputClassName={compactInputClass}
+                                                    />
+                                                </label>
+                                            </div>
+                                        ) : null}
                                         <div className={guidedPanelClass(fieldPanelBlue, `job-${index}-model`)}>
                                             <label className={repairLabelClass}>Modelo / equipo<input className={guidedInputClass(`job-${index}-model`)} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} /></label>
                                             {renderDeviceModelSuggestions(index)}
@@ -2130,6 +2153,15 @@ export default function WorkbenchPage({
                                                     </option>
                                                 ))}
                                             </select>
+                                        ) : null}
+                                        {isPhoneCategory(job.categorias_reparacion) ? (
+                                            <PhoneUnlockFields
+                                                unlockType={job.unlock_type}
+                                                unlockValue={job.unlock_value}
+                                                onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                                selectClassName={ui.input}
+                                                inputClassName={ui.input}
+                                            />
                                         ) : null}
                                         <input
                                             className={ui.input}

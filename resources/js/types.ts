@@ -188,6 +188,8 @@ export interface RepairOrderView {
     marca?: string | null;
     modelo?: string | null;
     color?: string | null;
+    unlock_type?: string | null;
+    unlock_value?: string | null;
     descripcion?: string | null;
     observaciones?: string | null;
     info?: string | null;

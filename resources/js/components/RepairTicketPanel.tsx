@@ -21,6 +21,7 @@ import {
     FaWhatsapp,
 } from 'react-icons/fa';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
+import { PhoneUnlockFields, phoneUnlockLabel } from './PhoneUnlockFields';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
 import { cn, formatAmountInput, formatCurrency } from '../utils';
@@ -81,6 +82,8 @@ interface RepairUpdateFormData {
     repuesto_pedido: boolean;
     inventory_part_id: string;
     categorias_reparacion: string;
+    unlock_type: string;
+    unlock_value: string;
     images: File[] | null;
     final_images: File[] | null;
 }
@@ -100,6 +103,8 @@ interface AddRepairFormData {
     repuesto_pedido: boolean;
     inventory_part_id: string;
     categorias_reparacion: string;
+    unlock_type: string;
+    unlock_value: string;
     images: File[] | null;
 }
 
@@ -905,6 +910,8 @@ function AddRepairModal({
         repuesto_pedido: false,
         inventory_part_id: '',
         categorias_reparacion: '4',
+        unlock_type: '',
+        unlock_value: '',
         images: null,
     });
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -952,10 +959,14 @@ function AddRepairModal({
     };
 
     const changeCategory = (value: string): void => {
+        const phoneCategory = isPhoneCategoryValue(serviceCategories, value);
+
         form.setData((current) => ({
             ...current,
             categorias_reparacion: value,
-            marca: isPhoneCategoryValue(serviceCategories, value) ? current.marca : '',
+            marca: phoneCategory ? current.marca : '',
+            unlock_type: phoneCategory ? current.unlock_type : '',
+            unlock_value: phoneCategory ? current.unlock_value : '',
         }));
     };
 
@@ -1052,6 +1063,17 @@ function AddRepairModal({
                                         <option key={brand} value={brand}>{brand}</option>
                                     ))}
                                 </select>
+                            </EditField>
+                        ) : null}
+                        {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
+                            <EditField label="Desbloqueo">
+                                <PhoneUnlockFields
+                                    unlockType={form.data.unlock_type}
+                                    unlockValue={form.data.unlock_value}
+                                    onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                    selectClassName={ui.input}
+                                    inputClassName={ui.input}
+                                />
                             </EditField>
                         ) : null}
                         <EditField label="Modelo">
@@ -1242,6 +1264,8 @@ function RepairEditCard({
         repuesto_pedido: Boolean(repair.repuesto_pedido),
         inventory_part_id: repair.inventory_part_id ? String(repair.inventory_part_id) : '',
         categorias_reparacion: String(repair.categorias_reparacion ?? 4),
+        unlock_type: repair.unlock_type ?? '',
+        unlock_value: repair.unlock_value ?? '',
         images: null,
         final_images: null,
     });
@@ -1281,7 +1305,8 @@ function RepairEditCard({
     const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
     const nextStatus = nextQuickStatus(repair.estado);
     const displayStatus = statusLabel?.(repair) ?? compactStatus(repair.estado);
-    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni);
+    const unlockLabel = phoneUnlockLabel(repair.unlock_type, repair.unlock_value);
+    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni || unlockLabel);
     const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
@@ -1493,10 +1518,14 @@ function RepairEditCard({
     };
 
     const changeInlineCategory = (value: string): void => {
+        const phoneCategory = isPhoneCategoryValue(serviceCategories, value);
+
         form.setData((current) => ({
             ...current,
             categorias_reparacion: value,
-            marca: isPhoneCategoryValue(serviceCategories, value) ? current.marca : '',
+            marca: phoneCategory ? current.marca : '',
+            unlock_type: phoneCategory ? current.unlock_type : '',
+            unlock_value: phoneCategory ? current.unlock_value : '',
         }));
     };
 
@@ -1838,10 +1867,22 @@ function RepairEditCard({
                                     <RepairColorCombobox className={changedInputClass(form.data.color, repair.color ?? '')} value={form.data.color} onChange={(value) => form.setData('color', value)} disabled={readOnly} />
                                 </EditField>
                                 <EditField label="Categoria">
-                                    <select className={changedInputClass(form.data.categorias_reparacion, String(repair.categorias_reparacion ?? 4))} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)} disabled={readOnly}>
+                                    <select className={changedInputClass(form.data.categorias_reparacion, String(repair.categorias_reparacion ?? 4))} value={form.data.categorias_reparacion} onChange={(event) => changeInlineCategory(event.target.value)} disabled={readOnly}>
                                         {serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
                                     </select>
                                 </EditField>
+                                {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
+                                    <EditField label="Desbloqueo">
+                                        <PhoneUnlockFields
+                                            unlockType={form.data.unlock_type}
+                                            unlockValue={form.data.unlock_value}
+                                            onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                            selectClassName={changedInputClass(form.data.unlock_type, repair.unlock_type ?? '')}
+                                            inputClassName={changedInputClass(form.data.unlock_value, repair.unlock_value ?? '')}
+                                            disabled={readOnly}
+                                        />
+                                    </EditField>
+                                ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Monto ($)">
                                         <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
@@ -2263,6 +2304,7 @@ function RepairEditCard({
                         <FieldSummary label="Estado" value={<HighlightText value={displayStatus} term={highlightTerm} />} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
+                        {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                     </div>
                     {readOnly && repair.actions?.deliver ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={openDeliveryModal}>
@@ -2291,6 +2333,7 @@ function RepairEditCard({
                                 <FieldSummary label="F. ingreso" value={<HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} />} onClick={openInlineEditor} />
                                 {repair.descripcion ? <FieldSummary label="Descripcion" value={<HighlightText value={repair.descripcion} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.repuesto ? <FieldSummary label="Repuesto" value={repair.repuesto} onClick={openInlineEditor} /> : null}
+                                {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                                 {repair.observaciones ? <FieldSummary label="Observaciones" value={repair.observaciones} onClick={openInlineEditor} /> : null}
                             </div>
                         </details>

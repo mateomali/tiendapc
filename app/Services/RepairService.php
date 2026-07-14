@@ -279,6 +279,8 @@ class RepairService
                     'marca' => $this->detectDeviceBrandFromRepairText((string) ($job['modelo'] ?? ''), (string) $job['descripcion'], (string) ($job['marca'] ?? '')),
                     'modelo' => $model,
                     'color' => $job['color'],
+                    'unlock_type' => $job['unlock_type'],
+                    'unlock_value' => $job['unlock_value'],
                     'descripcion' => $this->uppercaseFailure((string) $job['descripcion']),
                     'observaciones' => $job['observaciones'],
                     'info' => $info !== '' ? $info : null,
@@ -338,6 +340,8 @@ class RepairService
                 'marca' => $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? '')),
                 'modelo' => $model,
                 'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
+                'unlock_type' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['type'],
+                'unlock_value' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['value'],
                 'descripcion' => $this->uppercaseFailure((string) $payload['descripcion']),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $order->info,
@@ -567,6 +571,8 @@ class RepairService
                 'marca' => $brand,
                 'modelo' => $model,
                 'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
+                'unlock_type' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['type'],
+                'unlock_value' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['value'],
                 'descripcion' => $this->uppercaseFailure((string) ($payload['descripcion'] ?? '')),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $info !== '' ? $info : null,
@@ -2024,7 +2030,9 @@ class RepairService
      *     repuesto:?string,
      *     pedir_repuesto:bool,
      *     inventory_part_id:int,
-     *     categorias_reparacion:int
+     *     categorias_reparacion:int,
+     *     unlock_type:?string,
+     *     unlock_value:?string
      * }>
      */
     private function normalizeJobs(array $payload): array
@@ -2043,6 +2051,8 @@ class RepairService
             'repuesto',
             'inventory_part_id',
             'categorias_reparacion',
+            'unlock_type',
+            'unlock_value',
         ])])
             ->filter(fn ($job): bool => is_array($job))
             ->map(function (array $job): array {
@@ -2055,6 +2065,8 @@ class RepairService
                 $shouldRequestPart = filter_var($job['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
                 $part = trim((string) ($job['repuesto'] ?? ''));
                 $inventoryPartId = max(0, (int) ($job['inventory_part_id'] ?? 0));
+                $categoryId = max(1, (int) ($job['categorias_reparacion'] ?? 4));
+                $unlock = $this->normalizeUnlockData($job, $categoryId);
 
                 if ($description === '' && $fallbackDescription !== '') {
                     $description = $fallbackDescription;
@@ -2079,7 +2091,9 @@ class RepairService
                     'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                     'pedir_repuesto' => $shouldRequestPart,
                     'inventory_part_id' => $inventoryPartId,
-                    'categorias_reparacion' => max(1, (int) ($job['categorias_reparacion'] ?? 4)),
+                    'categorias_reparacion' => $categoryId,
+                    'unlock_type' => $unlock['type'],
+                    'unlock_value' => $unlock['value'],
                 ];
             })
             ->filter(fn (array $job): bool => trim((string) $job['descripcion']) !== '')
@@ -2096,6 +2110,8 @@ class RepairService
             $shouldRequestPart = filter_var($payload['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
             $part = trim((string) ($payload['repuesto'] ?? ''));
             $inventoryPartId = max(0, (int) ($payload['inventory_part_id'] ?? 0));
+            $categoryId = max(1, (int) ($payload['categorias_reparacion'] ?? 4));
+            $unlock = $this->normalizeUnlockData($payload, $categoryId);
 
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
@@ -2111,10 +2127,44 @@ class RepairService
                 'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                 'pedir_repuesto' => $shouldRequestPart,
                 'inventory_part_id' => $inventoryPartId,
-                'categorias_reparacion' => max(1, (int) ($payload['categorias_reparacion'] ?? 4)),
+                'categorias_reparacion' => $categoryId,
+                'unlock_type' => $unlock['type'],
+                'unlock_value' => $unlock['value'],
             ]];
         }
 
         return $jobs;
+    }
+
+    /**
+     * @return array{type:?string,value:?string}
+     */
+    private function normalizeUnlockData(array $payload, int $categoryId): array
+    {
+        if ($categoryId !== 1) {
+            return ['type' => null, 'value' => null];
+        }
+
+        $type = trim((string) ($payload['unlock_type'] ?? ''));
+        if (! in_array($type, ['pin', 'pattern'], true)) {
+            return ['type' => null, 'value' => null];
+        }
+
+        $value = trim((string) ($payload['unlock_value'] ?? ''));
+        if ($type === 'pattern') {
+            $points = collect(preg_split('/[^1-9]+/', $value) ?: [])
+                ->filter(fn (string $point): bool => $point !== '')
+                ->unique()
+                ->values()
+                ->all();
+
+            $value = implode('-', $points);
+        }
+
+        if ($value === '') {
+            return ['type' => null, 'value' => null];
+        }
+
+        return ['type' => $type, 'value' => Str::limit($value, 80, '')];
     }
 }
