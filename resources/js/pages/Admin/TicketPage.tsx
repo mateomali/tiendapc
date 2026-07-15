@@ -59,9 +59,12 @@ export default function TicketPage({ business, sale }: TicketPageProps): JSX.Ele
                     }
 
                     html,
-                    body {
+                    body,
+                    #app {
                         width: 80mm;
                         min-width: 80mm;
+                        height: auto !important;
+                        min-height: 0 !important;
                         margin: 0 !important;
                         padding: 0 !important;
                         background: #fff !important;
@@ -69,6 +72,8 @@ export default function TicketPage({ business, sale }: TicketPageProps): JSX.Ele
 
                     .sales-pos-page {
                         width: 80mm !important;
+                        height: auto !important;
+                        min-height: 0 !important;
                         margin: 0 !important;
                         padding: 0 !important;
                     }
@@ -76,8 +81,10 @@ export default function TicketPage({ business, sale }: TicketPageProps): JSX.Ele
                     .sales-pos-ticket {
                         width: 80mm !important;
                         min-width: 80mm !important;
+                        height: auto !important;
+                        min-height: 0 !important;
                         margin: 0 !important;
-                        padding: 3mm 4mm 8mm !important;
+                        padding: 3mm 4mm 2mm !important;
                         box-shadow: none !important;
                         border: 0 !important;
                         border-radius: 0 !important;
@@ -106,7 +113,7 @@ export default function TicketPage({ business, sale }: TicketPageProps): JSX.Ele
                     </div>
                 </div>
 
-                <article className="sales-pos-ticket mx-auto w-[80mm] rounded-[10px] border border-[#dbe7f6] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_16px_34px_rgba(15,23,42,0.16)] print:rounded-none print:border-0 print:px-[4mm] print:pt-[4mm] print:pb-[6mm] print:shadow-none">
+                <article className="sales-pos-ticket mx-auto w-[80mm] rounded-[10px] border border-[#dbe7f6] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_16px_34px_rgba(15,23,42,0.16)] print:rounded-none print:border-0 print:px-[4mm] print:pt-[4mm] print:pb-[2mm] print:shadow-none">
                     <div className="hidden print:block print:h-[4mm]" />
 
                     <header className="text-center">
@@ -165,7 +172,6 @@ export default function TicketPage({ business, sale }: TicketPageProps): JSX.Ele
                             <div>GRACIAS POR SU COMPRA</div>
                             <div className="mt-[6px]">CONSERVAR TICKET PARA CAMBIOS.</div>
                         </div>
-                        <div className="hidden print:block print:h-[22mm]" aria-hidden="true" />
                     </footer>
                 </article>
             </section>

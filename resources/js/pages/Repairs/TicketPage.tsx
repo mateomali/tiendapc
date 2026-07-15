@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toDataURL } from 'qrcode';
 import type { RepairOrderView, RepairPaymentView, RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass } from '../../repairUi';
@@ -26,6 +26,8 @@ interface TicketPricingSettings {
 
 export default function TicketPage({ ticket, businessHours, ticketPricing, returnUrl }: TicketPageProps): JSX.Element {
     const [qrUrl, setQrUrl] = useState<string>('');
+    const [printPageHeightMm, setPrintPageHeightMm] = useState<number>(180);
+    const ticketRef = useRef<HTMLElement | null>(null);
     const now = new Date();
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, minute: '2-digit' });
@@ -63,16 +65,69 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
         };
     }, [ticket.trackingUrl]);
 
+    const updatePrintPageHeight = useCallback((): void => {
+        const ticketElement = ticketRef.current;
+        if (!ticketElement) {
+            return;
+        }
+
+        const contentHeightPx = ticketElement.getBoundingClientRect().height;
+        const contentHeightMm = contentHeightPx * 25.4 / 96;
+        setPrintPageHeightMm(Math.max(80, Math.ceil(contentHeightMm + 4)));
+    }, []);
+
+    useEffect(() => {
+        updatePrintPageHeight();
+        const timeoutId = window.setTimeout(updatePrintPageHeight, 150);
+        window.addEventListener('beforeprint', updatePrintPageHeight);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+            window.removeEventListener('beforeprint', updatePrintPageHeight);
+        };
+    }, [qrUrl, ticket.repairs.length, updatePrintPageHeight]);
+
+    const printTicket = (): void => {
+        updatePrintPageHeight();
+        window.requestAnimationFrame(() => window.print());
+    };
+
     return (
         <>
             <Head title={`Ticket #${ticket.id}`} />
+            <style>{`
+                @media print {
+                    @page {
+                        size: 80mm ${printPageHeightMm}mm;
+                        margin: 0;
+                    }
 
-            <div className="min-h-screen bg-[linear-gradient(180deg,#eef5ff,#f8fbff)] px-3 py-3 text-black print:w-[80mm] print:bg-white print:p-0">
+                    html,
+                    body,
+                    #app {
+                        width: 80mm;
+                        min-width: 80mm;
+                        height: auto !important;
+                        min-height: 0 !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #fff !important;
+                    }
+
+                    .repair-ticket-print-page,
+                    .repair-ticket-print-sheet {
+                        height: auto !important;
+                        min-height: 0 !important;
+                    }
+                }
+            `}</style>
+
+            <div className="repair-ticket-print-page min-h-screen bg-[linear-gradient(180deg,#eef5ff,#f8fbff)] px-3 py-3 text-black print:w-[80mm] print:bg-white print:p-0">
                 <div className="mx-auto mb-2 flex w-[80mm] flex-wrap justify-center gap-1.5 print:hidden">
                     <Link href={returnUrl} className={buttonClass('soft', 'sm')}>
                         Volver
                     </Link>
-                    <button type="button" className={buttonClass('primary', 'sm')} onClick={() => window.print()}>
+                    <button type="button" className={buttonClass('primary', 'sm')} onClick={printTicket}>
                         Imprimir
                     </button>
                     {ticket.whatsappUrl ? (
@@ -82,7 +137,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     ) : null}
                 </div>
 
-                <main className="mx-auto w-[80mm] rounded-[10px] border border-[#dbe7f6] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_16px_34px_rgba(15,23,42,0.16)] print:mx-auto print:w-[80mm] print:rounded-none print:border-0 print:px-[4mm] print:pt-[4mm] print:pb-[6mm] print:shadow-none">
+                <main ref={ticketRef} className="repair-ticket-print-sheet mx-auto w-[80mm] rounded-[10px] border border-[#dbe7f6] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_16px_34px_rgba(15,23,42,0.16)] print:mx-auto print:w-[80mm] print:rounded-none print:border-0 print:px-[4mm] print:pt-[4mm] print:pb-[2mm] print:shadow-none">
                     <div className="hidden print:block print:h-[4mm]" />
 
                     <header className="text-center">
@@ -184,7 +239,6 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                         <div className="mt-[6px]">CONSERVAR ESTE TICKET. EN CASO DE EXTRAVIO, EL EQUIPO SOLO PODRA SER RETIRADO PRESENTANDO EL DNI FISICO DEL TITULAR.</div>
                     </footer>
 
-                    <div className="hidden print:block print:h-[22mm]" aria-hidden="true" />
                 </main>
             </div>
         </>
@@ -323,9 +377,9 @@ function formatDeliveredTicketDate(value?: string | null): string {
 function TicketLine({ label, value, strongClassName = '', variant = 'default' }: { label: string; value: string; strongClassName?: string; variant?: 'default' | 'highlight' }): JSX.Element {
     if (variant === 'highlight') {
         return (
-            <div className="my-[4px] flex items-center justify-between gap-[5px] border border-black bg-black px-[5px] py-[4px] text-white print:border-black print:bg-black print:text-white">
-                <span className="shrink-0 text-[18px] leading-none">ORDEN:</span>
-                <strong className="break-words text-right text-[18px] leading-none">{value}</strong>
+            <div className="my-[4px] flex items-center justify-between gap-[5px] border-2 border-black bg-white px-[5px] py-[4px] text-black print:border-black print:bg-white print:text-black">
+                <span className="shrink-0 text-[18px] font-black leading-none text-black print:text-black">ORDEN:</span>
+                <strong className="break-words text-right text-[19px] font-black leading-none text-black print:text-black">{value}</strong>
             </div>
         );
     }
