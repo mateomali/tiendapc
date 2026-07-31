@@ -44,8 +44,33 @@ class SiteController extends Controller
             'config' => [
                 'rotation_ms' => SiteAnnouncementConfig::query()->firstOrCreate(['id' => 1], ['rotation_ms' => 4300])->rotation_ms,
                 'catalog_product_image_rotation_ms' => max(2000, min(20000, (int) SiteGlobalConfig::value('catalog_product_image_rotation_ms', '10000'))),
+                'startup_notice_enabled' => $this->truthy(SiteGlobalConfig::value('startup_notice_enabled', '0')),
+                'startup_notice_title' => SiteGlobalConfig::value('startup_notice_title', ''),
+                'startup_notice_body' => SiteGlobalConfig::value('startup_notice_body', ''),
+                'startup_notice_button_label' => SiteGlobalConfig::value('startup_notice_button_label', ''),
+                'startup_notice_category_slug' => SiteGlobalConfig::value('startup_notice_category_slug', ''),
+                'startup_notice_image_url' => SiteGlobalConfig::value('startup_notice_image_url', ''),
+                'startup_notice_mobile_image_url' => SiteGlobalConfig::value('startup_notice_mobile_image_url', ''),
+                'startup_notice_background_image_url' => SiteGlobalConfig::value('startup_notice_background_image_url', ''),
+                'startup_notice_background_color' => SiteGlobalConfig::value('startup_notice_background_color', '#edf4ff'),
+                'startup_notice_text_color' => SiteGlobalConfig::value('startup_notice_text_color', '#143a7c'),
+                'startup_notice_title_size' => SiteGlobalConfig::value('startup_notice_title_size', '64'),
+                'startup_notice_body_size' => SiteGlobalConfig::value('startup_notice_body_size', '24'),
+                'startup_notice_starts_at' => SiteGlobalConfig::value('startup_notice_starts_at', ''),
+                'startup_notice_ends_at' => SiteGlobalConfig::value('startup_notice_ends_at', ''),
             ],
             'mediaItems' => $this->serializeMediaItems(),
+            'categories' => Category::query()
+                ->where('is_hidden', false)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (Category $category): array => [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'slug' => $category->slug,
+                    'group_key' => (string) $category->group_key,
+                ]),
         ]);
     }
 
@@ -54,6 +79,20 @@ class SiteController extends Controller
         $validated = $request->validate([
             'rotation_ms' => ['required', 'integer', 'min:1000'],
             'catalog_product_image_rotation_ms' => ['required', 'integer', 'min:2000', 'max:20000'],
+            'startup_notice_enabled' => ['nullable', 'boolean'],
+            'startup_notice_title' => ['nullable', 'string', 'max:120'],
+            'startup_notice_body' => ['nullable', 'string', 'max:800'],
+            'startup_notice_button_label' => ['nullable', 'string', 'max:80'],
+            'startup_notice_category_slug' => ['nullable', 'string', 'max:255', 'exists:categories,slug'],
+            'startup_notice_image_url' => ['nullable', 'string', 'max:500'],
+            'startup_notice_mobile_image_url' => ['nullable', 'string', 'max:500'],
+            'startup_notice_background_image_url' => ['nullable', 'string', 'max:500'],
+            'startup_notice_background_color' => ['nullable', 'string', 'max:24'],
+            'startup_notice_text_color' => ['nullable', 'string', 'max:24'],
+            'startup_notice_title_size' => ['nullable', 'integer', 'min:24', 'max:120'],
+            'startup_notice_body_size' => ['nullable', 'integer', 'min:14', 'max:48'],
+            'startup_notice_starts_at' => ['nullable', 'date'],
+            'startup_notice_ends_at' => ['nullable', 'date', 'after_or_equal:startup_notice_starts_at'],
             'items' => ['required', 'array'],
             'items.*.id' => ['nullable', 'integer'],
             'items.*.message' => ['required', 'string', 'max:255'],
@@ -69,6 +108,20 @@ class SiteController extends Controller
 
         SiteAnnouncementConfig::query()->updateOrCreate(['id' => 1], ['rotation_ms' => $validated['rotation_ms']]);
         SiteGlobalConfig::putValue('catalog_product_image_rotation_ms', (string) $validated['catalog_product_image_rotation_ms']);
+        SiteGlobalConfig::putValue('startup_notice_enabled', (bool) ($validated['startup_notice_enabled'] ?? false) ? '1' : '0');
+        SiteGlobalConfig::putValue('startup_notice_title', trim((string) ($validated['startup_notice_title'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_body', trim((string) ($validated['startup_notice_body'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_button_label', trim((string) ($validated['startup_notice_button_label'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_category_slug', trim((string) ($validated['startup_notice_category_slug'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_image_url', trim((string) ($validated['startup_notice_image_url'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_mobile_image_url', trim((string) ($validated['startup_notice_mobile_image_url'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_background_image_url', trim((string) ($validated['startup_notice_background_image_url'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_background_color', $this->sanitizeCssColor($validated['startup_notice_background_color'] ?? '#edf4ff', '#edf4ff'));
+        SiteGlobalConfig::putValue('startup_notice_text_color', $this->sanitizeCssColor($validated['startup_notice_text_color'] ?? '#143a7c', '#143a7c'));
+        SiteGlobalConfig::putValue('startup_notice_title_size', (string) max(24, min(120, (int) ($validated['startup_notice_title_size'] ?? 64))));
+        SiteGlobalConfig::putValue('startup_notice_body_size', (string) max(14, min(48, (int) ($validated['startup_notice_body_size'] ?? 24))));
+        SiteGlobalConfig::putValue('startup_notice_starts_at', trim((string) ($validated['startup_notice_starts_at'] ?? '')));
+        SiteGlobalConfig::putValue('startup_notice_ends_at', trim((string) ($validated['startup_notice_ends_at'] ?? '')));
 
         $ids = [];
         foreach ($validated['items'] as $index => $item) {
@@ -155,6 +208,10 @@ class SiteController extends Controller
             'settings.catalog_new_days' => ['nullable', 'integer', 'min:1', 'max:90'],
             'settings.catalog_product_image_rotation_ms' => ['nullable', 'integer', 'min:2000', 'max:20000'],
             'settings.product_detail_description_word_limit' => ['nullable', 'integer', 'min:40', 'max:1000'],
+            'settings.product_cash_discount_enabled' => ['nullable', 'boolean'],
+            'settings.product_cash_discount_threshold' => ['nullable', 'integer', 'min:0', 'max:999999999'],
+            'settings.product_cash_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'settings.product_cash_discount_note' => ['nullable', 'string', 'max:255'],
             'settings.repair_cash_discount_enabled' => ['nullable', 'boolean'],
             'settings.repair_cash_discount_threshold' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'settings.repair_cash_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -374,6 +431,10 @@ class SiteController extends Controller
             'catalog_new_days' => SiteGlobalConfig::value('catalog_new_days', '10'),
             'catalog_product_image_rotation_ms' => SiteGlobalConfig::value('catalog_product_image_rotation_ms', '10000'),
             'product_detail_description_word_limit' => SiteGlobalConfig::value('product_detail_description_word_limit', '100'),
+            'product_cash_discount_enabled' => SiteGlobalConfig::value('product_cash_discount_enabled', '1'),
+            'product_cash_discount_threshold' => SiteGlobalConfig::value('product_cash_discount_threshold', '20000'),
+            'product_cash_discount_percentage' => SiteGlobalConfig::value('product_cash_discount_percentage', '10'),
+            'product_cash_discount_note' => SiteGlobalConfig::value('product_cash_discount_note', 'Oferta en efectivo al retirar en el local.'),
             'repair_cash_discount_enabled' => SiteGlobalConfig::value('repair_cash_discount_enabled', '1'),
             'repair_cash_discount_threshold' => SiteGlobalConfig::value('repair_cash_discount_threshold', '30000'),
             'repair_cash_discount_percentage' => SiteGlobalConfig::value('repair_cash_discount_percentage', '10'),
@@ -487,6 +548,17 @@ class SiteController extends Controller
         }
 
         return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'on', 'si'], true);
+    }
+
+    private function sanitizeCssColor(mixed $value, string $default): string
+    {
+        $color = trim((string) $value);
+
+        if (preg_match('/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/', $color) === 1) {
+            return $color;
+        }
+
+        return $default;
     }
 
     private function normalizeMediaUrl(?string $value): ?string

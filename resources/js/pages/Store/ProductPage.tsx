@@ -1,5 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
+import { PaymentMethodsLine } from '../../components/PaymentMethodsLine';
 import { SiteLayout } from '../../layouts/SiteLayout';
 import type { AnnouncementItem, HeaderSearchState, ProductDetail, RelatedProduct, SharedPageProps } from '../../types';
 import {
@@ -15,9 +16,7 @@ import {
     catalogCartQtyTrackClass,
     catalogCategoryRowClass,
     catalogCategoryClass,
-    catalogFeaturedChipClass,
     catalogImageClass,
-    catalogImageBadgesClass,
     catalogImageDetailsPillClass,
     catalogImageLinkClass,
     catalogImageNewBadgeClass,
@@ -39,10 +38,8 @@ import {
     productDescriptionBodyClass,
     productDescriptionClass,
     productDescriptionHeaderClass,
-    productDetailBadgesClass,
     productDetailCategoryClass,
     productDetailImageNewChipClass,
-    productFeaturedFlagClass,
     productInfoCardClass,
     productMoreButtonClass,
     productPriceBoxClass,
@@ -93,6 +90,17 @@ function CartIcon({ size = 14 }: { size?: number }): JSX.Element {
     );
 }
 
+function CashIcon(): JSX.Element {
+    return (
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" className="h-4 w-4 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
+            <rect x="3" y="6" width="18" height="12" rx="2" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="M6 9h1" />
+            <path d="M17 15h1" />
+        </svg>
+    );
+}
+
 function WhatsAppIcon({ size = 16 }: { size?: number }): JSX.Element {
     return (
         <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="currentColor" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
@@ -117,7 +125,7 @@ function RelatedProductCard({ product, cartUrl, imageRotationMs }: RelatedProduc
     }, [imageRotationMs, product.images]);
 
     const activeImage = product.images[imageIndex] ?? product.imageUrl;
-    const cardTone: StoreTone = product.hasOffer ? 'offer' : product.isFeatured ? 'featured' : product.isNew ? 'new' : 'regular';
+    const cardTone: StoreTone = product.hasOffer ? 'offer' : product.isNew ? 'new' : 'regular';
 
     return (
         <article className={catalogCardClass(cardTone, 'min-h-full')}>
@@ -126,11 +134,6 @@ function RelatedProductCard({ product, cartUrl, imageRotationMs }: RelatedProduc
                     {'\u{1F525}'}Oferta -{product.discountPercentage}%
                 </div>
             ) : null}
-
-            <div className="hidden">
-                {product.isFeatured ? <span className={catalogFeaturedChipClass} aria-label="Mas vendido">★</span> : null}
-                {product.isNew && !product.hasOffer ? <span className={catalogNewChipClass}>NOVEDAD!</span> : null}
-            </div>
 
             <Link href={product.detailUrl} className={`${catalogImageLinkClass} ${catalogImageToneClass(cardTone)}`} prefetch={['hover', 'click']} cacheFor="30s">
                 <img
@@ -145,16 +148,6 @@ function RelatedProductCard({ product, cartUrl, imageRotationMs }: RelatedProduc
                     }}
                 />
                 {product.isNew ? <span className={`${catalogNewChipClass} ${catalogImageNewBadgeClass}`}>NOVEDAD!</span> : null}
-                {product.isFeatured ? (
-                    <div className={catalogImageBadgesClass}>
-                        <span />
-                        {
-                            <span className={catalogFeaturedChipClass} aria-label="Mas vendido">
-                                <span aria-hidden="true">★</span>MAS VENDIDO!
-                            </span>
-                        }
-                    </div>
-                ) : null}
                 <span className={catalogImageDetailsPillClass}>Más detalles</span>
             </Link>
 
@@ -166,27 +159,30 @@ function RelatedProductCard({ product, cartUrl, imageRotationMs }: RelatedProduc
                     {product.name}
                 </Link>
 
-                <div className="hidden">
-                    {product.isNew ? <span className={catalogNewChipClass}>NOVEDAD!</span> : <span />}
-                    {product.isFeatured ? (
-                        <span className={catalogFeaturedChipClass} aria-label="Mas vendido">
-                            <span aria-hidden="true">★</span>MAS VENDIDO!
-                        </span>
-                    ) : null}
-                </div>
 
-                <div className={`${catalogPriceBoxClass} ${catalogPriceBoxToneClass(cardTone)}`}>
-                    {product.hasOffer ? (
-                        <>
-                            <span className={catalogPriceBeforeClass}>
-                                ANTES <span className={catalogPriceBeforeValueClass}>${product.priceLabel}</span>
-                            </span>
+                {product.cashPrice ? (
+                    <div className="grid justify-items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-center leading-tight text-emerald-900">
+                        <span className="inline-flex items-center gap-1 text-[0.62rem] font-black uppercase tracking-[0.045em] text-emerald-700">
+                            Oferta en efectivo
+                            <CashIcon />
+                        </span>
+                        <strong className="catalog-preview-price-font text-[1.74rem] font-black leading-none text-emerald-950 [font-variant-numeric:tabular-nums]">${product.cashPriceLabel}</strong>
+                        <PaymentMethodsLine priceLabel={product.displayPriceLabel} />
+                    </div>
+                ) : (
+                    <div className={`${catalogPriceBoxClass} ${catalogPriceBoxToneClass(cardTone)}`}>
+                        {product.hasOffer ? (
+                            <>
+                                <span className={catalogPriceBeforeClass}>
+                                    ANTES <span className={catalogPriceBeforeValueClass}>${product.priceLabel}</span>
+                                </span>
+                                <strong className={catalogPriceClass}>${product.displayPriceLabel}</strong>
+                            </>
+                        ) : (
                             <strong className={catalogPriceClass}>${product.displayPriceLabel}</strong>
-                        </>
-                    ) : (
-                        <strong className={catalogPriceClass}>${product.displayPriceLabel}</strong>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
 
                 <div className={catalogActionsClass}>
                     <button
@@ -230,7 +226,7 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
     const relatedTrackRef = useRef<HTMLDivElement | null>(null);
     const activeIndex = Math.max(0, product.images.indexOf(activeImage));
     const hasGallery = product.images.length > 1;
-    const toneClass: StoreTone = product.hasOffer ? 'offer' : product.isFeatured ? 'featured' : product.isNew ? 'new' : 'regular';
+    const toneClass: StoreTone = product.hasOffer ? 'offer' : product.isNew ? 'new' : 'regular';
 
     const scrollRelatedProducts = (direction: 'left' | 'right'): void => {
         const track = relatedTrackRef.current;
@@ -301,9 +297,6 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                                 {'\u{1F525}'}Oferta -{product.discountPercentage}%
                             </div>
                         ) : null}
-                        <div className={productDetailBadgesClass}>
-                            {product.isFeatured ? <span className={productFeaturedFlagClass}>★MAS VENDIDO!</span> : null}
-                        </div>
                         <div className={productThumbRowClass}>
                             {product.images.map((image) => (
                                 <button key={image} type="button" className={productThumbClass(activeImage === image)} onClick={() => setActiveImage(image)}>
@@ -367,7 +360,21 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                                     ANTES <span className={catalogPriceBeforeValueClass}>${product.priceLabel}</span>
                                 </span>
                             ) : null}
-                            <strong className={`${productPriceClass} catalog-preview-price-font text-[2.4rem] max-[640px]:text-[2rem]`}>${product.displayPriceLabel}</strong>
+                            {product.cashPrice ? (
+                                <div className="grid w-full justify-items-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 leading-tight text-emerald-900">
+                                    <span className="inline-flex items-center gap-1.5 text-[0.82rem] font-black uppercase tracking-[0.045em] text-emerald-700">
+                                        Oferta en efectivo
+                                        <CashIcon />
+                                    </span>
+                                    <strong className="catalog-preview-price-font text-[2.55rem] font-black leading-none text-emerald-950 [font-variant-numeric:tabular-nums] max-[640px]:text-[2.05rem]">${product.cashPriceLabel}</strong>
+                                    <PaymentMethodsLine priceLabel={product.displayPriceLabel} variant="detail" />
+                                </div>
+                            ) : (
+                                <strong className={`${productPriceClass} catalog-preview-price-font text-[2.4rem] max-[640px]:text-[2rem]`}>${product.displayPriceLabel}</strong>
+                            )}
+                            {product.cashPrice && product.cashDiscountNote ? (
+                                <span className="max-w-sm text-[0.74rem] font-bold leading-5 text-emerald-900">{product.cashDiscountNote}</span>
+                            ) : null}
                         </div>
 
                         <div className={productActionsClass}>

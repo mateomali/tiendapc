@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import { FormEvent, useEffect, useRef, useState } from 'react';
+import { PaymentMethodsLine } from '../../components/PaymentMethodsLine';
 import { SiteLayout } from '../../layouts/SiteLayout';
 import type { CartLine, HeaderSearchState } from '../../types';
 import { buttonClass, storeBackLinkClass } from '../../ui';
@@ -11,12 +12,26 @@ interface CartPageProps {
     totalItems: number;
     total: number;
     totalLabel: string;
+    cashTotal: number;
+    cashTotalLabel: string;
+    hasCashDiscount: boolean;
     clearAction: string;
     continueShoppingUrl: string;
     checkoutWhatsappUrl: string;
 }
 
-export default function CartPage({ headerSearch, items, totalItems, totalLabel, clearAction, continueShoppingUrl, checkoutWhatsappUrl }: CartPageProps): JSX.Element {
+function CashIcon(): JSX.Element {
+    return (
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" className="h-4 w-4 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
+            <rect x="3" y="6" width="18" height="12" rx="2" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="M6 9h1" />
+            <path d="M17 15h1" />
+        </svg>
+    );
+}
+
+export default function CartPage({ headerSearch, items, totalItems, totalLabel, cashTotalLabel, hasCashDiscount, clearAction, continueShoppingUrl, checkoutWhatsappUrl }: CartPageProps): JSX.Element {
     const customerNameRef = useRef<HTMLInputElement | null>(null);
     const [customerName, setCustomerName] = useState('');
     const [customerNameError, setCustomerNameError] = useState('');
@@ -50,7 +65,7 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
         try {
             const url = new URL(checkoutWhatsappUrl);
             const message = url.searchParams.get('text') ?? '';
-            const lines = message.split('\n').map((line) => line.startsWith('TOTAL:') ? `*${line}*` : line);
+            const lines = message.split('\n').map((line) => line.startsWith('TOTAL ') ? `*${line}*` : line);
             const customerName = name.toUpperCase();
             const nextMessage = [
                 `SOY *${customerName}*, ME GUSTARIA COMPRAR LO SIGUIENTE:`,
@@ -102,6 +117,8 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
                                         const lineQty = qtyByProduct[item.productId] ?? item.qty;
                                         const lineSubtotal = item.unitPrice * lineQty;
                                         const lineSubtotalLabel = new Intl.NumberFormat('es-AR').format(lineSubtotal);
+                                        const lineCashSubtotal = item.cashUnitPrice ? item.cashUnitPrice * lineQty : null;
+                                        const lineCashSubtotalLabel = lineCashSubtotal !== null ? new Intl.NumberFormat('es-AR').format(lineCashSubtotal) : '';
 
                                         return (
                                             <article
@@ -119,6 +136,13 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
                                                 <div className="grid gap-1">
                                                     <h2 className="text-[1.06rem] font-bold leading-[1.22] text-[#1f365d]">{item.name}</h2>
                                                     <p className="text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700">Precio unitario: <span className="catalog-preview-price-font">${item.unitPriceLabel}</span></p>
+                                                    {item.cashUnitPrice ? (
+                                                        <p className="inline-flex items-center gap-1 text-[0.76rem] font-black uppercase tracking-[0.045em] text-emerald-700">
+                                                            Oferta en efectivo
+                                                            <CashIcon />
+                                                            : <span className="catalog-preview-price-font">${item.cashUnitPriceLabel}</span>
+                                                        </p>
+                                                    ) : null}
                                                 </div>
                                                 <div className="grid gap-2 md:justify-items-end">
                                                     <div className="flex items-center justify-center gap-2 rounded-[1rem] border border-[rgba(188,214,245,0.92)] bg-[linear-gradient(180deg,#f8fbff_0%,#ebf4ff_100%)] p-1">
@@ -152,7 +176,21 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
                                                             +
                                                         </button>
                                                     </div>
-                                                    <strong className="catalog-preview-price-font text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${lineSubtotalLabel}</strong>
+                                                    {lineCashSubtotal !== null ? (
+                                                        <div className="grid justify-items-end rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 leading-tight text-emerald-900">
+                                                            <span className="inline-flex items-center gap-1 text-[0.72rem] font-black uppercase tracking-[0.045em] text-emerald-700">
+                                                                Oferta en efectivo
+                                                                <CashIcon />
+                                                            </span>
+                                                            <strong className="catalog-preview-price-font text-[1.55rem] font-black leading-none text-emerald-950 [font-variant-numeric:tabular-nums]">${lineCashSubtotalLabel}</strong>
+                                                            <PaymentMethodsLine priceLabel={lineSubtotalLabel} align="end" />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid justify-items-end gap-1">
+                                                            <span className="text-[0.68rem] font-black uppercase tracking-[0.045em] text-slate-500">Subtotal</span>
+                                                            <strong className="catalog-preview-price-font text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${lineSubtotalLabel}</strong>
+                                                        </div>
+                                                    )}
                                                     <button
                                                         type="button"
                                                         className={buttonClass('danger', 'sm', 'rounded-[0.95rem] px-4 py-2 text-[0.84rem]')}
@@ -178,7 +216,21 @@ export default function CartPage({ headerSearch, items, totalItems, totalLabel, 
                     <aside className="grid h-fit gap-3 rounded-[1.35rem] border border-[rgba(124,180,243,0.76)] bg-[linear-gradient(180deg,#2f5daf_0%,#294f99_100%)] p-4 shadow-[0_16px_32px_rgba(34,75,154,0.16)] xl:sticky xl:top-[7.2rem]">
                         <form className="grid gap-3 rounded-[1.15rem] border border-[rgba(208,228,252,0.85)] bg-[linear-gradient(180deg,#ffffff_0%,#eff6ff_100%)] p-5 shadow-[0_14px_28px_rgba(33,74,154,0.12)]" onSubmit={finishCheckout}>
                         <p className="text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700">RESUMEN</p>
-                        <strong className="catalog-preview-price-font text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${totalLabel}</strong>
+                        {hasCashDiscount ? (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                                <p className="inline-flex items-center gap-1.5 text-[0.78rem] font-black uppercase tracking-[0.045em] text-emerald-700">
+                                    Total oferta en efectivo
+                                    <CashIcon />
+                                </p>
+                                <strong className="catalog-preview-price-font text-[2.35rem] font-black leading-none text-emerald-950">${cashTotalLabel}</strong>
+                                <div className="mt-1">
+                                    <PaymentMethodsLine priceLabel={totalLabel} />
+                                </div>
+                                <p className="mt-1 text-[0.72rem] font-bold leading-5 text-emerald-900">Oferta en efectivo al retirar en el local.</p>
+                            </div>
+                        ) : (
+                            <strong className="catalog-preview-price-font text-[2.02rem] font-black leading-none text-black [font-variant-numeric:tabular-nums]">${totalLabel}</strong>
+                        )}
 
                         <label className="grid gap-1.5">
                             <span className="text-[0.76rem] font-semibold uppercase tracking-[0.045em] text-blue-700">Nombre y apellido</span>

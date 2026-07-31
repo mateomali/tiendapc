@@ -58,6 +58,23 @@ const labels: Record<string, { label: string; hint: string; multiline?: boolean 
         label: 'Limite descripcion detalle',
         hint: 'Cantidad de palabras antes de truncar la descripcion larga.',
     },
+    product_cash_discount_enabled: {
+        label: 'Precio efectivo en productos',
+        hint: 'Activa el precio especial por pago en efectivo para articulos del catalogo.',
+    },
+    product_cash_discount_threshold: {
+        label: 'Aplicar desde',
+        hint: 'Precio minimo del producto para mostrar descuento en efectivo.',
+    },
+    product_cash_discount_percentage: {
+        label: 'Descuento global',
+        hint: 'Porcentaje por defecto. Cada producto puede sobrescribirlo.',
+    },
+    product_cash_discount_note: {
+        label: 'Texto precio efectivo',
+        hint: 'Mensaje que acompana el precio especial en catalogo, carrito y WhatsApp.',
+        multiline: true,
+    },
     repair_cash_discount_enabled: {
         label: 'Precio efectivo en reparaciones',
         hint: 'Activa el calculo de precio lista y precio efectivo en tickets tecnicos.',
@@ -101,6 +118,12 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
         'repair_cash_discount_percentage',
         'repair_cash_discount_note',
     ];
+    const productCashKeys = [
+        'product_cash_discount_enabled',
+        'product_cash_discount_threshold',
+        'product_cash_discount_percentage',
+        'product_cash_discount_note',
+    ];
 
     const renderSettingField = (key: string): JSX.Element => {
         const meta = labels[key];
@@ -109,7 +132,7 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
         return (
             <label key={key} className={ui.field}>
                 <span className={ui.fieldLabel}>{meta.label}</span>
-                {key === 'repair_cash_discount_enabled' ? (
+                {key === 'repair_cash_discount_enabled' || key === 'product_cash_discount_enabled' ? (
                     <select
                         className={ui.input}
                         value={value}
@@ -138,8 +161,8 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
                     <input
                         className={ui.input}
                         type={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' ? 'number' : 'text'}
-                        min={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' ? '0' : undefined}
-                        step={key === 'repair_cash_discount_percentage' ? '0.1' : undefined}
+                        min={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' ? '0' : undefined}
+                        step={key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_percentage' ? '0.1' : undefined}
                         value={value}
                         onChange={(event) =>
                             form.setData('settings', {
@@ -189,6 +212,17 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
                     </div>
                     <div className={ui.settingsGrid}>
                         {siteKeys.map(renderSettingField)}
+                    </div>
+                    <div className="mt-5 border-t border-sky-100 pt-5">
+                        <div className={ui.cardHeading}>
+                            <div className={ui.cardTitleWrap}>
+                                <p className={ui.eyebrow}>Catalogo</p>
+                                <h3 className={ui.cardTitle}>Precio efectivo en productos</h3>
+                            </div>
+                        </div>
+                        <div className={ui.settingsGrid}>
+                            {productCashKeys.map(renderSettingField)}
+                        </div>
                     </div>
                     <div className="mt-5 border-t border-sky-100 pt-5">
                         <div className={ui.cardHeading}>

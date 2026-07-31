@@ -15,6 +15,13 @@ interface MediaItem {
     height?: number | null;
 }
 
+interface CategoryOption {
+    id: number;
+    name: string;
+    slug: string;
+    group_key: string;
+}
+
 interface AnnouncementItem {
     id?: number;
     message: string;
@@ -35,13 +42,42 @@ interface AnnouncementsPageProps {
     config: {
         rotation_ms: number;
         catalog_product_image_rotation_ms: number;
+        startup_notice_enabled: boolean;
+        startup_notice_title: string;
+        startup_notice_body: string;
+        startup_notice_button_label: string;
+        startup_notice_category_slug: string;
+        startup_notice_image_url: string;
+        startup_notice_mobile_image_url: string;
+        startup_notice_background_image_url: string;
+        startup_notice_background_color: string;
+        startup_notice_text_color: string;
+        startup_notice_title_size: string | number;
+        startup_notice_body_size: string | number;
+        startup_notice_starts_at: string;
+        startup_notice_ends_at: string;
     };
     mediaItems: MediaItem[];
+    categories: CategoryOption[];
 }
 
 interface AnnouncementFormData {
     rotation_ms: number;
     catalog_product_image_rotation_ms: number;
+    startup_notice_enabled: boolean;
+    startup_notice_title: string;
+    startup_notice_body: string;
+    startup_notice_button_label: string;
+    startup_notice_category_slug: string;
+    startup_notice_image_url: string;
+    startup_notice_mobile_image_url: string;
+    startup_notice_background_image_url: string;
+    startup_notice_background_color: string;
+    startup_notice_text_color: string;
+    startup_notice_title_size: string | number;
+    startup_notice_body_size: string | number;
+    startup_notice_starts_at: string;
+    startup_notice_ends_at: string;
     items: AnnouncementItem[];
 }
 
@@ -105,10 +141,10 @@ function statusChipClass(item: AnnouncementItem): string {
     return 'border-emerald-200 bg-emerald-50 text-emerald-800';
 }
 
-export default function AnnouncementsPage({ items, config, mediaItems }: AnnouncementsPageProps): JSX.Element {
+export default function AnnouncementsPage({ items, config, mediaItems, categories }: AnnouncementsPageProps): JSX.Element {
     const [activeIndex, setActiveIndex] = useState(0);
     const [mediaOpen, setMediaOpen] = useState(false);
-    const [mediaTarget, setMediaTarget] = useState<'desktop' | 'mobile'>('desktop');
+    const [mediaTarget, setMediaTarget] = useState<'desktop' | 'mobile' | 'startup_desktop' | 'startup_mobile' | 'startup_background'>('desktop');
     const [mediaSearch, setMediaSearch] = useState('');
     const [uploading, setUploading] = useState(false);
     const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
@@ -117,6 +153,20 @@ export default function AnnouncementsPage({ items, config, mediaItems }: Announc
     const form = useForm<AnnouncementFormData>({
         rotation_ms: config.rotation_ms,
         catalog_product_image_rotation_ms: config.catalog_product_image_rotation_ms,
+        startup_notice_enabled: Boolean(config.startup_notice_enabled),
+        startup_notice_title: config.startup_notice_title ?? '',
+        startup_notice_body: config.startup_notice_body ?? '',
+        startup_notice_button_label: config.startup_notice_button_label ?? '',
+        startup_notice_category_slug: config.startup_notice_category_slug ?? '',
+        startup_notice_image_url: config.startup_notice_image_url ?? '',
+        startup_notice_mobile_image_url: config.startup_notice_mobile_image_url ?? '',
+        startup_notice_background_image_url: config.startup_notice_background_image_url ?? '',
+        startup_notice_background_color: config.startup_notice_background_color ?? '#edf4ff',
+        startup_notice_text_color: config.startup_notice_text_color ?? '#143a7c',
+        startup_notice_title_size: config.startup_notice_title_size ?? 64,
+        startup_notice_body_size: config.startup_notice_body_size ?? 24,
+        startup_notice_starts_at: config.startup_notice_starts_at ?? '',
+        startup_notice_ends_at: config.startup_notice_ends_at ?? '',
         items: items.length > 0 ? items : [blankAnnouncement(1)],
     });
 
@@ -185,7 +235,7 @@ export default function AnnouncementsPage({ items, config, mediaItems }: Announc
         setActiveIndex(Math.max(0, index - 1));
     }
 
-    function openMediaPicker(target: 'desktop' | 'mobile'): void {
+    function openMediaPicker(target: 'desktop' | 'mobile' | 'startup_desktop' | 'startup_mobile' | 'startup_background'): void {
         setMediaTarget(target);
         setUploadFeedback(null);
         setUploadError(null);
@@ -193,6 +243,21 @@ export default function AnnouncementsPage({ items, config, mediaItems }: Announc
     }
 
     function assignAnnouncementImage(fileUrl: string): void {
+        if (mediaTarget === 'startup_desktop') {
+            form.setData('startup_notice_image_url', fileUrl);
+            return;
+        }
+
+        if (mediaTarget === 'startup_mobile') {
+            form.setData('startup_notice_mobile_image_url', fileUrl);
+            return;
+        }
+
+        if (mediaTarget === 'startup_background') {
+            form.setData('startup_notice_background_image_url', fileUrl);
+            return;
+        }
+
         if (!selected) {
             return;
         }
@@ -208,14 +273,14 @@ export default function AnnouncementsPage({ items, config, mediaItems }: Announc
     async function uploadAnnouncementImage(event: ChangeEvent<HTMLInputElement>): Promise<void> {
         const file = event.target.files?.[0] ?? null;
 
-        if (!file || !selected) {
+        if (!file) {
             return;
         }
 
         const payload = new FormData();
         payload.append('file', file);
-        payload.append('title', selected.message.trim() || file.name);
-        payload.append('tags', 'anuncio');
+        payload.append('title', (mediaTarget.startsWith('startup') ? form.data.startup_notice_title.trim() : selected?.message.trim()) || file.name);
+        payload.append('tags', mediaTarget.startsWith('startup') ? 'aviso-inicial' : 'anuncio');
 
         setUploading(true);
         setUploadFeedback(null);
@@ -238,7 +303,7 @@ export default function AnnouncementsPage({ items, config, mediaItems }: Announc
             }
 
             assignAnnouncementImage(data.media.fileUrl);
-            setUploadFeedback(`Imagen subida y asignada a ${mediaTarget === 'mobile' ? 'móvil' : 'desktop'}.`);
+            setUploadFeedback(`Imagen subida y asignada a ${mediaTarget === 'mobile' || mediaTarget === 'startup_mobile' ? 'movil' : 'desktop'}.`);
             setMediaOpen(false);
             event.currentTarget.value = '';
         } catch (error) {
@@ -285,6 +350,234 @@ export default function AnnouncementsPage({ items, config, mediaItems }: Announc
                                 <FaSave aria-hidden="true" />
                                 Guardar
                             </button>
+                        </div>
+                    </div>
+                </section>
+
+                <section className={`${ui.sectionCardTight} grid gap-3`}>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="grid gap-1">
+                            <p className={ui.eyebrow}>Aviso inicial</p>
+                            <h2 className="text-xl font-black text-ink-950">Pantalla emergente</h2>
+                            <p className={ui.inlineCaption}>Se muestra al entrar a la tienda hasta que el cliente la cierre.</p>
+                        </div>
+                        <label className={ui.checkboxLine}>
+                            <input
+                                type="checkbox"
+                                checked={form.data.startup_notice_enabled}
+                                onChange={(event) => form.setData('startup_notice_enabled', event.target.checked)}
+                            />
+                            <span>Mostrar aviso</span>
+                        </label>
+                    </div>
+
+                    <div className={ui.formGrid}>
+                        <label className={ui.field}>
+                            <span className={ui.fieldLabel}>Titulo</span>
+                            <input
+                                className={ui.input}
+                                placeholder="MES DEL NINO"
+                                value={form.data.startup_notice_title}
+                                onChange={(event) => form.setData('startup_notice_title', event.target.value)}
+                            />
+                        </label>
+                        <label className={ui.field}>
+                            <span className={ui.fieldLabel}>Texto del boton</span>
+                            <input
+                                className={ui.input}
+                                placeholder="Ver jugueteria"
+                                value={form.data.startup_notice_button_label}
+                                onChange={(event) => form.setData('startup_notice_button_label', event.target.value)}
+                            />
+                        </label>
+                        <label className={ui.fieldWide}>
+                            <span className={ui.fieldLabel}>Mensaje</span>
+                            <textarea
+                                className={ui.textarea}
+                                placeholder="NO TE PIERDAS LAS MEJORES OFERTAS!"
+                                value={form.data.startup_notice_body}
+                                onChange={(event) => form.setData('startup_notice_body', event.target.value)}
+                            />
+                        </label>
+                        <label className={ui.fieldWide}>
+                            <span className={ui.fieldLabel}>Categoria destino</span>
+                            <select
+                                className={ui.input}
+                                value={form.data.startup_notice_category_slug}
+                                onChange={(event) => form.setData('startup_notice_category_slug', event.target.value)}
+                            >
+                                <option value="">Sin boton de categoria</option>
+                                {categories.map((category) => (
+                                    <option key={category.id} value={category.slug}>
+                                        {category.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className={ui.field}>
+                            <span className={ui.fieldLabel}>Mostrar desde</span>
+                            <input
+                                type="datetime-local"
+                                className={ui.input}
+                                value={form.data.startup_notice_starts_at}
+                                onChange={(event) => form.setData('startup_notice_starts_at', event.target.value)}
+                            />
+                        </label>
+                        <label className={ui.field}>
+                            <span className={ui.fieldLabel}>Mostrar hasta</span>
+                            <input
+                                type="datetime-local"
+                                className={ui.input}
+                                value={form.data.startup_notice_ends_at}
+                                onChange={(event) => form.setData('startup_notice_ends_at', event.target.value)}
+                            />
+                        </label>
+                        <div className={`${ui.fieldWide} rounded-lg border border-sky-100 bg-white/80 p-3`}>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="grid gap-1">
+                                    <span className={ui.fieldLabel}>Imagen del aviso</span>
+                                    <span className={ui.fieldHint}>Opcional. Si cargás imagen móvil, se usa en pantallas chicas.</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => openMediaPicker('startup_desktop')}>
+                                        <FaImage aria-hidden="true" />
+                                        Elegir desktop
+                                    </button>
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => openMediaPicker('startup_mobile')}>
+                                        <FaImage aria-hidden="true" />
+                                        Elegir móvil
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={buttonClass('soft', 'sm')}
+                                        onClick={() => {
+                                            form.setData('startup_notice_image_url', '');
+                                            form.setData('startup_notice_mobile_image_url', '');
+                                        }}
+                                    >
+                                        Quitar imagen
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <label className={ui.field}>
+                                    <span className={ui.fieldLabel}>Imagen desktop</span>
+                                    <input
+                                        className={ui.input}
+                                        value={form.data.startup_notice_image_url}
+                                        onChange={(event) => form.setData('startup_notice_image_url', event.target.value)}
+                                    />
+                                </label>
+                                <label className={ui.field}>
+                                    <span className={ui.fieldLabel}>Imagen móvil</span>
+                                    <input
+                                        className={ui.input}
+                                        value={form.data.startup_notice_mobile_image_url}
+                                        onChange={(event) => form.setData('startup_notice_mobile_image_url', event.target.value)}
+                                    />
+                                </label>
+                            </div>
+                        </div>
+                        <div className={`${ui.fieldWide} rounded-lg border border-sky-100 bg-white/80 p-3`}>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="grid gap-1">
+                                    <span className={ui.fieldLabel}>Fondo y letras</span>
+                                    <span className={ui.fieldHint}>Color de fondo, imagen de fondo y tamaño visual del aviso principal.</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => openMediaPicker('startup_background')}>
+                                        <FaImage aria-hidden="true" />
+                                        Elegir fondo
+                                    </button>
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => form.setData('startup_notice_background_image_url', '')}>
+                                        Quitar fondo
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <label className={ui.field}>
+                                    <span className={ui.fieldLabel}>Imagen de fondo</span>
+                                    <input
+                                        className={ui.input}
+                                        value={form.data.startup_notice_background_image_url}
+                                        onChange={(event) => form.setData('startup_notice_background_image_url', event.target.value)}
+                                    />
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <label className={ui.field}>
+                                        <span className={ui.fieldLabel}>Color fondo</span>
+                                        <input
+                                            type="color"
+                                            className={`${ui.input} h-10 p-1`}
+                                            value={String(form.data.startup_notice_background_color || '#edf4ff')}
+                                            onChange={(event) => form.setData('startup_notice_background_color', event.target.value)}
+                                        />
+                                    </label>
+                                    <label className={ui.field}>
+                                        <span className={ui.fieldLabel}>Color letras</span>
+                                        <input
+                                            type="color"
+                                            className={`${ui.input} h-10 p-1`}
+                                            value={String(form.data.startup_notice_text_color || '#143a7c')}
+                                            onChange={(event) => form.setData('startup_notice_text_color', event.target.value)}
+                                        />
+                                    </label>
+                                </div>
+                                <label className={ui.field}>
+                                    <span className={ui.fieldLabel}>Tamaño titulo</span>
+                                    <input
+                                        type="number"
+                                        min={24}
+                                        max={120}
+                                        className={ui.input}
+                                        value={form.data.startup_notice_title_size}
+                                        onChange={(event) => form.setData('startup_notice_title_size', Number(event.target.value))}
+                                    />
+                                </label>
+                                <label className={ui.field}>
+                                    <span className={ui.fieldLabel}>Tamaño mensaje</span>
+                                    <input
+                                        type="number"
+                                        min={14}
+                                        max={48}
+                                        className={ui.input}
+                                        value={form.data.startup_notice_body_size}
+                                        onChange={(event) => form.setData('startup_notice_body_size', Number(event.target.value))}
+                                    />
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border border-sky-100 bg-white p-3">
+                        <div
+                            className="relative mx-auto grid min-h-[260px] max-w-3xl content-center gap-3 overflow-hidden rounded-lg border border-slate-200 p-6 text-center"
+                            style={{
+                                backgroundColor: String(form.data.startup_notice_background_color || '#edf4ff'),
+                                backgroundImage: form.data.startup_notice_background_image_url ? `linear-gradient(rgba(255,255,255,0.18),rgba(255,255,255,0.18)), url("${form.data.startup_notice_background_image_url}")` : undefined,
+                                backgroundPosition: 'center',
+                                backgroundSize: 'cover',
+                                color: String(form.data.startup_notice_text_color || '#143a7c'),
+                            }}
+                        >
+                            <span className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700">X</span>
+                            {form.data.startup_notice_image_url ? (
+                                <picture>
+                                    {form.data.startup_notice_mobile_image_url ? <source media="(max-width: 560px)" srcSet={form.data.startup_notice_mobile_image_url} /> : null}
+                                    <img src={form.data.startup_notice_image_url} alt={form.data.startup_notice_title || 'Aviso'} className="mx-auto max-h-52 w-full rounded-md object-contain" />
+                                </picture>
+                            ) : null}
+                            <strong className="font-black uppercase leading-none" style={{ fontSize: `${form.data.startup_notice_title_size || 64}px`, color: 'inherit' }}>
+                                {form.data.startup_notice_title || 'Titulo del aviso'}
+                            </strong>
+                            <p className="mx-auto max-w-xl whitespace-pre-line font-black uppercase leading-tight" style={{ fontSize: `${form.data.startup_notice_body_size || 24}px`, color: 'inherit' }}>
+                                {form.data.startup_notice_body || 'Mensaje destacado para los clientes.'}
+                            </p>
+                            {form.data.startup_notice_button_label && form.data.startup_notice_category_slug ? (
+                                <span className="mx-auto inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-black text-white">
+                                    {form.data.startup_notice_button_label}
+                                </span>
+                            ) : null}
                         </div>
                     </div>
                 </section>
@@ -358,7 +651,7 @@ export default function AnnouncementsPage({ items, config, mediaItems }: Announc
                                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                                 <div>
                                                     <p className={ui.eyebrow}>Biblioteca</p>
-                                                    <h3 className="text-xl font-black text-ink-950">Elegir imagen {mediaTarget === 'mobile' ? 'móvil' : 'desktop'}</h3>
+                                                    <h3 className="text-xl font-black text-ink-950">Elegir imagen {mediaTarget === 'mobile' || mediaTarget === 'startup_mobile' ? 'móvil' : 'desktop'}</h3>
                                                 </div>
                                                 <div className="flex flex-wrap gap-2">
                                                     <input

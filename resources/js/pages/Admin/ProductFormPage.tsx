@@ -13,6 +13,9 @@ interface ProductFormData {
     description: string;
     price: number;
     offer_price: number | null;
+    cash_discount_mode: string;
+    cash_discount_percentage: number | null;
+    cash_price: number | null;
     stock: number;
     stock_status: string;
     image_url: string;
@@ -52,6 +55,9 @@ export default function ProductFormPage({ product, categories }: ProductFormPage
         description: product?.description ?? '',
         price: product?.price ?? 0,
         offer_price: product?.offer_price ?? null,
+        cash_discount_mode: product?.cash_discount_mode ?? 'global',
+        cash_discount_percentage: product?.cash_discount_percentage ?? null,
+        cash_price: product?.cash_price ?? null,
         stock: product?.stock ?? 0,
         stock_status: product?.stock_status ?? 'instock',
         image_url: product?.image_url ?? '',
@@ -239,6 +245,48 @@ export default function ProductFormPage({ product, categories }: ProductFormPage
                             <label className={ui.fieldLabel}>Stock</label>
                             <input className={ui.input} type="number" value={form.data.stock} onChange={(event) => form.setData('stock', Number(event.target.value))} />
                         </div>
+                    </div>
+                    <div className="grid gap-2 lg:grid-cols-[minmax(180px,220px)_minmax(160px,200px)_minmax(160px,200px)_minmax(0,1fr)]">
+                        <div className={ui.field}>
+                            <label className={ui.fieldLabel}>Precio efectivo</label>
+                            <select
+                                className={ui.input}
+                                value={form.data.cash_discount_mode}
+                                onChange={(event) => form.setData('cash_discount_mode', event.target.value)}
+                            >
+                                <option value="global">Usar ajuste global</option>
+                                <option value="percentage">Porcentaje propio</option>
+                                <option value="manual">Precio manual</option>
+                                <option value="disabled">Sin precio efectivo</option>
+                            </select>
+                        </div>
+                        <div className={ui.field}>
+                            <label className={ui.fieldLabel}>Porcentaje</label>
+                            <input
+                                className={ui.input}
+                                type="number"
+                                min={0}
+                                max={100}
+                                step="0.1"
+                                disabled={form.data.cash_discount_mode !== 'percentage'}
+                                value={form.data.cash_discount_percentage ?? ''}
+                                onChange={(event) => form.setData('cash_discount_percentage', event.target.value === '' ? null : Number(event.target.value))}
+                            />
+                        </div>
+                        <div className={ui.field}>
+                            <label className={ui.fieldLabel}>Precio manual</label>
+                            <input
+                                className={ui.input}
+                                type="number"
+                                min={0}
+                                disabled={form.data.cash_discount_mode !== 'manual'}
+                                value={form.data.cash_price ?? ''}
+                                onChange={(event) => form.setData('cash_price', event.target.value === '' ? null : Number(event.target.value))}
+                            />
+                        </div>
+                        <p className="self-end rounded-lg border border-sky-100 bg-white/80 px-3 py-2 text-xs font-bold leading-5 text-ink-700">
+                            Elegi porcentaje o precio manual. Si usas global, toma el porcentaje de Ajustes. Si elegis manual, el precio debe ser menor al precio visible.
+                        </p>
                     </div>
                     <div className="grid gap-2">
                         <div className="grid gap-3 rounded-[1.25rem] border border-sky-100 bg-white/80 p-3 shadow-[0_10px_22px_rgba(18,58,132,0.06)]">

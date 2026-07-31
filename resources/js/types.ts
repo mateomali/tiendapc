@@ -29,6 +29,21 @@ export interface SiteLayoutData {
     navItems: LayoutNavItem[];
     cartUrl: string;
     repairUrl: string;
+    startupNotice?: {
+        enabled: boolean;
+        title: string;
+        body: string;
+        imageUrl: string;
+        mobileImageUrl: string;
+        backgroundImageUrl: string;
+        backgroundColor: string;
+        textColor: string;
+        titleSize: number;
+        bodySize: number;
+        buttonLabel: string;
+        buttonUrl: string;
+        version: string;
+    };
     footer: LayoutFooter;
 }
 
@@ -112,6 +127,10 @@ export interface CatalogProduct {
     offerPriceLabel: string;
     displayPrice: number;
     displayPriceLabel: string;
+    cashPrice?: number | null;
+    cashPriceLabel: string;
+    cashDiscountPercentage: number;
+    cashDiscountNote: string;
     hasOffer: boolean;
     discountPercentage: number;
     isNew: boolean;
@@ -135,6 +154,10 @@ export interface ProductDetail {
     priceLabel: string;
     offerPriceLabel: string;
     displayPriceLabel: string;
+    cashPrice?: number | null;
+    cashPriceLabel: string;
+    cashDiscountPercentage: number;
+    cashDiscountNote: string;
     hasOffer: boolean;
     discountPercentage: number;
     isNew: boolean;
@@ -162,6 +185,12 @@ export interface CartLine {
     unitPriceLabel: string;
     subtotal: number;
     subtotalLabel: string;
+    cashUnitPrice?: number | null;
+    cashUnitPriceLabel: string;
+    cashSubtotal?: number | null;
+    cashSubtotalLabel: string;
+    cashDiscountPercentage: number;
+    cashDiscountNote: string;
     hasOffer: boolean;
     updateAction: string;
     removeAction: string;

@@ -36,6 +36,7 @@ class CartService
 
                 $quantity = max(1, (int) $item['quantity']);
                 $unitPrice = $product->effectivePrice();
+                $cashUnitPrice = $product->cashPrice();
 
                 return [
                     'product_id' => $product->id,
@@ -45,6 +46,10 @@ class CartService
                     'quantity' => $quantity,
                     'unit_price' => $unitPrice,
                     'subtotal' => $unitPrice * $quantity,
+                    'cash_unit_price' => $cashUnitPrice,
+                    'cash_subtotal' => $cashUnitPrice !== null ? $cashUnitPrice * $quantity : null,
+                    'cash_discount_percentage' => $cashUnitPrice !== null ? $product->cashDiscountPercentage() : 0,
+                    'cash_discount_note' => $cashUnitPrice !== null ? $product->cashDiscountNote() : '',
                 ];
             })
             ->filter()

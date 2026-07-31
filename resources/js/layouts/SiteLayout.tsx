@@ -66,6 +66,15 @@ function MenuNavIcon({ open }: { open: boolean }): JSX.Element {
     );
 }
 
+function CloseIcon(): JSX.Element {
+    return (
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M6 6l12 12" />
+            <path d="M18 6 6 18" />
+        </svg>
+    );
+}
+
 function RepairNavIcon(): JSX.Element {
     return (
         <img src="/assets/img/repair-icon.png" alt="" aria-hidden="true" />
@@ -109,6 +118,9 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
     const [announcementIndex, setAnnouncementIndex] = useState(0);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [cartPulse, setCartPulse] = useState(false);
+    const [startupNoticeOpen, setStartupNoticeOpen] = useState(false);
+    const startupNotice = layout.startupNotice;
+    const startupNoticeStorageKey = startupNotice?.version ? `sudoku.startupNotice.closed.${startupNotice.version}` : '';
 
     useEffect(() => {
         setSearch(headerSearch?.query ?? '');
@@ -134,6 +146,32 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
 
         return () => window.clearTimeout(timeout);
     }, [cartPulse]);
+
+    useEffect(() => {
+        if (!startupNotice?.enabled || `${startupNotice.title}${startupNotice.body}${startupNotice.imageUrl}`.trim() === '') {
+            setStartupNoticeOpen(false);
+            return;
+        }
+
+        const wasClosed = startupNoticeStorageKey !== '' && window.sessionStorage.getItem(startupNoticeStorageKey) === '1';
+        setStartupNoticeOpen(!wasClosed);
+    }, [startupNotice?.body, startupNotice?.enabled, startupNotice?.imageUrl, startupNotice?.title, startupNoticeStorageKey]);
+
+    useEffect(() => {
+        if (!startupNoticeOpen) {
+            return;
+        }
+
+        const closeOnEscape = (event: KeyboardEvent): void => {
+            if (event.key === 'Escape') {
+                closeStartupNotice();
+            }
+        };
+
+        window.addEventListener('keydown', closeOnEscape);
+
+        return () => window.removeEventListener('keydown', closeOnEscape);
+    }, [startupNoticeOpen]);
 
     useEffect(() => {
         const mediaQuery = window.matchMedia('(min-width: 861px)');
@@ -226,6 +264,14 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
         });
     };
 
+    const closeStartupNotice = (): void => {
+        if (startupNoticeStorageKey !== '') {
+            window.sessionStorage.setItem(startupNoticeStorageKey, '1');
+        }
+
+        setStartupNoticeOpen(false);
+    };
+
     const showAnnouncementControls = (announcements?.items.length ?? 0) > 1;
     const isCatalogLegacyAnnouncements = announcementMode === 'catalogLegacy';
 
@@ -302,6 +348,71 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
         <>
             <Head title={title} />
             <div className={`${site.shell} catalog-font-scope`}>
+                {startupNoticeOpen && startupNotice ? (
+                    <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/72 p-3 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="startup-notice-title">
+                        <section
+                            className="relative grid h-[min(86vh,720px)] w-[min(94vw,980px)] content-center gap-5 overflow-y-auto rounded-lg border border-white/20 px-5 py-10 text-center text-[#102146] shadow-[0_18px_42px_rgba(3,10,28,0.32)] sm:px-8 md:px-12"
+                            style={{
+                                backgroundColor: startupNotice.backgroundColor,
+                                backgroundImage: startupNotice.backgroundImageUrl ? `linear-gradient(rgba(255,255,255,0.16),rgba(255,255,255,0.16)), url("${startupNotice.backgroundImageUrl}")` : undefined,
+                                backgroundPosition: 'center',
+                                backgroundSize: 'cover',
+                                color: startupNotice.textColor,
+                            }}
+                        >
+                            <button
+                                type="button"
+                                className="absolute right-3 top-3 inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-[0_2px_8px_rgba(15,23,42,0.10)] transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2456b4]"
+                                onClick={closeStartupNotice}
+                                aria-label="Cerrar aviso"
+                            >
+                                <span className="h-4 w-4 [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-[2.5] [&_svg]:[stroke-linecap:round]">
+                                    <CloseIcon />
+                                </span>
+                            </button>
+                            <div className="mx-auto grid w-full max-w-3xl gap-4">
+                                {startupNotice.imageUrl.trim() !== '' ? (
+                                    <picture>
+                                        {startupNotice.mobileImageUrl.trim() !== '' ? <source media="(max-width: 560px)" srcSet={startupNotice.mobileImageUrl} /> : null}
+                                        <img
+                                            src={startupNotice.imageUrl}
+                                            alt={startupNotice.title || 'Aviso importante'}
+                                            className="mx-auto max-h-[min(46vh,390px)] w-full rounded-md object-contain"
+                                        />
+                                    </picture>
+                                ) : null}
+                                {startupNotice.title.trim() !== '' ? (
+                                    <h2
+                                        id="startup-notice-title"
+                                        className="font-black uppercase leading-[0.96]"
+                                        style={{ fontSize: `clamp(2rem, 7vw, ${startupNotice.titleSize}px)`, color: 'inherit' }}
+                                    >
+                                        {startupNotice.title}
+                                    </h2>
+                                ) : (
+                                    <h2 id="startup-notice-title" className="sr-only">Aviso importante</h2>
+                                )}
+                                {startupNotice.body.trim() !== '' ? (
+                                    <p
+                                        className="mx-auto max-w-2xl whitespace-pre-line font-black uppercase leading-tight"
+                                        style={{ fontSize: `clamp(1rem, 2.6vw, ${startupNotice.bodySize}px)`, color: 'inherit' }}
+                                    >
+                                        {startupNotice.body}
+                                    </p>
+                                ) : null}
+                                {startupNotice.buttonLabel.trim() !== '' && startupNotice.buttonUrl.trim() !== '' ? (
+                                    <Link
+                                        href={startupNotice.buttonUrl}
+                                        className="mx-auto mt-2 inline-flex min-h-12 items-center justify-center rounded-md bg-[#d71920] px-5 py-3 text-sm font-black uppercase tracking-[0.04em] text-white shadow-[0_8px_18px_rgba(168,15,23,0.22)] transition hover:bg-[#b9151b] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d71920]"
+                                        onClick={closeStartupNotice}
+                                    >
+                                        {startupNotice.buttonLabel}
+                                    </Link>
+                                ) : null}
+                            </div>
+                        </section>
+                    </div>
+                ) : null}
                 <div className={site.frame}>
                     <header className={site.header}>
                         <div className={site.headerInner}>

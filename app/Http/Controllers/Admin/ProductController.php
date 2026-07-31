@@ -303,6 +303,17 @@ class ProductController extends Controller
         $payload['stock_status'] = $payload['stock_status'] ?? 'instock';
         $payload['is_featured'] = (bool) ($payload['is_featured'] ?? false);
         $payload['is_active'] = (bool) ($payload['is_active'] ?? true);
+        $payload['cash_discount_mode'] = in_array(($payload['cash_discount_mode'] ?? 'global'), ['global', 'percentage', 'manual', 'disabled'], true)
+            ? $payload['cash_discount_mode']
+            : 'global';
+
+        if ($payload['cash_discount_mode'] !== 'percentage') {
+            $payload['cash_discount_percentage'] = null;
+        }
+
+        if ($payload['cash_discount_mode'] !== 'manual') {
+            $payload['cash_price'] = null;
+        }
 
         if ($product !== null && $payload['slug'] === $product->slug) {
             return $payload;
@@ -332,6 +343,12 @@ class ProductController extends Controller
             'offer_price' => $product->offer_price,
             'offer_start_at' => optional($product->offer_start_at)->format('Y-m-d\TH:i'),
             'offer_end_at' => optional($product->offer_end_at)->format('Y-m-d\TH:i'),
+            'cash_discount_percentage' => $product->cash_discount_percentage,
+            'cash_discount_mode' => $product->cashDiscountMode(),
+            'cash_price' => $product->cash_price,
+            'cash_effective_price' => $product->cashPrice(),
+            'cash_discount_applies' => $product->cashDiscountApplies(),
+            'cash_discount_effective_percentage' => $product->cashDiscountPercentage(),
             'stock' => $product->stock,
             'stock_status' => $product->stock_status,
             'image_url' => $product->image_url,
