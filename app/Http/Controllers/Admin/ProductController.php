@@ -11,6 +11,7 @@ use App\Models\SiteGlobalConfig;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -313,6 +314,12 @@ class ProductController extends Controller
 
         if ($payload['cash_discount_mode'] !== 'manual') {
             $payload['cash_price'] = null;
+        }
+
+        foreach (['cash_discount_percentage', 'cash_discount_mode', 'cash_price'] as $cashColumn) {
+            if (! Schema::hasColumn('products', $cashColumn)) {
+                unset($payload[$cashColumn]);
+            }
         }
 
         if ($product !== null && $payload['slug'] === $product->slug) {

@@ -24,6 +24,12 @@ interface ProductRow {
     offer_price?: number | null;
     offer_start_at?: string | null;
     offer_end_at?: string | null;
+    cash_discount_percentage?: number | string | null;
+    cash_discount_mode?: string | null;
+    cash_price?: number | null;
+    cash_effective_price?: number | null;
+    cash_discount_applies?: boolean;
+    cash_discount_effective_percentage?: number | string | null;
     stock?: number | null;
     stock_status?: string | null;
     image_url?: string | null;
@@ -101,8 +107,22 @@ interface InlineProductState {
     sku: string;
     price: string;
     offer_price: string;
+    cash_discount_mode: string;
+    cash_price: string;
+    cash_discount_percentage: string;
     is_active: boolean;
     is_featured: boolean;
+}
+
+async function readInlineSaveError(response: Response): Promise<string> {
+    try {
+        const data = await response.json() as { message?: string; errors?: Record<string, string[]> };
+        const firstError = data.errors ? Object.values(data.errors).flat()[0] : '';
+
+        return firstError || data.message || 'No se pudo guardar';
+    } catch {
+        return 'No se pudo guardar';
+    }
 }
 
 const summaryLabels: Record<string, string> = {
@@ -448,6 +468,9 @@ function ProductInlineRow({
         sku: product.sku ?? '',
         price: String(product.price ?? 0),
         offer_price: product.offer_price ? String(product.offer_price) : '',
+        cash_discount_mode: product.cash_discount_mode ?? 'global',
+        cash_price: product.cash_price ? String(product.cash_price) : '',
+        cash_discount_percentage: product.cash_discount_percentage !== null && product.cash_discount_percentage !== undefined ? String(product.cash_discount_percentage) : '',
         is_active: product.is_active,
         is_featured: product.is_featured,
     }), [product]);
@@ -500,6 +523,9 @@ function ProductInlineRow({
         offer_price: form.offer_price === '' ? '' : Number(form.offer_price),
         offer_start_at: product.offer_start_at ?? '',
         offer_end_at: product.offer_end_at ?? '',
+        cash_discount_percentage: form.cash_discount_percentage,
+        cash_discount_mode: form.cash_price.trim() !== '' ? 'manual' : form.cash_discount_mode,
+        cash_price: form.cash_price.trim() === '' ? '' : Number(form.cash_price),
         stock: product.stock ?? 0,
         stock_status: product.stock_status ?? 'instock',
         image_url: product.image_url ?? '',
@@ -535,7 +561,7 @@ function ProductInlineRow({
 
         if (!response.ok) {
             setStatus('error');
-            setFeedback('No se pudo guardar');
+            setFeedback(await readInlineSaveError(response));
             return;
         }
 
@@ -590,9 +616,9 @@ function ProductInlineRow({
                     {product.image_url ? <img src={product.image_url} alt={product.name} className="h-full w-full object-contain" /> : <span>Sin foto</span>}
                 </div>
             </td>
-            <td className={`${ui.tableCell} min-w-[330px] !px-2 !py-2`} data-label="Producto">
+            <td className={`${ui.tableCell} min-w-[260px] !px-1.5 !py-2`} data-label="Producto">
                 <input
-                    className={`${ui.input} min-h-9 rounded-lg px-2 py-1 text-xs font-bold`}
+                    className={`${ui.input} min-h-9 rounded-lg px-2 py-1 text-[0.72rem] font-bold`}
                     aria-label="Nombre"
                     value={form.name}
                     onChange={(event) => {
@@ -604,7 +630,7 @@ function ProductInlineRow({
                 <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
                     <input
                         ref={skuInputRef}
-                        className={`${ui.input} min-h-8 rounded-lg px-2 py-1 text-xs`}
+                        className={`${ui.input} min-h-8 rounded-lg px-2 py-1 text-[0.72rem]`}
                         aria-label="SKU"
                         placeholder="Sin SKU - tocar para cargar"
                         value={form.sku}
@@ -639,9 +665,9 @@ function ProductInlineRow({
                     {product.deleted_at ? <button type="button" className={stateChipClass('trash')} onClick={() => onFilter({ quick: 'trashed', includeDeleted: true })}>Papelera</button> : null}
                 </div>
             </td>
-            <td className={`${ui.tableCell} min-w-[190px] !px-2 !py-2`} data-label="Categoria">
+            <td className={`${ui.tableCell} min-w-[160px] !px-1.5 !py-2`} data-label="Categoria">
                 <CategoryCombobox
-                    className={`${ui.input} min-h-9 rounded-lg px-2 py-1 text-xs`}
+                    className={`${ui.input} min-h-9 rounded-lg px-2 py-1 text-[0.72rem]`}
                     value={form.category_id}
                     categories={categories}
                     onChange={(category_id) => {
@@ -663,7 +689,6 @@ function ProductInlineRow({
                     }}
                     onKeyDown={handleInlineKeyDown}
                 />
-                <span className="mt-1 block text-[0.62rem] font-semibold text-ink-700/80">Ef.: {formatCurrency(Number(form.offer_price || form.price || 0))}</span>
             </td>
             <td className={`${ui.tableCell} w-[88px] !px-1.5 !py-2`} data-label="Oferta">
                 <input
@@ -687,10 +712,33 @@ function ProductInlineRow({
                     {product.offer_is_active ? 'Oferta' : 'Sin oferta'}
                 </span>
             </td>
-            <td className={`${ui.tableCell} min-w-[120px] !px-2 !py-2`} data-label="Estado">
+            <td className={`${ui.tableCell} w-[88px] !px-1.5 !py-2 text-center`} data-label="Efectivo">
+                <label className="grid justify-items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-emerald-900">
+                    <span className="text-[0.54rem] font-black uppercase tracking-[0.04em] text-emerald-700">Efectivo</span>
+                    <input
+                        className={`${ui.input} min-h-8 w-full rounded-md px-1.5 py-1 text-center text-[0.72rem] font-black text-emerald-950`}
+                        aria-label="Precio efectivo"
+                        value={form.cash_price}
+                        placeholder={product.cash_effective_price ? formatCurrency(Number(product.cash_effective_price)).replace('$', '') : 'Manual'}
+                        inputMode="numeric"
+                        onChange={(event) => {
+                            const nextCashPrice = event.target.value.replace(/[^\d]/g, '');
+                            setForm((current) => ({
+                                ...current,
+                                cash_price: nextCashPrice,
+                                cash_discount_mode: nextCashPrice === '' ? 'global' : 'manual',
+                            }));
+                            markDirty();
+                        }}
+                        onKeyDown={handleInlineKeyDown}
+                    />
+                    <span className="text-[0.5rem] font-bold leading-none text-emerald-700">{form.cash_price === '' ? 'Global' : 'Manual'}</span>
+                </label>
+            </td>
+            <td className={`${ui.tableCell} min-w-[82px] !px-1 !py-2`} data-label="Estado">
                 <label
                     className={cn(
-                        'inline-flex min-h-8 items-center gap-2 rounded-lg border px-2 text-xs font-black transition',
+                        'inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-1.5 text-[0.7rem] font-black transition',
                         form.is_active
                             ? 'border-emerald-300 bg-emerald-100 text-emerald-900 shadow-[0_6px_12px_rgba(16,185,129,0.12)]'
                             : 'border-slate-200 bg-white text-ink-700',
@@ -705,11 +753,11 @@ function ProductInlineRow({
                         }}
                         onKeyDown={handleInlineKeyDown}
                     />
-                    <span>Activo</span>
+                    <span>Act.</span>
                 </label>
                 <label
                     className={cn(
-                        'mt-1 inline-flex min-h-8 items-center gap-2 rounded-lg border px-2 text-xs font-black transition',
+                        'mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-1.5 text-[0.7rem] font-black transition',
                         form.is_featured
                             ? 'border-cyan-300 bg-cyan-100 text-cyan-950 shadow-[0_6px_12px_rgba(8,145,178,0.12)]'
                             : 'border-sky-100 bg-white text-ink-700',
@@ -724,7 +772,7 @@ function ProductInlineRow({
                         }}
                         onKeyDown={handleInlineKeyDown}
                     />
-                    <span>Destacado</span>
+                    <span>Dest.</span>
                 </label>
             </td>
             <td className={`${ui.tableCell} w-[76px] !px-1 !py-2`} data-label="Acciones">
@@ -796,6 +844,9 @@ function ProductMobileCard({
         sku: product.sku ?? '',
         price: String(product.price ?? 0),
         offer_price: product.offer_price ? String(product.offer_price) : '',
+        cash_discount_mode: product.cash_discount_mode ?? 'global',
+        cash_price: product.cash_price ? String(product.cash_price) : '',
+        cash_discount_percentage: product.cash_discount_percentage !== null && product.cash_discount_percentage !== undefined ? String(product.cash_discount_percentage) : '',
         is_active: product.is_active,
         is_featured: product.is_featured,
     }), [product]);
@@ -848,6 +899,9 @@ function ProductMobileCard({
         offer_price: form.offer_price === '' ? '' : Number(form.offer_price),
         offer_start_at: product.offer_start_at ?? '',
         offer_end_at: product.offer_end_at ?? '',
+        cash_discount_percentage: form.cash_discount_percentage,
+        cash_discount_mode: form.cash_price.trim() !== '' ? 'manual' : form.cash_discount_mode,
+        cash_price: form.cash_price.trim() === '' ? '' : Number(form.cash_price),
         stock: product.stock ?? 0,
         stock_status: product.stock_status ?? 'instock',
         image_url: product.image_url ?? '',
@@ -883,7 +937,7 @@ function ProductMobileCard({
 
         if (!response.ok) {
             setStatus('error');
-            setFeedback('No se pudo guardar');
+            setFeedback(await readInlineSaveError(response));
             return;
         }
 
@@ -1015,10 +1069,26 @@ function ProductMobileCard({
             </div>
 
             <div className="grid gap-2 rounded-xl border border-sky-100 bg-sky-50/55 p-2">
-                <div className="flex items-center justify-between gap-2 text-sm font-black text-ink-900">
+                <label className="grid gap-1 text-sm font-black text-ink-900">
                     <span>Efectivo</span>
-                    <span>{formatCurrency(Number(form.offer_price || form.price || 0))}</span>
-                </div>
+                    <input
+                        className={`${ui.input} min-h-10 rounded-xl px-3 py-2 text-sm font-black text-emerald-950`}
+                        value={form.cash_price}
+                        placeholder={product.cash_effective_price ? formatCurrency(Number(product.cash_effective_price)).replace('$', '') : 'Precio manual'}
+                        inputMode="numeric"
+                        onChange={(event) => {
+                            const nextCashPrice = event.target.value.replace(/[^\d]/g, '');
+                            setForm((current) => ({
+                                ...current,
+                                cash_price: nextCashPrice,
+                                cash_discount_mode: nextCashPrice === '' ? 'global' : 'manual',
+                            }));
+                            markDirty();
+                        }}
+                        onKeyDown={handleInlineKeyDown}
+                    />
+                    <span className="text-[0.68rem] font-bold text-emerald-700">{form.cash_price === '' ? 'Usa descuento global' : 'Precio manual en efectivo'}</span>
+                </label>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label
                         className={cn(
@@ -1846,11 +1916,12 @@ export default function ProductsPage({
                             <col className="w-[30px]" />
                             <col className="w-[58px]" />
                             <col className="w-[72px]" />
-                            <col className="w-[410px]" />
-                            <col className="w-[210px]" />
+                            <col className="w-[330px]" />
+                            <col className="w-[180px]" />
                             <col className="w-[88px]" />
                             <col className="w-[88px]" />
-                            <col className="w-[112px]" />
+                            <col className="w-[88px]" />
+                            <col className="w-[82px]" />
                             <col className="w-[76px]" />
                         </colgroup>
                         <thead>
@@ -1872,6 +1943,7 @@ export default function ProductsPage({
                                 <th className={ui.tableHeadCell}>
                                     <button type="button" className={sortHeaderClass('offer')} onClick={() => applySort('offer')}>Oferta{sortLabel('offer')}</button>
                                 </th>
+                                <th className={ui.tableHeadCell}>Efectivo</th>
                                 <th className={ui.tableHeadCell}>
                                     <button type="button" className={sortHeaderClass('status')} onClick={() => applySort('status')}>Estado{sortLabel('status')}</button>
                                 </th>
@@ -1894,7 +1966,7 @@ export default function ProductsPage({
                                     }
                                 />
                             ))}
-                            {products.length === 0 ? <tr><td colSpan={9} className={ui.tableEmptyCell}>No se encontraron productos para los filtros actuales.</td></tr> : null}
+                            {products.length === 0 ? <tr><td colSpan={10} className={ui.tableEmptyCell}>No se encontraron productos para los filtros actuales.</td></tr> : null}
                         </tbody>
                     </table>
                 </div>
