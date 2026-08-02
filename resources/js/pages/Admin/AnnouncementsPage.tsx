@@ -47,6 +47,7 @@ interface AnnouncementsPageProps {
         startup_notice_body: string;
         startup_notice_button_label: string;
         startup_notice_category_slug: string;
+        startup_notice_category_slugs: string[];
         startup_notice_image_url: string;
         startup_notice_mobile_image_url: string;
         startup_notice_background_image_url: string;
@@ -69,6 +70,7 @@ interface AnnouncementFormData {
     startup_notice_body: string;
     startup_notice_button_label: string;
     startup_notice_category_slug: string;
+    startup_notice_category_slugs: string[];
     startup_notice_image_url: string;
     startup_notice_mobile_image_url: string;
     startup_notice_background_image_url: string;
@@ -86,6 +88,8 @@ const iconButton =
 const iconSoft = `${iconButton} border-sky-200 bg-white text-brand-700 hover:bg-brand-50`;
 const iconPrimary = `${iconButton} border-brand-500 bg-brand-600 text-white hover:bg-brand-700`;
 const iconDanger = `${iconButton} border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100`;
+
+type AdminSection = 'startup' | 'ticker';
 
 const blankAnnouncement = (sortOrder: number): AnnouncementItem => ({
     message: '',
@@ -143,7 +147,9 @@ function statusChipClass(item: AnnouncementItem): string {
 
 export default function AnnouncementsPage({ items, config, mediaItems, categories }: AnnouncementsPageProps): JSX.Element {
     const [activeIndex, setActiveIndex] = useState(0);
+    const [activeSection, setActiveSection] = useState<AdminSection>('startup');
     const [mediaOpen, setMediaOpen] = useState(false);
+    const [startupCategoriesOpen, setStartupCategoriesOpen] = useState(false);
     const [mediaTarget, setMediaTarget] = useState<'desktop' | 'mobile' | 'startup_desktop' | 'startup_mobile' | 'startup_background'>('desktop');
     const [mediaSearch, setMediaSearch] = useState('');
     const [uploading, setUploading] = useState(false);
@@ -158,6 +164,7 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
         startup_notice_body: config.startup_notice_body ?? '',
         startup_notice_button_label: config.startup_notice_button_label ?? '',
         startup_notice_category_slug: config.startup_notice_category_slug ?? '',
+        startup_notice_category_slugs: config.startup_notice_category_slugs?.length ? config.startup_notice_category_slugs : (config.startup_notice_category_slug ? [config.startup_notice_category_slug] : []),
         startup_notice_image_url: config.startup_notice_image_url ?? '',
         startup_notice_mobile_image_url: config.startup_notice_mobile_image_url ?? '',
         startup_notice_background_image_url: config.startup_notice_background_image_url ?? '',
@@ -173,6 +180,9 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
     const selected = form.data.items[activeIndex] ?? form.data.items[0];
     const selectedIssues = selected ? itemIssues(selected) : [];
     const allIssues = form.data.items.flatMap((item, index) => itemIssues(item).map((issue) => `Anuncio ${index + 1}: ${issue}`));
+    const startupCategorySummary = categories
+        .filter((category) => form.data.startup_notice_category_slugs.includes(category.slug))
+        .map((category) => category.name);
     const filteredMedia = useMemo(() => {
         const term = mediaSearch.trim().toLowerCase();
 
@@ -191,6 +201,19 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
         const next = [...form.data.items];
         next[index] = nextItem;
         form.setData('items', next);
+    }
+
+    function toggleStartupNoticeCategory(slug: string): void {
+        const selected = form.data.startup_notice_category_slugs.includes(slug);
+        const next = selected
+            ? form.data.startup_notice_category_slugs.filter((currentSlug) => currentSlug !== slug)
+            : [...form.data.startup_notice_category_slugs, slug];
+
+        form.setData({
+            ...form.data,
+            startup_notice_category_slugs: next,
+            startup_notice_category_slug: next[0] ?? '',
+        });
     }
 
     function addItem(): void {
@@ -328,24 +351,48 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                 }}
             >
                 <section className={`${ui.sectionCardTight} grid gap-3`}>
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                        <div>
-                            <p className={ui.eyebrow}>Home y ticker</p>
-                            <h2 className="text-2xl font-black text-ink-950">Anuncios programados</h2>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="grid gap-1">
+                            <h2 className="text-xl font-black text-ink-950">Anuncios</h2>
+                            <div className="grid grid-cols-2 gap-1 rounded-lg border border-sky-100 bg-white p-1">
+                                {([
+                                    ['startup', 'Pantalla emergente'],
+                                    ['ticker', 'Ticker superior'],
+                                ] as const).map(([section, label]) => (
+                                    <button
+                                        key={section}
+                                        type="button"
+                                        className={cn(
+                                            'min-h-9 rounded-md px-3 text-sm font-black text-ink-800',
+                                            activeSection === section ? 'bg-brand-600 text-white' : 'bg-white hover:bg-sky-50',
+                                        )}
+                                        onClick={() => setActiveSection(section)}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[160px_180px_auto_auto] lg:items-end">
-                            <label className="grid gap-1">
-                                <span className={ui.fieldLabel}>Rotacion anuncios</span>
-                                <input type="number" className={ui.input} min={1000} step={100} value={form.data.rotation_ms} onChange={(event) => form.setData('rotation_ms', Number(event.target.value))} />
-                            </label>
-                            <label className="grid gap-1">
-                                <span className={ui.fieldLabel}>Rotacion catalogo</span>
-                                <input type="number" className={ui.input} min={2000} max={20000} step={500} value={form.data.catalog_product_image_rotation_ms} onChange={(event) => form.setData('catalog_product_image_rotation_ms', Number(event.target.value))} />
-                            </label>
-                            <button type="button" className={buttonClass('soft')} onClick={addItem}>
-                                <FaPlus aria-hidden="true" />
-                                Agregar
-                            </button>
+                        <div className={cn(
+                            'grid gap-2',
+                            activeSection === 'ticker' ? 'sm:grid-cols-2 lg:grid-cols-[160px_180px_auto_auto] lg:items-end' : 'sm:flex sm:justify-end',
+                        )}>
+                            {activeSection === 'ticker' ? (
+                                <>
+                                    <label className="grid gap-1">
+                                        <span className={ui.fieldLabel}>Rotacion anuncios</span>
+                                        <input type="number" className={ui.input} min={1000} step={100} value={form.data.rotation_ms} onChange={(event) => form.setData('rotation_ms', Number(event.target.value))} />
+                                    </label>
+                                    <label className="grid gap-1">
+                                        <span className={ui.fieldLabel}>Rotacion catalogo</span>
+                                        <input type="number" className={ui.input} min={2000} max={20000} step={500} value={form.data.catalog_product_image_rotation_ms} onChange={(event) => form.setData('catalog_product_image_rotation_ms', Number(event.target.value))} />
+                                    </label>
+                                    <button type="button" className={buttonClass('soft')} onClick={addItem}>
+                                        <FaPlus aria-hidden="true" />
+                                        Agregar
+                                    </button>
+                                </>
+                            ) : null}
                             <button type="submit" className={buttonClass('primary')} disabled={form.processing}>
                                 <FaSave aria-hidden="true" />
                                 Guardar
@@ -354,6 +401,7 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                     </div>
                 </section>
 
+                {activeSection === 'startup' ? (
                 <section className={`${ui.sectionCardTight} grid gap-3`}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="grid gap-1">
@@ -371,6 +419,8 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                         </label>
                     </div>
 
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.82fr)] xl:items-start">
+                        <div className="grid gap-3">
                     <div className={ui.formGrid}>
                         <label className={ui.field}>
                             <span className={ui.fieldLabel}>Titulo</span>
@@ -399,21 +449,57 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                                 onChange={(event) => form.setData('startup_notice_body', event.target.value)}
                             />
                         </label>
-                        <label className={ui.fieldWide}>
-                            <span className={ui.fieldLabel}>Categoria destino</span>
-                            <select
-                                className={ui.input}
-                                value={form.data.startup_notice_category_slug}
-                                onChange={(event) => form.setData('startup_notice_category_slug', event.target.value)}
-                            >
-                                <option value="">Sin boton de categoria</option>
-                                {categories.map((category) => (
-                                    <option key={category.id} value={category.slug}>
-                                        {category.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                        <div className={ui.fieldWide}>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className={ui.fieldLabel}>Categorias destino</span>
+                                {form.data.startup_notice_category_slugs.length > 0 ? (
+                                    <button
+                                        type="button"
+                                        className={buttonClass('soft', 'sm')}
+                                        onClick={() => form.setData({ ...form.data, startup_notice_category_slugs: [], startup_notice_category_slug: '' })}
+                                    >
+                                        Limpiar
+                                    </button>
+                                ) : null}
+                            </div>
+                            <div className="grid gap-2 rounded-lg border border-sky-100 bg-white p-2">
+                                <button
+                                    type="button"
+                                    className="grid min-h-10 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-md border border-sky-100 bg-sky-50/70 px-3 py-2 text-left"
+                                    onClick={() => setStartupCategoriesOpen((open) => !open)}
+                                    aria-expanded={startupCategoriesOpen}
+                                >
+                                    <span className="min-w-0 truncate text-sm font-bold text-ink-900">
+                                        {startupCategorySummary.length > 0 ? startupCategorySummary.join(', ') : 'Sin boton de categoria'}
+                                    </span>
+                                    <span className="text-xs font-black text-brand-700">
+                                        {startupCategoriesOpen ? 'Cerrar' : `${startupCategorySummary.length} seleccionadas`}
+                                    </span>
+                                </button>
+
+                                {startupCategoriesOpen ? (
+                                    <div className="grid max-h-48 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2 lg:max-h-56 lg:grid-cols-3">
+                                        {categories.map((category) => {
+                                            const selectedCategory = form.data.startup_notice_category_slugs.includes(category.slug);
+
+                                            return (
+                                                <label key={category.id} className={cn(ui.checkboxLine, 'justify-start rounded-md border-sky-100 bg-white px-2 py-2')}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedCategory}
+                                                        onChange={() => toggleStartupNoticeCategory(category.slug)}
+                                                    />
+                                                    <span className="truncate">{category.name}</span>
+                                                </label>
+                                            );
+                                        })}
+                                        {categories.length === 0 ? (
+                                            <p className="rounded-md border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-bold text-ink-700">No hay categorias visibles.</p>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
                         <label className={ui.field}>
                             <span className={ui.fieldLabel}>Mostrar desde</span>
                             <input
@@ -432,6 +518,9 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                                 onChange={(event) => form.setData('startup_notice_ends_at', event.target.value)}
                             />
                         </label>
+                    </div>
+
+                    <div className={ui.formGrid}>
                         <div className={`${ui.fieldWide} rounded-lg border border-sky-100 bg-white/80 p-3`}>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="grid gap-1">
@@ -478,6 +567,9 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                                 </label>
                             </div>
                         </div>
+                    </div>
+
+                    <div className={ui.formGrid}>
                         <div className={`${ui.fieldWide} rounded-lg border border-sky-100 bg-white/80 p-3`}>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div className="grid gap-1">
@@ -548,8 +640,9 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                             </div>
                         </div>
                     </div>
+                        </div>
 
-                    <div className="rounded-lg border border-sky-100 bg-white p-3">
+                    <div className="rounded-lg border border-sky-100 bg-white p-3 xl:sticky xl:top-3">
                         <div
                             className="relative mx-auto grid min-h-[260px] max-w-3xl content-center gap-3 overflow-hidden rounded-lg border border-slate-200 p-6 text-center"
                             style={{
@@ -573,15 +666,18 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                             <p className="mx-auto max-w-xl whitespace-pre-line font-black uppercase leading-tight" style={{ fontSize: `${form.data.startup_notice_body_size || 24}px`, color: 'inherit' }}>
                                 {form.data.startup_notice_body || 'Mensaje destacado para los clientes.'}
                             </p>
-                            {form.data.startup_notice_button_label && form.data.startup_notice_category_slug ? (
+                            {form.data.startup_notice_button_label && form.data.startup_notice_category_slugs.length > 0 ? (
                                 <span className="mx-auto inline-flex min-h-10 items-center justify-center rounded-md bg-brand-600 px-4 text-sm font-black text-white">
                                     {form.data.startup_notice_button_label}
                                 </span>
                             ) : null}
                         </div>
                     </div>
+                    </div>
                 </section>
+                ) : null}
 
+                {activeSection === 'ticker' ? (
                 <section className="grid gap-4 xl:grid-cols-[minmax(300px,0.76fr)_minmax(0,1.24fr)]">
                     <article className={`${ui.sectionCardTight} grid content-start gap-3`}>
                         <div className={ui.cardHeading}>
@@ -645,7 +741,7 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                                         {selectedIssues.join(' | ')}
                                     </div>
                                 ) : null}
-                                {mediaOpen ? (
+                                {false && mediaOpen ? (
                                     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
                                         <div className="grid max-h-[86vh] w-full max-w-5xl gap-3 overflow-hidden rounded-2xl border border-sky-100 bg-white p-4 shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
                                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -834,6 +930,61 @@ export default function AnnouncementsPage({ items, config, mediaItems, categorie
                         ) : null}
                     </article>
                 </section>
+                ) : null}
+
+                {mediaOpen ? (
+                    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
+                        <div className="grid max-h-[86vh] w-full max-w-5xl gap-3 overflow-hidden rounded-2xl border border-sky-100 bg-white p-4 shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p className={ui.eyebrow}>Biblioteca</p>
+                                    <h3 className="text-xl font-black text-ink-950">Elegir imagen {mediaTarget === 'mobile' || mediaTarget === 'startup_mobile' ? 'movil' : 'desktop'}</h3>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <input
+                                        ref={uploadInputRef}
+                                        className="hidden"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp,image/gif"
+                                        onChange={(event) => void uploadAnnouncementImage(event)}
+                                    />
+                                    <button type="button" className={buttonClass('primary', 'sm')} disabled={uploading} onClick={() => uploadInputRef.current?.click()}>
+                                        {uploading ? 'Subiendo...' : 'Subir imagen'}
+                                    </button>
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setMediaOpen(false)}>
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                            {uploadFeedback ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">{uploadFeedback}</p> : null}
+                            {uploadError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700">{uploadError}</p> : null}
+                            <div className="relative">
+                                <input className={`${ui.input} pr-10`} placeholder="Buscar por titulo, tag o URL" value={mediaSearch} onChange={(event) => setMediaSearch(event.target.value)} />
+                                <FaSearch className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-brand-700" aria-hidden="true" />
+                            </div>
+                            <div className="grid max-h-[62vh] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
+                                {filteredMedia.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        className="grid gap-2 rounded-lg border border-sky-100 bg-white p-2 text-left transition hover:border-brand-300 hover:bg-brand-50/40"
+                                        onClick={() => {
+                                            assignAnnouncementImage(item.fileUrl);
+                                            setMediaOpen(false);
+                                        }}
+                                    >
+                                        <img src={item.fileUrl} alt={item.title} className="h-24 w-full rounded-md object-cover" />
+                                        <strong className="line-clamp-1 text-xs text-ink-950">{item.title}</strong>
+                                        <span className="line-clamp-1 text-[0.68rem] font-bold text-ink-700">{item.tags || 'sin tags'}</span>
+                                    </button>
+                                ))}
+                                {filteredMedia.length === 0 ? (
+                                    <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-sm font-bold text-ink-700">No hay imagenes para esa busqueda.</div>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </form>
         </AdminLayout>
     );

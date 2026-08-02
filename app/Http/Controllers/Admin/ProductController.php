@@ -21,6 +21,7 @@ class ProductController extends Controller
     public function index(Request $request): Response
     {
         $routeName = (string) $request->route()?->getName();
+        $skuEnabled = $this->productSkuEnabled();
         $filters = $request->validate([
             'q' => ['nullable', 'string'],
             'category_id' => ['nullable', 'integer'],
@@ -41,11 +42,14 @@ class ProductController extends Controller
 
         if (($filters['q'] ?? '') !== '') {
             $search = '%' . trim((string) $filters['q']) . '%';
-            $query->where(function ($subQuery) use ($search): void {
+            $query->where(function ($subQuery) use ($search, $skuEnabled): void {
                 $subQuery
                     ->where('name', 'like', $search)
-                    ->orWhere('slug', 'like', $search)
-                    ->orWhere('sku', 'like', $search);
+                    ->orWhere('slug', 'like', $search);
+
+                if ($skuEnabled) {
+                    $subQuery->orWhere('sku', 'like', $search);
+                }
             });
         }
 
@@ -63,7 +67,7 @@ class ProductController extends Controller
             });
         }
 
-        if (($filters['missing'] ?? '') === 'sku') {
+        if ($skuEnabled && ($filters['missing'] ?? '') === 'sku') {
             $query->where(function ($subQuery): void {
                 $subQuery->whereNull('sku')->orWhere('sku', '');
             });
@@ -81,9 +85,9 @@ class ProductController extends Controller
             'missing_image' => $query->where(function ($subQuery): void {
                 $subQuery->whereNull('image_url')->orWhere('image_url', '');
             }),
-            'missing_sku' => $query->where(function ($subQuery): void {
+            'missing_sku' => $skuEnabled ? $query->where(function ($subQuery): void {
                 $subQuery->whereNull('sku')->orWhere('sku', '');
-            }),
+            }) : null,
             'missing_category' => $query->where(function ($subQuery): void {
                 $subQuery->whereNull('category_id')->orWhereDoesntHave('category');
             }),
@@ -149,6 +153,7 @@ class ProductController extends Controller
         ];
         $config = [
             'autosaveDefault' => SiteGlobalConfig::value('admin_products_autosave', '0') === '1',
+            'skuEnabled' => $skuEnabled,
         ];
 
         if ($routeName === 'admin.products.missing_images') {
@@ -164,6 +169,15 @@ class ProductController extends Controller
         }
 
         if ($routeName === 'admin.products.missing_sku') {
+            if (! $skuEnabled) {
+                return Inertia::render('Admin/ProductMissingSkusPage', [
+                    'items' => collect(),
+                    'urls' => [
+                        'products' => route('admin.products.index'),
+                    ],
+                ]);
+            }
+
             return Inertia::render('Admin/ProductMissingSkusPage', [
                 'items' => $products
                     ->filter(fn (Product $product): bool => collect($this->validationWarnings($product))->contains(fn (array $warning): bool => $warning['code'] === 'missing_sku'))
@@ -191,6 +205,9 @@ class ProductController extends Controller
             'product' => null,
             'categories' => Category::query()->orderBy('sort_order')->get(['id', 'name']),
             'mediaItems' => $this->serializeMediaItems(),
+            'config' => [
+                'skuEnabled' => $this->productSkuEnabled(),
+            ],
         ]);
     }
 
@@ -223,6 +240,9 @@ class ProductController extends Controller
             'product' => $this->serializeProduct($product, true),
             'categories' => Category::query()->orderBy('sort_order')->get(['id', 'name']),
             'mediaItems' => $this->serializeMediaItems(),
+            'config' => [
+                'skuEnabled' => $this->productSkuEnabled(),
+            ],
         ]);
     }
 
@@ -381,7 +401,7 @@ class ProductController extends Controller
             $warnings[] = ['code' => 'missing_image', 'label' => 'sin imagen'];
         }
 
-        if (trim((string) $product->sku) === '') {
+        if ($this->productSkuEnabled() && trim((string) $product->sku) === '') {
             $warnings[] = ['code' => 'missing_sku', 'label' => 'sin sku'];
         }
 
@@ -422,6 +442,11 @@ class ProductController extends Controller
                     'offer_start_at' => now(),
                 ]);
             });
+    }
+
+    private function productSkuEnabled(): bool
+    {
+        return SiteGlobalConfig::value('product_sku_enabled', '1') === '1';
     }
 
     private function serializeMissingImageProduct(Product $product): array

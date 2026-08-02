@@ -46,6 +46,7 @@ interface CatalogPageProps extends SharedPageProps {
     filters: {
         query: string;
         selectedCategory: string;
+        selectedCategories: string[];
         selectedGroup: string;
         order: string;
         onlyNew: boolean;
@@ -220,10 +221,11 @@ function CatalogToolbarButton({ ariaLabel, tooltip, isActive, onClick, children 
 
 function buildCatalogQuery(
     filters: CatalogPageProps['filters'],
-    overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
+    overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedCategories' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
 ): Record<string, string | number> {
     const nextFilters = {
         selectedCategory: filters.selectedCategory,
+        selectedCategories: filters.selectedCategories,
         selectedGroup: filters.selectedGroup,
         query: filters.query,
         order: filters.order,
@@ -235,6 +237,7 @@ function buildCatalogQuery(
 
     return {
         ...(nextFilters.selectedCategory !== '' ? { categoria: nextFilters.selectedCategory } : {}),
+        ...nextFilters.selectedCategories.reduce<Record<string, string>>((carry, slug, index) => ({ ...carry, [`categorias[${index}]`]: slug }), {}),
         ...(nextFilters.selectedGroup !== '' ? { grupo: nextFilters.selectedGroup } : {}),
         ...(nextFilters.query !== '' ? { q: nextFilters.query } : {}),
         ...(nextFilters.order !== 'fecha_ingreso' ? { orden: nextFilters.order } : {}),
@@ -597,7 +600,7 @@ export default function CatalogPage({
     const selectedCategoryItem = categories.find((category) => category.slug === filters.selectedCategory);
     const activeGroupKey = filters.selectedGroup !== '' ? filters.selectedGroup : selectedCategoryItem?.groupKey ?? '';
     const visibleCategories = activeGroupKey === '' ? categories : categories.filter((category) => category.groupKey === activeGroupKey);
-    const isFiltered = activeGroupKey !== '' || filters.selectedCategory !== '' || filters.onlyNew || filters.onlyOffers || filters.onlyFeatured || filters.order !== 'fecha_ingreso';
+    const isFiltered = activeGroupKey !== '' || filters.selectedCategory !== '' || filters.selectedCategories.length > 0 || filters.onlyNew || filters.onlyOffers || filters.onlyFeatured || filters.order !== 'fecha_ingreso';
     const ProductCard = previewCardGrid ? CatalogProductPreviewCard : CatalogProductCard;
 
     const updateGridColumns = (columns: CatalogGridColumns): void => {
@@ -606,7 +609,7 @@ export default function CatalogPage({
     };
 
     const goToCatalogFilters = (
-        overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
+        overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedCategories' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
     ): void => {
         router.get(filters.clearUrl, buildCatalogQuery(filters, overrides), { preserveScroll: true, preserveState: true });
     };
@@ -640,6 +643,7 @@ export default function CatalogPage({
         router.get(filters.clearUrl, buildCatalogQuery(filters, {
             selectedGroup: '',
             selectedCategory: '',
+            selectedCategories: [],
             onlyNew: false,
             onlyOffers: filter === 'offers',
             onlyFeatured: false,
@@ -664,6 +668,7 @@ export default function CatalogPage({
                         goToCatalogFilters({
                             selectedGroup: nextGroupKey,
                             selectedCategory: '',
+                            selectedCategories: [],
                         });
                     }}
                 >
@@ -694,6 +699,7 @@ export default function CatalogPage({
                             goToCatalogFilters({
                                 selectedGroup: selected?.groupKey ?? activeGroupKey,
                                 selectedCategory: selectedSlug,
+                                selectedCategories: [],
                             });
                         }}
                     >

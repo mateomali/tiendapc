@@ -49,6 +49,7 @@ class SiteController extends Controller
                 'startup_notice_body' => SiteGlobalConfig::value('startup_notice_body', ''),
                 'startup_notice_button_label' => SiteGlobalConfig::value('startup_notice_button_label', ''),
                 'startup_notice_category_slug' => SiteGlobalConfig::value('startup_notice_category_slug', ''),
+                'startup_notice_category_slugs' => $this->startupNoticeCategorySlugs(),
                 'startup_notice_image_url' => SiteGlobalConfig::value('startup_notice_image_url', ''),
                 'startup_notice_mobile_image_url' => SiteGlobalConfig::value('startup_notice_mobile_image_url', ''),
                 'startup_notice_background_image_url' => SiteGlobalConfig::value('startup_notice_background_image_url', ''),
@@ -84,6 +85,8 @@ class SiteController extends Controller
             'startup_notice_body' => ['nullable', 'string', 'max:800'],
             'startup_notice_button_label' => ['nullable', 'string', 'max:80'],
             'startup_notice_category_slug' => ['nullable', 'string', 'max:255', 'exists:categories,slug'],
+            'startup_notice_category_slugs' => ['nullable', 'array'],
+            'startup_notice_category_slugs.*' => ['string', 'max:255', 'exists:categories,slug'],
             'startup_notice_image_url' => ['nullable', 'string', 'max:500'],
             'startup_notice_mobile_image_url' => ['nullable', 'string', 'max:500'],
             'startup_notice_background_image_url' => ['nullable', 'string', 'max:500'],
@@ -112,7 +115,12 @@ class SiteController extends Controller
         SiteGlobalConfig::putValue('startup_notice_title', trim((string) ($validated['startup_notice_title'] ?? '')));
         SiteGlobalConfig::putValue('startup_notice_body', trim((string) ($validated['startup_notice_body'] ?? '')));
         SiteGlobalConfig::putValue('startup_notice_button_label', trim((string) ($validated['startup_notice_button_label'] ?? '')));
-        SiteGlobalConfig::putValue('startup_notice_category_slug', trim((string) ($validated['startup_notice_category_slug'] ?? '')));
+        $startupNoticeCategorySlugs = array_values(array_unique(array_filter(
+            array_map(static fn ($slug): string => trim((string) $slug), (array) ($validated['startup_notice_category_slugs'] ?? [])),
+            static fn (string $slug): bool => $slug !== '',
+        )));
+        SiteGlobalConfig::putValue('startup_notice_category_slugs', json_encode($startupNoticeCategorySlugs));
+        SiteGlobalConfig::putValue('startup_notice_category_slug', $startupNoticeCategorySlugs[0] ?? trim((string) ($validated['startup_notice_category_slug'] ?? '')));
         SiteGlobalConfig::putValue('startup_notice_image_url', trim((string) ($validated['startup_notice_image_url'] ?? '')));
         SiteGlobalConfig::putValue('startup_notice_mobile_image_url', trim((string) ($validated['startup_notice_mobile_image_url'] ?? '')));
         SiteGlobalConfig::putValue('startup_notice_background_image_url', trim((string) ($validated['startup_notice_background_image_url'] ?? '')));
@@ -208,6 +216,7 @@ class SiteController extends Controller
             'settings.catalog_new_days' => ['nullable', 'integer', 'min:1', 'max:90'],
             'settings.catalog_product_image_rotation_ms' => ['nullable', 'integer', 'min:2000', 'max:20000'],
             'settings.product_detail_description_word_limit' => ['nullable', 'integer', 'min:40', 'max:1000'],
+            'settings.product_sku_enabled' => ['nullable', 'boolean'],
             'settings.product_cash_discount_enabled' => ['nullable', 'boolean'],
             'settings.product_cash_discount_threshold' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'settings.product_cash_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -431,6 +440,7 @@ class SiteController extends Controller
             'catalog_new_days' => SiteGlobalConfig::value('catalog_new_days', '10'),
             'catalog_product_image_rotation_ms' => SiteGlobalConfig::value('catalog_product_image_rotation_ms', '10000'),
             'product_detail_description_word_limit' => SiteGlobalConfig::value('product_detail_description_word_limit', '100'),
+            'product_sku_enabled' => SiteGlobalConfig::value('product_sku_enabled', '1'),
             'product_cash_discount_enabled' => SiteGlobalConfig::value('product_cash_discount_enabled', '1'),
             'product_cash_discount_threshold' => SiteGlobalConfig::value('product_cash_discount_threshold', '20000'),
             'product_cash_discount_percentage' => SiteGlobalConfig::value('product_cash_discount_percentage', '10'),
@@ -440,6 +450,26 @@ class SiteController extends Controller
             'repair_cash_discount_percentage' => SiteGlobalConfig::value('repair_cash_discount_percentage', '10'),
             'repair_cash_discount_note' => SiteGlobalConfig::value('repair_cash_discount_note', 'Abonando en efectivo tenes 10% de descuento.'),
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function startupNoticeCategorySlugs(): array
+    {
+        $stored = SiteGlobalConfig::value('startup_notice_category_slugs', '');
+        $decoded = is_string($stored) && $stored !== '' ? json_decode($stored, true) : null;
+        $slugs = is_array($decoded) ? $decoded : [];
+        $legacySlug = trim((string) SiteGlobalConfig::value('startup_notice_category_slug', ''));
+
+        if ($slugs === [] && $legacySlug !== '') {
+            $slugs[] = $legacySlug;
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn ($slug): string => trim((string) $slug), $slugs),
+            static fn (string $slug): bool => $slug !== '',
+        )));
     }
 
     private function scheduleStatusLabel(SiteAnnouncement $announcement): string

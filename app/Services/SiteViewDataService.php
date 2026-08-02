@@ -114,22 +114,29 @@ class SiteViewDataService
         $titleSize = max(24, min(120, (int) $this->value('startup_notice_title_size', '64')));
         $bodySize = max(14, min(48, (int) $this->value('startup_notice_body_size', '24')));
         $buttonLabel = $this->value('startup_notice_button_label', '');
-        $categorySlug = $this->value('startup_notice_category_slug', '');
+        $categorySlugs = $this->startupNoticeCategorySlugs();
         $startsAt = $this->parseConfiguredDate($this->value('startup_notice_starts_at', ''));
         $endsAt = $this->parseConfiguredDate($this->value('startup_notice_ends_at', ''));
         $buttonUrl = '';
 
-        if ($categorySlug !== '') {
-            $category = Category::query()
-                ->where('slug', $categorySlug)
+        if ($categorySlugs !== []) {
+            $categories = Category::query()
+                ->whereIn('slug', $categorySlugs)
                 ->where('is_hidden', false)
-                ->first();
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'slug', 'group_key']);
 
-            if ($category instanceof Category) {
+            if ($categories->count() === 1) {
+                $category = $categories->first();
                 $buttonUrl = route('store.catalog', array_filter([
                     'categoria' => $category->slug,
                     'grupo' => (string) $category->group_key,
                 ], static fn ($value) => $value !== ''));
+            } elseif ($categories->count() > 1) {
+                $buttonUrl = route('store.catalog', [
+                    'categorias' => $categories->pluck('slug')->values()->all(),
+                ]);
             }
         }
 
@@ -151,6 +158,26 @@ class SiteViewDataService
             'buttonUrl' => $buttonUrl,
             'version' => substr(sha1($versionSource), 0, 12),
         ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function startupNoticeCategorySlugs(): array
+    {
+        $stored = $this->value('startup_notice_category_slugs', '');
+        $decoded = $stored !== '' ? json_decode($stored, true) : null;
+        $slugs = is_array($decoded) ? $decoded : [];
+        $legacySlug = trim($this->value('startup_notice_category_slug', ''));
+
+        if ($slugs === [] && $legacySlug !== '') {
+            $slugs[] = $legacySlug;
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn ($slug): string => trim((string) $slug), $slugs),
+            static fn (string $slug): bool => $slug !== '',
+        )));
     }
 
     private function normalizeMediaUrl(string $value): string

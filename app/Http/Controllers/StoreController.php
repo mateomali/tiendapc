@@ -57,7 +57,9 @@ class StoreController extends Controller
             ->sellable()
             ->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('is_hidden', false));
 
-        if ($filters['selectedCategory'] !== '') {
+        if ($filters['selectedCategories'] !== []) {
+            $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->whereIn('slug', $filters['selectedCategories']));
+        } elseif ($filters['selectedCategory'] !== '') {
             $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('slug', $filters['selectedCategory']));
         }
 
@@ -138,6 +140,7 @@ class StoreController extends Controller
             'filters' => [
                 'query' => $filters['query'],
                 'selectedCategory' => $filters['selectedCategory'],
+                'selectedCategories' => $filters['selectedCategories'],
                 'selectedGroup' => $filters['selectedGroup'],
                 'order' => $filters['order'],
                 'onlyNew' => $filters['onlyNew'],
@@ -321,18 +324,23 @@ class StoreController extends Controller
     }
 
     /**
-     * @return array{query: string, selectedCategory: string, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool}
+     * @return array{query: string, selectedCategory: string, selectedCategories: array<int, string>, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool}
      */
     private function catalogFilters(Request $request): array
     {
         $selectedCategory = trim((string) ($request->query('categoria', $request->query('category', ''))));
+        $selectedCategories = array_values(array_unique(array_filter(
+            array_map(static fn ($slug): string => trim((string) $slug), (array) $request->query('categorias', [])),
+            static fn (string $slug): bool => $slug !== '',
+        )));
         $selectedGroup = strtolower(trim((string) $request->query('grupo', '')));
         $query = trim((string) $request->query('q', ''));
         $order = trim((string) $request->query('orden', $request->query('order', 'fecha_ingreso')));
 
         return [
             'query' => $query,
-            'selectedCategory' => $selectedCategory,
+            'selectedCategory' => $selectedCategories === [] ? $selectedCategory : '',
+            'selectedCategories' => $selectedCategories,
             'selectedGroup' => $selectedGroup,
             'order' => in_array($order, ['fecha_ingreso', 'precio_asc', 'precio_desc'], true) ? $order : 'fecha_ingreso',
             'onlyNew' => $this->truthy($request->query('novedades', $request->query('only_new', false))),
@@ -343,7 +351,7 @@ class StoreController extends Controller
 
     /**
      * @param Collection<int, Category> $categories
-     * @param array{query: string, selectedCategory: string, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
+     * @param array{query: string, selectedCategory: string, selectedCategories: array<int, string>, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
      * @param Collection<int, Product> $products
      * @return array<int, array{id: int, name: string, slug: string, groupKey: string, productCount: int, url: string, isSelected: bool}>
      */
@@ -361,8 +369,9 @@ class StoreController extends Controller
                     'productCount' => (int) ($productCountsByCategory->get($category->id) ?? 0),
                     'url' => route($catalogRouteName, $this->catalogQuery([
                         'categoria' => $category->slug,
+                        'categorias' => null,
                     ], $filters)),
-                    'isSelected' => $filters['selectedCategory'] === $category->slug,
+                    'isSelected' => $filters['selectedCategory'] === $category->slug || in_array($category->slug, $filters['selectedCategories'], true),
                 ];
             })
             ->values()
@@ -630,14 +639,15 @@ class StoreController extends Controller
     }
 
     /**
-     * @param array<string, string|int|null> $overrides
-     * @param array{query: string, selectedCategory: string, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
-     * @return array<string, string|int>
+     * @param array<string, string|int|array<int, string>|null> $overrides
+     * @param array{query: string, selectedCategory: string, selectedCategories: array<int, string>, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
+     * @return array<string, string|int|array<int, string>>
      */
     private function catalogQuery(array $overrides, array $filters): array
     {
         $query = [
             'categoria' => $filters['selectedCategory'] !== '' ? $filters['selectedCategory'] : null,
+            'categorias' => $filters['selectedCategories'] !== [] ? $filters['selectedCategories'] : null,
             'grupo' => $filters['selectedGroup'] !== '' ? $filters['selectedGroup'] : null,
             'q' => $filters['query'] !== '' ? $filters['query'] : null,
             'orden' => $filters['order'] !== 'fecha_ingreso' ? $filters['order'] : null,
@@ -650,7 +660,7 @@ class StoreController extends Controller
             $query[$key] = $value;
         }
 
-        return array_filter($query, static fn ($value) => $value !== null && $value !== '');
+        return array_filter($query, static fn ($value) => $value !== null && $value !== '' && $value !== []);
     }
 
     private function safeRouteConfigValue(string $key, string $default): string

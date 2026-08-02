@@ -74,6 +74,7 @@ interface ProductsPageProps {
     };
     config: {
         autosaveDefault: boolean;
+        skuEnabled: boolean;
     };
 }
 
@@ -452,6 +453,7 @@ function ProductInlineRow({
     onFilter,
     onPendingChange,
     onRegisterSave,
+    skuEnabled,
 }: {
     product: ProductRow;
     categories: CategoryOption[];
@@ -461,6 +463,7 @@ function ProductInlineRow({
     onFilter: (next: { quick?: string; issue?: string; missing?: string; estado?: string; includeDeleted?: boolean }) => void;
     onPendingChange: (productId: number, isPending: boolean) => void;
     onRegisterSave: (productId: number, save: (() => Promise<void>) | null) => void;
+    skuEnabled: boolean;
 }): JSX.Element {
     const initialForm = useMemo<InlineProductState>(() => ({
         category_id: product.category_id ? String(product.category_id) : '',
@@ -516,7 +519,7 @@ function ProductInlineRow({
         name: form.name,
         slug: product.slug,
         permalink: '',
-        sku: form.sku,
+        sku: skuEnabled ? form.sku : product.sku ?? '',
         short_description: product.short_description ?? '',
         description: product.description ?? '',
         price: Number(form.price || 0),
@@ -627,22 +630,24 @@ function ProductInlineRow({
                     }}
                     onKeyDown={handleInlineKeyDown}
                 />
-                <div className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1">
-                    <input
-                        ref={skuInputRef}
-                        className={`${ui.input} min-h-8 rounded-lg px-2 py-1 text-[0.72rem]`}
-                        aria-label="SKU"
-                        placeholder="Sin SKU - tocar para cargar"
-                        value={form.sku}
-                        onChange={(event) => {
-                            setForm((current) => ({ ...current, sku: event.target.value }));
-                            markDirty();
-                        }}
-                        onKeyDown={handleInlineKeyDown}
-                    />
+                <div className={cn('mt-1 grid items-center gap-1', skuEnabled ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1')}>
+                    {skuEnabled ? (
+                        <input
+                            ref={skuInputRef}
+                            className={`${ui.input} min-h-8 rounded-lg px-2 py-1 text-[0.72rem]`}
+                            aria-label="SKU"
+                            placeholder="Sin SKU - tocar para cargar"
+                            value={form.sku}
+                            onChange={(event) => {
+                                setForm((current) => ({ ...current, sku: event.target.value }));
+                                markDirty();
+                            }}
+                            onKeyDown={handleInlineKeyDown}
+                        />
+                    ) : null}
                     {(product.validation ?? []).length > 0 ? (
                         <div className="flex max-w-[150px] flex-wrap justify-end gap-1">
-                            {(product.validation ?? []).slice(0, 2).map((warning) => (
+                            {(product.validation ?? []).filter((warning) => skuEnabled || warning.code !== 'missing_sku').slice(0, 2).map((warning) => (
                                 <button
                                     key={`${product.id}-${warning.code}`}
                                     type="button"
@@ -829,6 +834,7 @@ function ProductMobileCard({
     onFilter,
     onPendingChange,
     onRegisterSave,
+    skuEnabled,
 }: {
     product: ProductRow;
     categories: CategoryOption[];
@@ -837,6 +843,7 @@ function ProductMobileCard({
     onFilter: (next: { quick?: string; issue?: string; missing?: string; estado?: string; includeDeleted?: boolean }) => void;
     onPendingChange: (productId: number, isPending: boolean) => void;
     onRegisterSave: (productId: number, save: (() => Promise<void>) | null) => void;
+    skuEnabled: boolean;
 }): JSX.Element {
     const initialForm = useMemo<InlineProductState>(() => ({
         category_id: product.category_id ? String(product.category_id) : '',
@@ -892,7 +899,7 @@ function ProductMobileCard({
         name: form.name,
         slug: product.slug,
         permalink: '',
-        sku: form.sku,
+        sku: skuEnabled ? form.sku : product.sku ?? '',
         short_description: product.short_description ?? '',
         description: product.description ?? '',
         price: Number(form.price || 0),
@@ -988,18 +995,20 @@ function ProductMobileCard({
                         }}
                         onKeyDown={handleInlineKeyDown}
                     />
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <input
-                            ref={skuInputRef}
-                            className={`${ui.input} min-h-10 min-w-0 rounded-xl px-3 py-2 text-sm`}
-                            placeholder="SKU"
-                            value={form.sku}
-                            onChange={(event) => {
-                                setForm((current) => ({ ...current, sku: event.target.value }));
-                                markDirty();
-                            }}
-                            onKeyDown={handleInlineKeyDown}
-                        />
+                    <div className={cn('grid grid-cols-1 gap-2', skuEnabled && 'sm:grid-cols-2')}>
+                        {skuEnabled ? (
+                            <input
+                                ref={skuInputRef}
+                                className={`${ui.input} min-h-10 min-w-0 rounded-xl px-3 py-2 text-sm`}
+                                placeholder="SKU"
+                                value={form.sku}
+                                onChange={(event) => {
+                                    setForm((current) => ({ ...current, sku: event.target.value }));
+                                    markDirty();
+                                }}
+                                onKeyDown={handleInlineKeyDown}
+                            />
+                        ) : null}
                         <CategoryCombobox
                             className={`${ui.input} min-h-10 min-w-0 rounded-xl px-3 py-2 text-sm`}
                             value={form.category_id}
@@ -1013,7 +1022,7 @@ function ProductMobileCard({
                     </div>
                     {(product.validation ?? []).length > 0 ? (
                         <div className="flex flex-wrap gap-1.5">
-                            {(product.validation ?? []).map((warning) => (
+                            {(product.validation ?? []).filter((warning) => skuEnabled || warning.code !== 'missing_sku').map((warning) => (
                                 <button
                                     key={`${product.id}-${warning.code}`}
                                     type="button"
@@ -1187,6 +1196,7 @@ export default function ProductsPage({
     },
     config = {
         autosaveDefault: false,
+        skuEnabled: true,
     },
 }: ProductsPageProps): JSX.Element {
     const safeFilters = Array.isArray(filters) ? {} : (filters ?? {});
@@ -1195,6 +1205,7 @@ export default function ProductsPage({
         [categories],
     );
     const savedFiltersRef = useRef<SavedProductFilters | null>(readSavedProductFilters());
+    const skuEnabled = config.skuEnabled !== false;
     const hasIncomingFilters = Boolean(
         safeFilters.q ||
             safeFilters.category_id ||
@@ -1214,9 +1225,9 @@ export default function ProductsPage({
     const [categoryId, setCategoryId] = useState(safeFilters.category_id ? String(safeFilters.category_id) : savedFilters?.categoryId ?? '');
     const [estado, setEstado] = useState(safeFilters.estado ?? savedFilters?.estado ?? '');
     const [includeDeleted, setIncludeDeleted] = useState(Boolean(safeFilters.include_deleted ?? savedFilters?.includeDeleted ?? false));
-    const [missing, setMissing] = useState(safeFilters.missing ?? savedFilters?.missing ?? '');
+    const [missing, setMissing] = useState(skuEnabled ? safeFilters.missing ?? savedFilters?.missing ?? '' : '');
     const [quick, setQuick] = useState(safeFilters.quick ?? savedFilters?.quick ?? '');
-    const [issue, setIssue] = useState(safeFilters.issue ?? savedFilters?.issue ?? '');
+    const [issue, setIssue] = useState(skuEnabled ? safeFilters.issue ?? savedFilters?.issue ?? '' : '');
     const [sort, setSort] = useState(safeFilters.sort ?? savedFilters?.sort ?? 'created_at');
     const [order, setOrder] = useState(safeFilters.order ?? savedFilters?.order ?? 'desc');
     const [openPanel, setOpenPanel] = useState<'quick' | 'alerts' | 'bulk' | null>(null);
@@ -1288,7 +1299,7 @@ export default function ProductsPage({
             parts.push(estado === '1' ? 'Activos' : 'Inactivos');
         }
 
-        if (missing !== '') {
+        if (missing !== '' && (skuEnabled || missing !== 'sku')) {
             parts.push(missing === 'images' ? 'Sin imagen' : missing === 'sku' ? 'Sin SKU' : missing);
         }
 
@@ -1296,7 +1307,7 @@ export default function ProductsPage({
             parts.push(quickFilterLabels[quick] ?? quick);
         }
 
-        if (issue !== '') {
+        if (issue !== '' && (skuEnabled || issue !== 'missing_sku')) {
             parts.push(summaryLabels[issue] ?? issue);
         }
 
@@ -1309,7 +1320,7 @@ export default function ProductsPage({
         }
 
         return parts;
-    }, [categoryId, estado, includeDeleted, issue, missing, order, quick, search, sort, sortedCategories]);
+    }, [categoryId, estado, includeDeleted, issue, missing, order, quick, search, skuEnabled, sort, sortedCategories]);
     const hasActiveFilters = activeFilterSummary.length > 0;
 
     useEffect(() => {
@@ -1344,8 +1355,8 @@ export default function ProductsPage({
         }
 
         const nextQuick = next.quick ?? '';
-        const nextIssue = next.issue ?? '';
-        const nextMissing = next.missing ?? '';
+        const nextIssue = !skuEnabled && next.issue === 'missing_sku' ? '' : next.issue ?? '';
+        const nextMissing = !skuEnabled && next.missing === 'sku' ? '' : next.missing ?? '';
         const nextEstado = next.estado ?? '';
         const nextIncludeDeleted = next.includeDeleted ?? false;
 
@@ -1581,9 +1592,11 @@ export default function ProductsPage({
                     <Link href={route('admin.products.missing_images', { missing: 'images' })} className={buttonClass('soft')}>
                         Revisar imagenes
                     </Link>
-                    <Link href={route('admin.products.missing_sku', { missing: 'sku' })} className={buttonClass('soft')}>
-                        Revisar SKU
-                    </Link>
+                    {skuEnabled ? (
+                        <Link href={route('admin.products.missing_sku', { missing: 'sku' })} className={buttonClass('soft')}>
+                            Revisar SKU
+                        </Link>
+                    ) : null}
                 </div>
             </section>
 
@@ -1651,7 +1664,9 @@ export default function ProductsPage({
                                 </option>
                             ))}
                         </select>
-                        <input className={ui.input} placeholder="SKU" value={quickCreateForm.data.sku} onChange={(event) => quickCreateForm.setData('sku', event.target.value)} />
+                        {skuEnabled ? (
+                            <input className={ui.input} placeholder="SKU" value={quickCreateForm.data.sku} onChange={(event) => quickCreateForm.setData('sku', event.target.value)} />
+                        ) : null}
                         <input className={ui.input} placeholder="Precio" type="number" value={quickCreateForm.data.price} onChange={(event) => quickCreateForm.setData('price', event.target.value)} />
                         <input className={ui.input} placeholder="Imagen principal" value={quickCreateForm.data.image_url} onChange={(event) => quickCreateForm.setData('image_url', event.target.value)} />
                         <label className={ui.checkboxLine}>
@@ -1676,7 +1691,7 @@ export default function ProductsPage({
                 onToggle={() => setOpenPanel(openPanel === 'alerts' ? null : 'alerts')}
             >
                 <div className={ui.validationGrid}>
-                    {Object.entries(validationSummary ?? {}).map(([key, value]) => (
+                    {Object.entries(validationSummary ?? {}).filter(([key]) => skuEnabled || key !== 'missing_sku').map(([key, value]) => (
                         <button
                             key={key}
                             type="button"
@@ -1787,7 +1802,7 @@ export default function ProductsPage({
                             <div className="relative">
                                 <input
                                     className={`${ui.input} pr-20`}
-                                    placeholder="Buscar por nombre o SKU"
+                                    placeholder={skuEnabled ? 'Buscar por nombre o SKU' : 'Buscar por nombre'}
                                     value={search}
                                     onChange={(event) => setSearch(event.target.value)}
                                 />
@@ -1829,7 +1844,7 @@ export default function ProductsPage({
                             <select className={ui.input} value={missing} onChange={(event) => setMissing(event.target.value)}>
                                 <option value="">Faltantes</option>
                                 <option value="images">Sin imagen</option>
-                                <option value="sku">Sin SKU</option>
+                                {skuEnabled ? <option value="sku">Sin SKU</option> : null}
                             </select>
                             <label className={`${ui.checkboxLine} min-h-[2.5rem] justify-center px-3`}>
                                 <input type="checkbox" checked={includeDeleted} onChange={(event) => setIncludeDeleted(event.target.checked)} />
@@ -1888,6 +1903,7 @@ export default function ProductsPage({
                             onFilter={applyQuickFilter}
                             onPendingChange={updatePendingProduct}
                             onRegisterSave={registerPendingSave}
+                            skuEnabled={skuEnabled}
                             onToggleSelection={() =>
                                 setSelectedIds((current) => (current.includes(product.id) ? current.filter((item) => item !== product.id) : [...current, product.id]))
                             }
@@ -1961,6 +1977,7 @@ export default function ProductsPage({
                                     onFilter={applyQuickFilter}
                                     onPendingChange={updatePendingProduct}
                                     onRegisterSave={registerPendingSave}
+                                    skuEnabled={skuEnabled}
                                     onToggleSelection={() =>
                                         setSelectedIds((current) => (current.includes(product.id) ? current.filter((item) => item !== product.id) : [...current, product.id]))
                                     }
