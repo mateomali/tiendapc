@@ -24,3 +24,13 @@ powershell -ExecutionPolicy Bypass -File tools\start-local-server.ps1 -WithVite
 ```
 
 Use the bundled PHP first, preferably `C:\tiendapc\.tools\php-8.3.31\php.exe`, because the global PATH PHP may be `8.0.30` while this Laravel project requires PHP `^8.3`.
+
+# Hostinger bundle
+
+When the user asks to create a safe Hostinger bundle, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\create-safe-hostinger-bundle.ps1
+```
+
+This must generate a ZIP ready to extract directly inside Hostinger `public_html`, with `laravel_app` also inside `public_html` and protected by `.htaccess`. Do not use the split `public_html` + sibling `laravel_app` mode unless the user explicitly asks for that structure.

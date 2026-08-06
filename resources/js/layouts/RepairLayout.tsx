@@ -102,7 +102,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                             <Link href={route('repairs.workbench')} className="mr-auto inline-flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1 text-[0.8rem] font-bold text-white no-underline transition hover:text-[#dbeafe] xl:mr-3 xl:min-h-9 xl:px-2 xl:text-[0.95rem]">
                                 <FaTools className="shrink-0" aria-hidden="true" />
                                 <span className="truncate xl:hidden">{title}</span>
-                                <span className="hidden xl:inline">Gestion de Ordenes</span>
+                                <span className="hidden xl:inline">Gestión de Órdenes</span>
                             </Link>
                             <div className="xl:hidden">
                                 {auth.user ? (
@@ -122,7 +122,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                                         <span>Salir</span>
                                     </Link>
                                 ) : (
-                                    <Link href={route('repairs.workbench')} className={cn(navLinkClasses, 'bg-white/10')} aria-label="Acceso tecnico" title="Acceso tecnico">
+                                    <Link href={route('repairs.workbench')} className={cn(navLinkClasses, 'bg-white/10')} aria-label="Acceso técnico" title="Acceso técnico">
                                         <FaExternalLinkAlt aria-hidden="true" />
                                         <span>Acceso</span>
                                     </Link>
@@ -209,7 +209,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                         ) : (
                             <Link href={route('repairs.workbench')} className={cn(navLinkClasses, 'ml-auto !hidden xl:!inline-flex')}>
                                 <FaExternalLinkAlt aria-hidden="true" />
-                                <span>Acceso tecnico</span>
+                                <span>Acceso técnico</span>
                             </Link>
                         )}
                     </nav>

@@ -371,16 +371,6 @@ function SummaryFilterCard({
     active?: boolean;
     icon: JSX.Element;
 }): JSX.Element {
-    const iconTone = {
-        blue: 'from-[#2563eb] to-[#22d3ee]',
-        orange: 'from-[#f97316] to-[#fb923c]',
-        purple: 'from-[#a78bfa] via-[#8b5cf6] to-[#6d28d9]',
-        green: 'from-[#22c55e] to-[#16a34a]',
-        red: 'from-[#ef4444] to-[#b91c1c]',
-        cyan: 'from-[#0ea5e9] to-[#0284c7]',
-        yellow: 'from-[#eab308] to-[#facc15]',
-        brown: 'from-[#d6b48c] to-[#a16207]',
-    }[tone];
     const trendTone = {
         blue: 'text-[#1d4ed8]',
         orange: 'text-[#d97706]',
@@ -407,18 +397,18 @@ function SummaryFilterCard({
             href={href}
             preserveScroll
             className={cn(
-                'flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border bg-[#f8fbff] px-3 py-2.5 text-left no-underline shadow-sm transition hover:border-[#2563eb]',
-                active ? 'border-[#2563eb] bg-[#dbeafe]' : 'border-[#b8d3f7]',
+                'grid min-h-[62px] min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 rounded-md border bg-white px-2.5 py-2 text-left no-underline transition hover:border-[#2563eb] hover:bg-[#f8fbff]',
+                active ? 'border-[#2563eb] bg-[#eff6ff] shadow-[inset_0_0_0_1px_rgba(37,99,235,0.18)]' : 'border-[#cbd5e1]',
             )}
         >
-            <div className="text-[0.78rem] font-semibold text-[#1d4ed8]">{label}</div>
-            <div className="flex items-center justify-between gap-2.5">
-                <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
-                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border text-[0.86rem]', iconShellTone, trendTone)}>
-                    {icon}
-                </div>
+            <div className="min-w-0">
+                <div className="truncate text-[0.72rem] font-bold text-[#475569]">{label}</div>
+                <div className="mt-0.5 text-[1.22rem] font-black leading-none text-[#0f172a]">{value}</div>
             </div>
-            <div className={cn('text-[0.82rem] font-semibold', trendTone)}>{trend}</div>
+            <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border text-[0.8rem]', iconShellTone, trendTone)}>
+                {icon}
+            </div>
+            <div className={cn('col-span-2 truncate text-[0.68rem] font-bold', trendTone)}>{trend}</div>
         </Link>
     );
 }
@@ -437,6 +427,43 @@ function FilterPill({ label, href, active }: { label: string; href: string; acti
         >
             {label}
         </Link>
+    );
+}
+
+function ConsultasEmptyState({
+    hasFilters,
+    isTaskQueueView,
+}: {
+    hasFilters: boolean;
+    isTaskQueueView: boolean;
+}): JSX.Element {
+    const title = isTaskQueueView ? 'No hay tareas activas en cola' : 'No hay reparaciones para mostrar';
+    const message = isTaskQueueView
+        ? 'La cola no tiene órdenes activas pendientes. Las tareas cerradas, entregadas o archivadas ya no se muestran en consultas.'
+        : hasFilters
+            ? 'No encontramos tickets con los filtros actuales. Probá limpiar filtros o buscar en entregados.'
+            : 'No hay tickets activos en consultas. Podés crear una nueva orden o revisar entregados.';
+
+    return (
+        <div className="grid justify-items-center gap-3 rounded-lg border border-[#cbd5e1] bg-white px-4 py-8 text-center shadow-sm">
+            <div className="grid gap-1">
+                <h3 className="text-base font-black text-[#0f172a]">{title}</h3>
+                <p className="max-w-xl text-sm font-semibold leading-6 text-[#475569]">{message}</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+                {hasFilters ? (
+                    <Link href={route('repairs.workbench')} preserveScroll className={buttonClass('soft', 'sm')}>
+                        Limpiar filtros
+                    </Link>
+                ) : null}
+                <Link href={route('repairs.ingress')} className={buttonClass('primary', 'sm')}>
+                    Nueva orden
+                </Link>
+                <Link href={route('repairs.delivered')} className={buttonClass('soft', 'sm')}>
+                    Ver entregados
+                </Link>
+            </div>
+        </div>
     );
 }
 
@@ -737,6 +764,7 @@ export default function WorkbenchPage({
         activeSearchFields.length !== defaultSearchFields.length ? 'search-fields' : '',
         ...columnFilterKeys.map((key) => filters[key]),
     ].filter((value) => value !== undefined && value !== '').length;
+    const hasActiveConsultasFilters = activeMobileFilters > 0;
     const columnFilterQuery = Object.fromEntries(columnFilterKeys.map((key) => [key, filters[key]])) as Record<(typeof columnFilterKeys)[number], string | undefined>;
     const searchFieldsQuery = activeSearchFields.length === defaultSearchFields.length
         ? undefined
@@ -815,7 +843,7 @@ export default function WorkbenchPage({
             applySingleGridFilter(key, value);
         }, 450);
     };
-    const gridFilterInputClass = 'h-7 w-full min-w-0 rounded-sm border border-[#cbd5e1] bg-white px-1.5 text-[0.68rem] font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb33]';
+    const gridFilterInputClass = 'h-8 w-full min-w-0 rounded-sm border border-[#cbd5e1] bg-white px-1.5 text-[0.72rem] font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb33]';
     const clearGridFilterHref = route(
         'repairs.workbench',
         filterQuery(Object.fromEntries(columnFilterKeys.map((key) => [key, undefined])) as Record<string, undefined>),
@@ -829,7 +857,7 @@ export default function WorkbenchPage({
     };
     const sortHeaderClass = (column: SortableRepairColumn): string =>
         cn(
-            'inline-flex items-center gap-1 text-left text-[0.62rem] font-bold text-[#475569] no-underline hover:text-[#1d4ed8]',
+            'inline-flex items-center gap-1 text-left text-[0.62rem] font-black uppercase text-[#475569] no-underline hover:text-[#1d4ed8]',
             (filters.ordenar_por ?? 'ticket') === column && 'text-[#1d4ed8]',
         );
     const sortIndicator = (column: SortableRepairColumn): string => {
@@ -964,7 +992,7 @@ export default function WorkbenchPage({
 
         if (suggestions.length === 0) {
             return typedModel.length >= 2 && !hasExactDeviceModel(index)
-                ? <span className="text-xs font-semibold text-[#64748b]">Se guardara como nuevo modelo.</span>
+                ? <span className="text-xs font-semibold text-[#64748b]">Se guardará como nuevo modelo.</span>
                 : null;
         }
 
@@ -1400,9 +1428,9 @@ export default function WorkbenchPage({
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
-            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#1d4ed8] bg-[#174ea6] p-2 text-white shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:hidden">
+            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.10)] xl:hidden">
                 <form
-                    className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
+                    className="grid grid-cols-[minmax(0,1fr)_42px_42px] gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
                         submitCleanSearch(true);
@@ -1410,14 +1438,14 @@ export default function WorkbenchPage({
                 >
                     <input
                         className="min-h-10 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        placeholder="Buscar en columnas activas"
+                        placeholder="Buscar orden"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
                     <button type="submit" className="grid min-h-10 place-items-center rounded-md bg-[#2563eb] text-white" aria-label="Buscar">
                         <FaSearch aria-hidden="true" />
                     </button>
-                    <button type="button" className="relative grid min-h-10 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
+                    <button type="button" className="relative grid min-h-10 min-w-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
                         <FaFilter aria-hidden="true" />
                         {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-md bg-[#ef4444] px-1 text-[0.65rem] font-bold text-white">{activeMobileFilters}</span> : null}
                     </button>
@@ -1488,14 +1516,17 @@ export default function WorkbenchPage({
                         Hoy {summary.today}
                     </Link>
                 </div>
+                <div className="rounded-md border border-[#dbeafe] bg-[#f8fbff] px-2 py-1 text-[0.72rem] font-black text-[#334155]">
+                    Activas {summary.active} · Tareas {summary.tasks} · Entregadas {summary.delivered}
+                </div>
             </section>
             ) : null}
 
             {isConsultas ? (
-            <section className="hidden rounded-lg border border-[#1d4ed8] bg-[#174ea6] px-3 py-2 text-white shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:block">
+            <section className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-[#0f172a] shadow-sm xl:block">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-semibold text-[#dbeafe]">Periodo</span>
+                        <span className="mr-1 text-[0.78rem] font-black text-[#174ea6]">Período</span>
                         {periodOptions.map((option) => (
                             <FilterPill
                                 key={option.value}
@@ -1513,7 +1544,7 @@ export default function WorkbenchPage({
                         ))}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-semibold text-[#dbeafe]">Categorias</span>
+                        <span className="mr-1 text-[0.78rem] font-black text-[#174ea6]">Categorías</span>
                         {categoryOptions.map((option) => (
                             <FilterPill
                                 key={option.value || 'all'}
@@ -1606,17 +1637,17 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <form
-                className="hidden rounded-lg border border-[#1d4ed8] bg-[#174ea6] px-3 py-3 shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:block"
+                className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 shadow-sm xl:block"
                 onSubmit={(event) => {
                     event.preventDefault();
                     submitCleanSearch();
                 }}
             >
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative min-w-[360px] flex-[0_1_50%]">
+                    <div className="relative min-w-[360px] flex-[0_1_48%]">
                     <input
                         className="min-h-10 w-full rounded-md border border-[#cbd5e1] bg-white py-2 pl-3 pr-10 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        placeholder="Buscar en columnas activas"
+                        placeholder="Buscar por ID, cliente, DNI, contacto o modelo"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
@@ -1649,6 +1680,11 @@ export default function WorkbenchPage({
                                 </button>
                             );
                         })}
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 text-[0.72rem] font-black text-[#64748b]">
+                        <span>{visibleRepairs} reparaciones</span>
+                        <span className="h-4 w-px bg-[#cbd5e1]" aria-hidden="true" />
+                        <span>{tickets.length} tickets</span>
                     </div>
                 </div>
             </form>
@@ -1702,7 +1738,7 @@ export default function WorkbenchPage({
 
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
-                                    Categoria
+                                    Categoría
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.categoria_filter} onChange={(event) => filtersForm.setData('categoria_filter', event.target.value)}>
                                         {categoryOptions.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
                                     </select>
@@ -1743,7 +1779,7 @@ export default function WorkbenchPage({
                                     </select>
                                 </label>
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
-                                    Direccion
+                                    Dirección
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.direccion} onChange={(event) => filtersForm.setData('direccion', event.target.value)}>
                                         <option value="desc">DESCENDENTE</option>
                                         <option value="asc">ASCENDENTE</option>
@@ -1861,7 +1897,7 @@ export default function WorkbenchPage({
 
                                     <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
                                         <div className={fieldPanelPurple}>
-                                            <label className={repairLabelClass}>Categoria<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
+                                            <label className={repairLabelClass}>Categoría<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
                                         </div>
                                         {isPhoneCategory(job.categorias_reparacion) ? (
                                             <div className={guidedPanelClass(fieldPanelPurple, `job-${index}-brand`)}>
@@ -2278,19 +2314,19 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <section className="grid gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[0.92rem] font-semibold text-[#475569]">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-[0.84rem] font-bold text-[#475569] xl:hidden">
                     <span>Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}.</span>
-                    <span>Consulta técnica</span>
+                    <span className="hidden sm:inline">Consulta técnica</span>
                 </div>
                 <div className="hidden w-full overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
                     <div className="w-full min-w-0">
                         <form onSubmit={(event) => { event.preventDefault(); submitGridFilters(); }}>
-                            <div className={cn('grid w-full items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#eef4fb] [&>*]:min-w-0 [&>*]:px-1.5 [&>*]:py-1.5', repairDesktopTableGridClass)}>
-                                <label className="grid gap-1">
+                            <div className={cn('sticky top-0 z-10 grid w-full items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#f1f5f9] shadow-[0_1px_0_rgba(15,23,42,0.04)] [&>*]:min-w-0 [&>*]:px-1.5 [&>*]:py-1.5', repairDesktopTableGridClass)}>
+                                <label className="sticky left-0 z-20 grid gap-1 bg-[#f1f5f9] shadow-[1px_0_0_#cbd5e1]">
                                     <Link href={sortHeaderHref('ticket')} preserveScroll className={cn(sortHeaderClass('ticket'), 'justify-center')}>ID {sortIndicator('ticket')}</Link>
                                     <input className={cn(gridFilterInputClass, 'text-center')} inputMode="numeric" placeholder="ID" value={filtersForm.data.filter_id} onChange={(event) => setSingleGridFilter('filter_id', event.target.value)} />
                                 </label>
-                                <label className="grid gap-1">
+                                <label className="sticky left-[6.8rem] z-20 grid gap-1 bg-[#f1f5f9] shadow-[1px_0_0_#cbd5e1]">
                                     <Link href={sortHeaderHref('cliente')} preserveScroll className={sortHeaderClass('cliente')}>Cliente {sortIndicator('cliente')}</Link>
                                     <input className={gridFilterInputClass} placeholder="Cliente" value={filtersForm.data.filter_cliente} onChange={(event) => setSingleGridFilter('filter_cliente', event.target.value)} />
                                 </label>
@@ -2364,12 +2400,14 @@ export default function WorkbenchPage({
                                             </div>
                                         </div>
                                         {taskTickets.completed.length > 0 ? renderDesktopTaskTickets(taskTickets.completed) : (
-                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">Todavia no hay tareas listas o canceladas.</div>
+                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">Todavía no hay tareas listas o canceladas.</div>
                                         )}
                                     </>
                                 ) : renderDesktopDateGroups(ticketDateGroups)
                             ) : (
-                                <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets activos para los filtros actuales.</div>
+                                <div className="p-3">
+                                    <ConsultasEmptyState hasFilters={hasActiveConsultasFilters} isTaskQueueView={isTaskQueueView} />
+                                </div>
                             )}
                             {isConsultas && deliveredSearchTickets.length > 0 ? (
                                 <>
@@ -2406,12 +2444,12 @@ export default function WorkbenchPage({
                             </div>
                             <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2">
                                 {taskTickets.completed.length > 0 ? renderMobileTaskTickets(taskTickets.completed) : (
-                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">Todavia no hay tareas listas o canceladas.</div>
+                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">Todavía no hay tareas listas o canceladas.</div>
                                 )}
                             </section>
                         </>
                     ) : renderMobileDateGroups(ticketDateGroups)}
-                    {tickets.length === 0 ? <div className="rounded-lg border border-[#cbd5e1] bg-white p-6 text-center font-semibold text-[#475569] shadow-sm">No hay tickets activos para los filtros actuales.</div> : null}
+                    {tickets.length === 0 ? <ConsultasEmptyState hasFilters={hasActiveConsultasFilters} isTaskQueueView={isTaskQueueView} /> : null}
                     {isConsultas && deliveredSearchTickets.length > 0 ? (
                         <>
                             <div className="bg-[#f1f5f9] py-3">

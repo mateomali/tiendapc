@@ -9,6 +9,7 @@ import {
     FaChevronDown,
     FaDollyFlatbed,
     FaEdit,
+    FaEllipsisH,
     FaImage,
     FaImages,
     FaInfoCircle,
@@ -46,7 +47,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_6rem_4.6rem_6rem_minmax(20.1rem,1.29fr)]';
+    'grid-cols-[6.8rem_7.6rem_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_6rem_4.6rem_6rem_minmax(12.4rem,0.82fr)]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -173,12 +174,53 @@ function repairStatusHeaderClass(status: string): string {
 function repairStatusBadgeClass(status: string): string {
     const normalized = normalizeStatus(status);
 
-    if (normalized === 'LISTA') return 'bg-[#198754] text-white';
-    if (normalized === 'CANCELADA') return 'bg-[#dc3545] text-white';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#6d28d9] text-white';
-    if (normalized === 'PENDIENTE') return 'bg-[#ffc107] text-[#111827]';
+    if (normalized === 'LISTA') return 'rounded-full border border-[#86efac] bg-[#dcfce7] text-[#166534]';
+    if (normalized === 'CANCELADA') return 'rounded-full border border-[#fecdd3] bg-[#fff1f2] text-[#be123c]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'rounded-full border border-[#c4b5fd] bg-[#f5f3ff] text-[#5b21b6]';
+    if (normalized === 'PENDIENTE') return 'rounded-full border border-[#fde68a] bg-[#fef3c7] text-[#92400e]';
 
-    return 'bg-[#6c757d] text-white';
+    return 'rounded-full border border-[#cbd5e1] bg-[#f1f5f9] text-[#475569]';
+}
+
+function repairStatusDotClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'bg-[#16a34a]';
+    if (normalized === 'CANCELADA') return 'bg-[#dc2626]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#7c3aed]';
+    if (normalized === 'PENDIENTE') return 'bg-[#f59e0b]';
+
+    return 'bg-[#64748b]';
+}
+
+function repairStatusRailClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'border-l-[#16a34a]';
+    if (normalized === 'CANCELADA') return 'border-l-[#dc2626]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-[#7c3aed]';
+    if (normalized === 'PENDIENTE') return 'border-l-[#f59e0b]';
+
+    return 'border-l-[#64748b]';
+}
+
+function repairStatusRailFillClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'before:bg-[#16a34a]';
+    if (normalized === 'CANCELADA') return 'before:bg-[#dc2626]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'before:bg-[#7c3aed]';
+    if (normalized === 'PENDIENTE') return 'before:bg-[#f59e0b]';
+
+    return 'before:bg-[#64748b]';
+}
+
+function compactStatusLabel(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'REPARACIÓN';
+
+    return compactStatus(status);
 }
 
 function repairStatusSelectClass(status: string): string {
@@ -206,9 +248,9 @@ function repairStatusTextClass(status: string): string {
 function desktopGroupedRepairClass(index: number): string {
     const tones = [
         'border-l-[#1d4ed8] bg-white',
-        'border-l-[#7c3aed] bg-[#fbfaff]',
-        'border-l-[#0f766e] bg-[#f8fffd]',
-        'border-l-[#b45309] bg-[#fffdf8]',
+        'border-l-[#2563eb] bg-[#f8fbff]',
+        'border-l-[#2563eb] bg-white',
+        'border-l-[#2563eb] bg-[#f8fbff]',
     ];
 
     return tones[index % tones.length];
@@ -251,7 +293,7 @@ function SeniaBadge({ label }: { label: string | null }): JSX.Element | null {
     if (!label) return null;
 
     return (
-        <span className="inline-flex w-fit items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[0.65rem] font-black text-amber-900">
+        <span className="inline-flex w-fit items-center rounded-full border border-orange-300 bg-orange-50 px-2 py-0.5 text-[0.65rem] font-black text-orange-900">
             {label}
         </span>
     );
@@ -670,7 +712,7 @@ function FieldSummary({
 function PaymentStatus({ monto, senia }: { monto: number; senia: number }): JSX.Element {
     if (monto <= 0 && senia <= 0) {
         return (
-            <span className="inline-flex w-fit items-center rounded-md border border-amber-200 bg-amber-100 px-2.5 py-1 text-[0.68rem] font-bold text-amber-900">
+            <span className="inline-flex w-fit items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[0.68rem] font-bold text-sky-800">
                 COTIZAR
             </span>
         );
@@ -678,7 +720,7 @@ function PaymentStatus({ monto, senia }: { monto: number; senia: number }): JSX.
 
     if (monto > 0 && senia >= monto) {
         return (
-            <span className="inline-flex w-fit items-center rounded-md border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-bold text-emerald-800">
+            <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-bold text-emerald-800">
                 PAGADO
             </span>
         );
@@ -1284,6 +1326,7 @@ function RepairEditCard({
     });
     const [editOpen, setEditOpen] = useState(false);
     const [infoOpen, setInfoOpen] = useState(false);
+    const [quickOpen, setQuickOpen] = useState(false);
     const [inlineOpen, setInlineOpen] = useState(false);
     const [deliveryOpen, setDeliveryOpen] = useState(false);
     const [deliveryVia, setDeliveryVia] = useState<DeliveryVia>('dni');
@@ -1507,6 +1550,10 @@ function RepairEditCard({
         }
     };
 
+    const openQuickView = (): void => {
+        setQuickOpen(true);
+    };
+
     const openDeliveryModal = (): void => {
         form.setData('fecha_entregado', form.data.fecha_entregado || todayInputValue());
         setDeliveryOpen(true);
@@ -1702,7 +1749,7 @@ function RepairEditCard({
                 <>
                     <FaImage className="absolute text-slate-400" aria-hidden="true" />
                     <img src={firstImage.thumbnailUrl || firstImage.url} alt={firstImage.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
-                    {galleryImages.length > 1 ? <span className="absolute right-1 top-1 rounded-md bg-slate-950/75 px-1.5 py-0.5 text-[0.68rem] font-bold text-white">+{galleryImages.length - 1}</span> : null}
+                    {galleryImages.length > 1 ? <span className="absolute right-1 top-1 rounded-full bg-slate-950/75 px-1.5 py-0.5 text-[0.68rem] font-bold text-white">+{galleryImages.length - 1}</span> : null}
                 </>
             ) : (
                 <FaImage aria-hidden="true" />
@@ -1715,10 +1762,119 @@ function RepairEditCard({
         const base = mobile
             ? 'grid h-9 w-9 place-items-center rounded-md text-[0.78rem] no-underline'
             : 'grid h-7 w-7 place-items-center rounded-md text-[0.72rem] no-underline shadow-sm transition hover:brightness-95';
+        const menuItem = 'flex min-h-8 items-center gap-2 rounded-md border border-[#cbd5e1] bg-white px-2.5 py-1.5 text-left text-[0.72rem] font-black text-[#334155] no-underline transition hover:bg-[#f8fafc]';
         const groupClass = mobile
             ? 'flex items-center gap-1.5'
             : 'flex items-center gap-1 border-l border-[#cbd5e1] pl-1.5 first:border-l-0 first:pl-0';
         const showWorkflowActions = (!readOnly && canAddToTasks && Boolean(repair.actions?.addToTasks)) || canMarkReady || canDeliver;
+        const hasSecondaryDesktopActions = !mobile && (
+            showGeneralTicketActions
+            || showOrderActions
+            || canCancel
+            || Boolean(repair.actions?.archive && !repair.archivado_at)
+            || Boolean(repair.actions?.delete)
+        );
+
+        if (!mobile) {
+            return (
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                    {showWorkflowActions ? (
+                        <span className={groupClass}>
+                            {!readOnly && canAddToTasks && repair.actions?.addToTasks ? (
+                                <button
+                                    type="button"
+                                    className={cn(base, 'relative border border-[#d6b48c] bg-[#d6b48c] text-[#3f2a16]')}
+                                    onClick={addToTasks}
+                                    title={repair.taskQueuePosition ? `Quitar de tareas: posicion ${repair.taskQueuePosition}` : 'Agregar a tareas'}
+                                >
+                                    <FaClipboardCheck aria-hidden="true" />
+                                    {repair.taskQueuePosition ? (
+                                        <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full border border-white bg-[#3f2a16] px-1 text-[0.58rem] font-black leading-none text-white">
+                                            {repair.taskQueuePosition}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            ) : null}
+                            {canMarkReady ? (
+                                <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
+                                    <FaCheckCircle aria-hidden="true" />
+                                </button>
+                            ) : null}
+                            {canDeliver ? (
+                                <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
+                                    <FaDollyFlatbed aria-hidden="true" />
+                                </button>
+                            ) : null}
+                        </span>
+                    ) : null}
+                    <span className={groupClass}>
+                        {showGeneralTicketActions ? (
+                            <button
+                                type="button"
+                                className={cn(base, hasInfo ? 'border border-[#0f766e] bg-[#0f766e] text-white' : 'border border-[#cbd5e1] bg-white text-[#334155]')}
+                                onClick={() => setInfoOpen(true)}
+                                title={hasInfo ? 'Info cargada' : 'Agregar info'}
+                            >
+                                <FaInfoCircle aria-hidden="true" />
+                            </button>
+                        ) : null}
+                        <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
+                            <FaEdit aria-hidden="true" />
+                        </button>
+                        {showOrderActions ? (
+                            <>
+                                <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparación">
+                                    <FaPlus aria-hidden="true" />
+                                </button>
+                                <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
+                                    <FaReceipt aria-hidden="true" />
+                                </Link>
+                                {ticket.whatsappUrl ? (
+                                    <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')} title="WhatsApp">
+                                        <FaWhatsapp aria-hidden="true" />
+                                    </a>
+                                ) : (
+                                    <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
+                                        <FaWhatsapp aria-hidden="true" />
+                                    </span>
+                                )}
+                            </>
+                        ) : null}
+                    </span>
+                    {hasSecondaryDesktopActions ? (
+                        <details className="relative">
+                            <summary className={cn(base, 'cursor-pointer list-none border border-[#cbd5e1] bg-white text-[#334155] [&::-webkit-details-marker]:hidden')} title="Mas acciones">
+                                <FaEllipsisH aria-hidden="true" />
+                            </summary>
+                            <div className="absolute right-0 top-8 z-40 grid w-[11.5rem] gap-1 rounded-md border border-[#cbd5e1] bg-white p-1.5 shadow-lg">
+                                {showOrderActions ? (
+                                    <>
+                                        <a href={ticket.trackingUrl} className={menuItem}>
+                                            <FaArrowRight aria-hidden="true" /> Seguimiento
+                                        </a>
+                                    </>
+                                ) : null}
+                                {canCancel ? (
+                                    <button type="button" className={cn(menuItem, 'border-[#fed7aa] bg-[#fff7ed] text-[#92400e]')} onClick={cancelRepair}>
+                                        <FaTimes aria-hidden="true" /> Cancelar
+                                    </button>
+                                ) : null}
+                                {!readOnly && repair.actions?.archive && !repair.archivado_at ? (
+                                    <button type="button" className={cn(menuItem, 'border-[#cbd5e1] bg-[#f8fafc] text-[#475569]')} onClick={() => router.post(repair.actions?.archive ?? '', {}, { preserveScroll: true })}>
+                                        <FaArchive aria-hidden="true" /> Archivar
+                                    </button>
+                                ) : null}
+                                {repair.actions?.delete ? (
+                                    <button type="button" className={cn(menuItem, 'border-[#fecdd3] bg-[#fff1f2] text-[#be123c]')} onClick={deleteRepair}>
+                                        <FaTrashAlt aria-hidden="true" /> Eliminar
+                                    </button>
+                                ) : null}
+                            </div>
+                        </details>
+                    ) : null}
+                </div>
+            );
+        }
 
         return (
             <div className={cn(mobile ? 'flex flex-wrap justify-end gap-1.5' : 'flex flex-wrap items-center justify-end gap-1')}>
@@ -1813,6 +1969,88 @@ function RepairEditCard({
 
     const modals = (
         <>
+            {quickOpen ? (
+                <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45" role="dialog" aria-modal="true">
+                    <button type="button" className="min-w-0 flex-1 cursor-default" aria-label="Cerrar vista rápida" onClick={() => setQuickOpen(false)} />
+                    <aside className="h-full w-full max-w-[520px] overflow-y-auto border-l border-[#cbd5e1] bg-white shadow-lg">
+                        <header className="sticky top-0 z-10 border-b border-[#cbd5e1] bg-white px-4 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-xs font-black uppercase text-[#2563eb]">Ticket #{repair.id} · Trabajo {repair.reparacion}</div>
+                                    <h3 className="mt-1 truncate text-xl font-black text-[#0f172a]">{repair.nombre_cliente}</h3>
+                                    <p className="text-sm font-bold text-[#475569]">{repairDisplayModel || 'Sin modelo'} · {displayStatus}</p>
+                                </div>
+                                <button type="button" className="grid h-9 w-9 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setQuickOpen(false)} title="Cerrar">
+                                    <FaTimes aria-hidden="true" />
+                                </button>
+                            </div>
+                        </header>
+                        <div className="grid gap-3 p-4 text-sm">
+                            <section className="grid grid-cols-2 gap-2">
+                                <FieldSummary label="DNI" value={<HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} />} />
+                                <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto || '-'} term={highlightTerm} />} />
+                                <FieldSummary label="Ingreso" value={<HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} />} />
+                                <FieldSummary label="Estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black text-[#92400e]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black text-[#be123c]">{overdueText}</span> : null}</>} />
+                                <FieldSummary label="Monto" value={formatCurrency(monto)} strong />
+                                <FieldSummary label="Seña" value={senia > 0 ? formatCurrency(senia) : '-'} />
+                            </section>
+                            <section className="grid gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] p-3">
+                                <div className="text-xs font-black uppercase text-[#475569]">Falla</div>
+                                <p className="whitespace-pre-wrap font-semibold text-[#0f172a]"><HighlightText value={displayDescription} term={highlightTerm} /></p>
+                            </section>
+                            {repair.repuesto ? (
+                                <section className="grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-3">
+                                    <div className="text-xs font-black uppercase text-[#92400e]">Repuesto</div>
+                                    <p className="whitespace-pre-wrap font-semibold text-[#7c2d12]"><HighlightText value={repair.repuesto} term={highlightTerm} /></p>
+                                </section>
+                            ) : null}
+                            {ticket.info ? (
+                                <section className="grid gap-2 rounded-md border border-[#99f6e4] bg-[#f0fdfa] p-3">
+                                    <div className="text-xs font-black uppercase text-[#0f766e]">Info interna</div>
+                                    <p className="whitespace-pre-wrap font-semibold text-[#134e4a]">{ticket.info}</p>
+                                </section>
+                            ) : null}
+                            {payments.length > 0 ? (
+                                <section className="grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-3">
+                                    <div className="text-xs font-black uppercase text-[#475569]">Movimientos</div>
+                                    {payments.slice(0, 5).map((payment) => (
+                                        <div key={payment.id} className="flex items-center justify-between gap-2 border-t border-[#e2e8f0] pt-2 first:border-t-0 first:pt-0">
+                                            <span className="font-bold text-[#334155]">{payment.payment_type} · {payment.method}</span>
+                                            <span className="font-black text-[#0f172a]">{formatCurrency(payment.amount)}</span>
+                                        </div>
+                                    ))}
+                                </section>
+                            ) : null}
+                            {galleryImages.length > 0 ? (
+                                <section className="grid gap-2">
+                                    <div className="text-xs font-black uppercase text-[#475569]">Imágenes</div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {galleryImages.slice(0, 6).map((image, imageIndex) => (
+                                            <button key={`${image.filename}-${imageIndex}`} type="button" className="aspect-square overflow-hidden rounded-md border border-[#cbd5e1] bg-[#f1f5f9]" onClick={() => setGalleryIndex(imageIndex)}>
+                                                <img src={image.thumbnailUrl || image.url} alt={image.filename} className="h-full w-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </section>
+                            ) : null}
+                            {!readOnly ? (
+                                <div className="sticky bottom-0 -mx-4 -mb-4 grid grid-cols-2 gap-2 border-t border-[#cbd5e1] bg-white p-4">
+                                    <button type="button" className={buttonClass('primary', 'sm')} onClick={() => { setQuickOpen(false); setEditOpen(true); }}>
+                                        Editar
+                                    </button>
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setQuickOpen(false); setInfoOpen(true); }}>
+                                        Info
+                                    </button>
+                                    {ticket.ticketUrl ? <Link href={ticket.ticketUrl} className={buttonClass('soft', 'sm')}>Ticket</Link> : null}
+                                    {ticket.trackingUrl ? <a href={ticket.trackingUrl} className={buttonClass('soft', 'sm')}>Seguimiento</a> : null}
+                                    {ticket.whatsappUrl ? <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={buttonClass('soft', 'sm')}>WhatsApp</a> : null}
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setQuickOpen(false); onAddRepair(); }}>Agregar reparación</button>
+                                </div>
+                            ) : null}
+                        </div>
+                    </aside>
+                </div>
+            ) : null}
             {infoOpen ? (
                 <ModalShell title={`Info interna orden #${ticket.id}`} onClose={() => setInfoOpen(false)}>
                     <form className="grid gap-3" onSubmit={submitInfo}>
@@ -2155,9 +2393,16 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
-                    <div className="grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 text-center">
-                        {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#<HighlightText value={repair.id} term={highlightTerm} /></strong> : <span className="text-slate-300">-</span>}
+                <div className={cn('group/repair-row grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] focus-within:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
+                    <div className="sticky left-0 z-[2] grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 bg-inherit text-center shadow-[1px_0_0_#cbd5e1]">
+                        {showDesktopTicketData ? (
+                            <button type="button" className="text-base font-black leading-none text-[#0f172a]" onClick={openQuickView}>#<HighlightText value={repair.id} term={highlightTerm} /></button>
+                        ) : (
+                            <button type="button" className="grid gap-0.5 text-left" onClick={openQuickView}>
+                                <span className="text-[0.58rem] font-black uppercase text-[#2563eb]">Trabajo</span>
+                                <span className="text-sm font-black text-[#0f172a]">{rowIndex + 1}/{rowTotal}</span>
+                            </button>
+                        )}
                         {showDesktopTicketData && rowTotal > 1 && onToggleDesktopGroup ? (
                             <button
                                 type="button"
@@ -2170,44 +2415,45 @@ function RepairEditCard({
                             </button>
                         ) : <span className="block h-6 w-[2.35rem]" aria-hidden="true" />}
                     </div>
-                    <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? <HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} /> : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? <HighlightText value={repair.contacto || '-'} term={highlightTerm} /> : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? <HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="sticky left-[6.8rem] z-[2] flex items-center bg-inherit text-left font-black uppercase text-[#0f172a] shadow-[1px_0_0_#cbd5e1]" onClick={openQuickView} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : <span className="text-[0.68rem] text-[#64748b]">Mismo ticket</span>}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView} title={repair.contacto || '-'}>{showDesktopTicketData ? <HighlightText value={repair.contacto || '-'} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} /> : ''}</button>
                     <div className="flex items-center justify-center"><Thumb large /></div>
                     <div className="grid content-center gap-1 text-left">
                         {rowTotal > 1 ? (
                             <div className="flex min-w-0 items-center gap-2">
-                                <button type="button" className="min-w-0 text-left text-[0.62rem] font-black text-[#2563eb]" onClick={openInlineEditor} title={desktopWorkLabel}>
+                                <button type="button" className="min-w-0 text-left text-[0.62rem] font-black text-[#2563eb]" onClick={openQuickView} title={desktopWorkLabel}>
                                     {desktopWorkLabel}
                                 </button>
                             </div>
                         ) : null}
-                        <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repairDisplayModel || '-'}>
+                        <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openQuickView} title={repairDisplayModel || '-'}>
                             <RepairModelLabel repair={repair} term={highlightTerm} />
                         </button>
                     </div>
-                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={displayDescription}>
+                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openQuickView} title={displayDescription}>
                         <span className="line-clamp-2"><HighlightText value={displayDescription} term={highlightTerm} /></span>
                     </button>
-                    <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
+                    <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openQuickView}>
                         <span className="whitespace-nowrap"><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} /></span>
-                        {isToday(repair.fecha_estimada) ? <span className="w-fit rounded bg-[#ffc107] px-1 text-[0.65rem] font-black leading-tight text-[#111827]">Hoy</span> : null}
-                        {overdueText ? <span className="w-fit rounded bg-[#dc3545] px-1 text-[0.65rem] font-black leading-tight text-white">{overdueText}</span> : null}
+                        {isToday(repair.fecha_estimada) ? <span className="w-fit rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black leading-tight text-[#92400e]">Hoy</span> : null}
+                        {overdueText ? <span className="w-fit rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black leading-tight text-[#be123c]">{overdueText}</span> : null}
                     </button>
-                    <button type="button" className="grid content-center gap-1 text-left font-black text-[#0f172a]" onClick={openInlineEditor}>
+                    <button type="button" className="grid content-center gap-1 text-left font-black text-[#0f172a]" onClick={openQuickView}>
                         <PaymentStatus monto={monto} senia={senia} />
                         <SeniaBadge label={seniaLabel} />
                     </button>
-                    <div className="flex items-center justify-center">
+                    <div className={cn('relative flex items-center justify-center pl-2 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full', repairStatusRailFillClass(repair.estado))}>
                         <button
                             type="button"
-                            className={cn('rounded-md px-2.5 py-1 text-[0.68rem] font-bold', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
+                            className={cn('inline-flex min-w-[5.8rem] items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[0.64rem] font-black uppercase leading-none', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
                             onClick={cycleDesktopStatus}
                             disabled={readOnly || !canCycleStatus || form.processing}
-                            title={!readOnly && canCycleStatus ? `Cambiar a ${compactStatus(nextStatus)}` : displayStatus}
+                            title={!readOnly && canCycleStatus ? `${displayStatus}. Cambiar a ${compactStatusLabel(nextStatus)}` : displayStatus}
                         >
-                            <HighlightText value={displayStatus} term={highlightTerm} />
+                            <span className={cn('h-2 w-2 rounded-full', repairStatusDotClass(repair.estado))} aria-hidden="true" />
+                            <HighlightText value={compactStatusLabel(displayStatus)} term={highlightTerm} />
                         </button>
                     </div>
                     <div className="flex items-center justify-end">
@@ -2260,15 +2506,15 @@ function RepairEditCard({
                             <div className="mb-1 flex items-center gap-1.5">
                                 <span className="text-[0.68rem] font-bold text-[#0f172a]">#{repair.id}</span>
                                 <span className="text-[0.68rem] font-bold text-[#64748b]">{rowIndex + 1}/{rowTotal}</span>
-                                <span className={cn('rounded-md border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
+                                <span className={cn('rounded-full border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
                             <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
                             <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>
-                                {isToday(repair.fecha_estimada) ? <span className="rounded-md bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
-                                {overdueText ? <span className="rounded-md bg-[#dc3545] px-1.5 py-0.5 text-white">{overdueText}</span> : null}
-                                <span className="rounded-md border border-[#cbd5e1] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
+                                {isToday(repair.fecha_estimada) ? <span className="rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 py-0.5 text-[#92400e]">Hoy</span> : null}
+                                {overdueText ? <span className="rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 py-0.5 text-[#be123c]">{overdueText}</span> : null}
+                                <span className="rounded-full border border-[#cbd5e1] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
                                     Saldo: <PaymentStatus monto={monto} senia={senia} />
                                 </span>
                                 <SeniaBadge label={seniaLabel} />
@@ -2300,7 +2546,7 @@ function RepairEditCard({
                         {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={<HighlightText value={repair.dni} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                         {repair.contacto ? <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
-                        <FieldSummary label="F. estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
+                        <FieldSummary label="F. estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black text-[#92400e]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black text-[#be123c]">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
                         <FieldSummary label="Estado" value={<HighlightText value={displayStatus} term={highlightTerm} />} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}

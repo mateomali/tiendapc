@@ -735,11 +735,11 @@ class RepairService
         $staleOrders = RepairOrder::query()
             ->where('entregado', 'no')
             ->whereNull('archivado_at')
-            ->whereDate('fecha', '<=', now()->subDays(45)->toDateString())
+            ->whereDate('fecha', '<=', now()->subDays(60)->toDateString())
             ->get();
 
         foreach ($staleOrders as $order) {
-            $this->archive($order, 'automatico_45_dias');
+            $this->archive($order, 'automatico_60_dias');
         }
 
         return $staleOrders->count();
@@ -1579,6 +1579,10 @@ class RepairService
 
         return RepairTaskItem::query()
             ->whereNull('completed_at')
+            ->whereHas('repairOrder', fn ($query) => $query
+                ->whereNull('archivado_at')
+                ->where('entregado', 'no')
+                ->whereNotIn('estado', ['LISTA', 'CANCELADA']))
             ->oldest('task_date')
             ->oldest('created_at')
             ->oldest('id')
