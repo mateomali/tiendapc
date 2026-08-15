@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\RepairEvent;
+use App\Models\RepairAnnotation;
 use App\Models\RepairDeviceModel;
 use App\Models\RepairOrder;
 use App\Models\RepairPayment;
@@ -41,6 +42,40 @@ it('shows delivered repairs in the dedicated technical view', function (): void 
             ->has('tickets', 1));
 });
 
+it('prefills a new repair order from a delivered search result', function (): void {
+    RepairOrder::query()->create([
+        'id' => 502,
+        'reparacion' => 1,
+        'fecha' => now()->subDays(10)->toDateString(),
+        'nombre_cliente' => 'Maria Perez',
+        'dni' => 27888999,
+        'contacto' => '1155667788',
+        'modelo' => 'Moto E',
+        'descripcion' => 'Cambio de bateria',
+        'estado' => 'ENTREGADA',
+        'entregado' => 'si',
+        'fecha_entregado' => now()->subDay()->toDateString(),
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => 'Maria']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('deliveredSearchTickets', 1)
+            ->where('deliveredSearchTickets.0.newOrderUrl', route('repairs.ingress', ['from_order' => 502])));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.ingress', ['from_order' => 502]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('pageMode', 'ingreso')
+            ->where('initialCreateClient.nombre_cliente', 'Maria Perez')
+            ->where('initialCreateClient.dni', 27888999)
+            ->where('initialCreateClient.contacto', '1155667788'));
+});
+
 it('finds active repairs by ticket id from consultations search', function (): void {
     RepairOrder::query()->create([
         'id' => 1906,
@@ -64,6 +99,29 @@ it('finds active repairs by ticket id from consultations search', function (): v
             ->where('tickets.0.repairs.0.modelo', 'Joystick PS4'));
 });
 
+it('finds active repairs by model from consultations search', function (): void {
+    RepairOrder::query()->create([
+        'id' => 1907,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Lautaro',
+        'dni' => 12345678,
+        'modelo' => 'Moto Edge 40',
+        'descripcion' => 'No enciende',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => 'Edge 40', 'q_fields' => ['modelo']]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 1)
+            ->where('tickets.0.id', 1907)
+            ->where('tickets.0.repairs.0.modelo', 'Moto Edge 40'));
+});
+
 it('creates multi-job repair orders and redirects to the technical ticket', function (): void {
     $response = $this->withSession(['repair_tech_authenticated' => true])
         ->post(route('repairs.orders.store'), [
@@ -74,6 +132,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
                 [
                     'marca' => 'MOTOROLA',
                     'modelo' => 'Moto G54',
+                    'color' => 'Azul',
                     'tipo_servicio' => 'modulo',
                     'descripcion' => '',
                     'observaciones' => 'Pantalla partida',
@@ -113,6 +172,8 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
         ]);
     expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('marca')->all())
         ->toBe(['MOTOROLA', 'MOTOROLA']);
+    expect(RepairOrder::query()->where('id', $orderId)->orderBy('reparacion')->pluck('color')->all())
+        ->toBe(['Azul', null]);
     expect(RepairDeviceModel::query()->where('model', 'MOTO G54')->value('usage_count'))->toBe(2);
 
     $this->withSession(['repair_tech_authenticated' => true])
@@ -222,7 +283,7 @@ it('stores successive repair payments as history and updates paid total', functi
     $this->withSession(['repair_tech_authenticated' => true])
         ->post(route('repairs.orders.payments.store', $order), [
             'amount' => 15000,
-            'payment_type' => 'pago',
+            'payment_type' => 'senia',
             'paid_at' => '2026-05-31',
         ])
         ->assertRedirect();
@@ -238,6 +299,146 @@ it('stores successive repair payments as history and updates paid total', functi
 
     expect(RepairPayment::query()->where('orden_id', 801)->where('reparacion', 1)->count())->toBe(1);
     expect((float) $order->fresh()?->senia)->toBe(15000.0);
+});
+
+it('stores repair increments as ticket additions without counting them as payments', function (): void {
+    SiteGlobalConfig::putValue('repair_cash_discount_enabled', '1');
+    SiteGlobalConfig::putValue('repair_cash_discount_threshold', '25000');
+    SiteGlobalConfig::putValue('repair_cash_discount_percentage', '15');
+    SiteGlobalConfig::putValue('repair_cash_discount_note', 'Precio efectivo configurado para reparaciones.');
+
+    $order = RepairOrder::query()->create([
+        'id' => 802,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Incremento',
+        'dni' => 33444222,
+        'modelo' => 'Moto E32',
+        'descripcion' => 'Cambio de modulo',
+        'monto' => 35000,
+        'senia' => 10000,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.payments.store', $order), [
+            'amount' => 5000,
+            'payment_type' => 'incremento',
+            'notes' => 'Pin de carga',
+            'paid_at' => '2026-06-21',
+        ])
+        ->assertRedirect();
+
+    $order->refresh();
+    expect((float) $order->monto)->toBe(40000.0);
+    expect((float) $order->senia)->toBe(10000.0);
+
+    $increment = RepairPayment::query()
+        ->where('orden_id', 802)
+        ->where('reparacion', 1)
+        ->where('payment_type', 'incremento')
+        ->firstOrFail();
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.tickets.show', ['orderId' => 802]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/TicketPage')
+            ->where('summary.totalMonto', 40000)
+            ->where('summary.totalSenia', 10000)
+            ->where('summary.saldo', 30000)
+            ->where('ticketPricing.cashDiscountEnabled', true)
+            ->where('ticketPricing.cashDiscountThreshold', 25000)
+            ->where('ticketPricing.cashDiscountPercentage', 15)
+            ->where('ticketPricing.cashDiscountNote', 'Precio efectivo configurado para reparaciones.')
+            ->where('ticket.totalMonto', 40000)
+            ->where('ticket.totalSenia', 10000)
+            ->where('ticket.repairs.0.monto', '40000.00')
+            ->where('ticket.repairs.0.senia', '10000.00')
+            ->where('ticket.repairs.0.payments.0.payment_type', 'incremento')
+            ->where('ticket.repairs.0.payments.0.notes', 'Pin de carga')
+            ->where('ticket.repairs.0.payments.0.amount', '5000.00'));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.payments.delete', [$order, $increment]))
+        ->assertRedirect();
+
+    $order->refresh();
+    expect((float) $order->monto)->toBe(35000.0);
+    expect((float) $order->senia)->toBe(10000.0);
+});
+
+it('renders daily repair log without intake events', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 803,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Log',
+        'dni' => 33444333,
+        'modelo' => 'Moto G52',
+        'descripcion' => 'Cambio de pantalla',
+        'monto' => 45000,
+        'senia' => 10000,
+        'estado' => 'LISTA',
+        'entregado' => 'no',
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'CREADA',
+        'estado_anterior' => null,
+        'estado_nuevo' => 'PENDIENTE',
+        'created_at' => now()->setTime(8, 0),
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'ACTUALIZADA',
+        'estado_anterior' => 'PENDIENTE',
+        'estado_nuevo' => 'LISTA',
+        'created_at' => now()->setTime(9, 30),
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'ENTREGADA',
+        'estado_anterior' => 'LISTA',
+        'estado_nuevo' => 'ENTREGADA',
+        'created_at' => now()->setTime(10, 15),
+    ]);
+
+    RepairEvent::query()->create([
+        'orden_id' => $order->id,
+        'reparacion' => 1,
+        'usuario' => 'panel',
+        'evento' => 'CANCELADA',
+        'estado_anterior' => 'PENDIENTE',
+        'estado_nuevo' => 'CANCELADA',
+        'created_at' => now()->subDay()->setTime(11, 0),
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.log'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/LogPage')
+            ->where('date', now()->toDateString())
+            ->where('summary.total', 2)
+            ->where('summary.delivered', 1)
+            ->where('summary.cancelled', 0)
+            ->where('summary.updated', 1)
+            ->has('events', 2)
+            ->where('events.0.event', 'ENTREGADA')
+            ->where('events.0.customerName', 'Cliente Log')
+            ->where('events.0.model', 'Moto G52')
+            ->where('events.1.event', 'ACTUALIZADA'));
 });
 
 it('generates a verifier token for tickets without dni and uses it for public tracking', function (): void {
@@ -661,6 +862,8 @@ it('stores internal info notes for the whole repair order', function (): void {
 
     expect($first->fresh()?->info)->toBe('Avisar antes de cambiar pin.')
         ->and($second->fresh()?->info)->toBe('Avisar antes de cambiar pin.');
+    expect(RepairAnnotation::query()->where('source', 'order_info')->where('repair_order_id', 930)->value('body'))
+        ->toBe('Avisar antes de cambiar pin.');
 
     $this->withSession(['repair_tech_authenticated' => true])
         ->get(route('repairs.workbench', ['q' => '930']))
@@ -668,6 +871,48 @@ it('stores internal info notes for the whole repair order', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/WorkbenchPage')
             ->where('tickets.0.info', 'Avisar antes de cambiar pin.'));
+});
+
+it('manages repair annotations as a dated log', function (): void {
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.annotations'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/AnnotationsPage')
+            ->has('annotations', 0));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.annotations.store'), [
+            'body' => 'Llego proveedor con repuestos.',
+        ])
+        ->assertRedirect();
+
+    $annotation = RepairAnnotation::query()->firstOrFail();
+
+    expect($annotation->body)->toBe('Llego proveedor con repuestos.')
+        ->and($annotation->source)->toBe('manual');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.annotations.update', $annotation), [
+            'body' => 'Llego proveedor con repuestos y facturas.',
+        ])
+        ->assertRedirect();
+
+    expect($annotation->fresh()?->body)->toBe('Llego proveedor con repuestos y facturas.');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.annotations'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/AnnotationsPage')
+            ->has('annotations', 1)
+            ->where('annotations.0.body', 'Llego proveedor con repuestos y facturas.'));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.annotations.delete', $annotation))
+        ->assertRedirect();
+
+    expect(RepairAnnotation::query()->count())->toBe(0);
 });
 
 it('reads internal order info from any job in the ticket', function (): void {

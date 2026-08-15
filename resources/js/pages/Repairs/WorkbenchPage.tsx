@@ -1,6 +1,7 @@
 import { Link, router, useForm } from '@inertiajs/react';
-import { useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
@@ -63,8 +64,10 @@ interface WorkbenchPageProps {
         filter_estimada?: string;
         filter_saldo?: string;
         filter_estado?: string;
+        q_fields?: string[];
     };
     tickets: RepairTicketView[];
+    deliveredSearchTickets: RepairTicketView[];
     summary: {
         active: number;
         delivered: number;
@@ -88,22 +91,31 @@ interface WorkbenchPageProps {
     deviceModels: DeviceModelOption[];
     nextOrderId: number;
     pageMode?: 'consultas' | 'ingreso';
+    initialCreateClient?: {
+        nombre_cliente: string;
+        dni: number | string;
+        contacto?: string | null;
+    } | null;
 }
 
 interface RepairJobFormData {
     marca: string;
     modelo: string;
+    color: string;
     tipo_servicio: string;
     descripcion: string;
     observaciones: string;
     monto: string;
     senia: string;
+    senia_method: string;
     fecha_estimada: string;
     estado: string;
     repuesto: string;
     pedir_repuesto: boolean;
     inventory_part_id: string;
     categorias_reparacion: string;
+    unlock_type: string;
+    unlock_value: string;
     images: File[] | null;
 }
 
@@ -123,22 +135,44 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
     return {
         marca: '',
         modelo: '',
+        color: '',
         tipo_servicio: '',
         descripcion: '',
         observaciones: 'sin observaciones',
         monto: '0',
         senia: '0',
+        senia_method: 'efectivo',
         fecha_estimada: today,
         estado: defaultState,
         repuesto: '',
         pedir_repuesto: false,
         inventory_part_id: '',
         categorias_reparacion: '4',
+        unlock_type: '',
+        unlock_value: '',
         images: null,
     };
 }
 
 const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
+const repairColorOptions = [
+    { value: '', label: 'Sin color', hex: '#f8fafc' },
+    { value: 'NEGRO', label: 'Negro', hex: '#111827' },
+    { value: 'BLANCO', label: 'Blanco', hex: '#ffffff' },
+    { value: 'GRIS', label: 'Gris', hex: '#6b7280' },
+    { value: 'PLATA', label: 'Plata', hex: '#c0c0c0' },
+    { value: 'AZUL', label: 'Azul', hex: '#2563eb' },
+    { value: 'CELESTE', label: 'Celeste', hex: '#38bdf8' },
+    { value: 'ROJO', label: 'Rojo', hex: '#dc2626' },
+    { value: 'VERDE', label: 'Verde', hex: '#16a34a' },
+    { value: 'AMARILLO', label: 'Amarillo', hex: '#facc15' },
+    { value: 'DORADO', label: 'Dorado', hex: '#d97706' },
+    { value: 'ROSA', label: 'Rosa', hex: '#f472b6' },
+    { value: 'VIOLETA', label: 'Violeta', hex: '#7c3aed' },
+    { value: 'NARANJA', label: 'Naranja', hex: '#f97316' },
+    { value: 'MARRON', label: 'Marron', hex: '#7c2d12' },
+    { value: 'BEIGE', label: 'Beige', hex: '#d6b48c' },
+] as const;
 
 function normalizeDeviceSearch(value: string): string {
     return value
@@ -161,6 +195,127 @@ function removeBrandPrefix(value: string, brand: string): string {
     return normalizedValue === normalizedBrand
         ? ''
         : normalizedValue.replace(new RegExp(`^${normalizedBrand}\\s+`), '').trim();
+}
+
+function repairColorLabel(color?: string | null): string {
+    const normalized = normalizeDeviceSearch(color ?? '');
+    const option = repairColorOptions.find((item) => item.value === normalized);
+
+    return option?.label ?? (color ?? '');
+}
+
+function repairColorHex(color?: string | null): string {
+    const normalized = normalizeDeviceSearch(color ?? '');
+    const option = repairColorOptions.find((item) => item.value === normalized);
+
+    return option?.hex ?? '#94a3b8';
+}
+
+function RepairColorCombobox({
+    className,
+    value,
+    onChange,
+}: {
+    className: string;
+    value: string;
+    onChange: (value: string) => void;
+}): JSX.Element {
+    const [open, setOpen] = useState(false);
+    const [showAllColors, setShowAllColors] = useState(false);
+    const [query, setQuery] = useState(repairColorLabel(value));
+    const normalizedQuery = normalizeDeviceSearch(query);
+    const filteredOptions = showAllColors || normalizedQuery === ''
+        ? repairColorOptions
+        : repairColorOptions.filter((option) => normalizeDeviceSearch(option.label).includes(normalizedQuery) || option.value.includes(normalizedQuery));
+
+    const selectColor = (nextValue: string): void => {
+        onChange(nextValue);
+        setQuery(repairColorLabel(nextValue));
+        setShowAllColors(false);
+        setOpen(false);
+    };
+
+    return (
+        <div className="relative">
+            <span
+                className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]"
+                style={{ backgroundColor: normalizeDeviceSearch(value) === '' ? '#f8fafc' : repairColorHex(value) }}
+                aria-hidden="true"
+            />
+            <input
+                className={cn(className, 'pl-9 pr-9')}
+                value={open ? query : repairColorLabel(value)}
+                placeholder="Color"
+                onFocus={() => {
+                    setQuery(repairColorLabel(value));
+                    setShowAllColors(false);
+                }}
+                onChange={(event) => {
+                    setQuery(event.target.value);
+                    setShowAllColors(false);
+                    setOpen(true);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' && filteredOptions[0]) {
+                        event.preventDefault();
+                        selectColor(filteredOptions[0].value);
+                    }
+                    if (event.key === 'Escape') {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        setQuery(repairColorLabel(value));
+                    }
+                }}
+                onBlur={() => {
+                    window.setTimeout(() => {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        setQuery(repairColorLabel(value));
+                    }, 120);
+                }}
+            />
+            <button
+                type="button"
+                className="absolute right-2 top-1/2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[#475569] hover:bg-[#e2e8f0]"
+                aria-label="Mostrar colores"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                    if (open && showAllColors) {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        return;
+                    }
+
+                    setQuery(repairColorLabel(value));
+                    setShowAllColors(true);
+                    setOpen(true);
+                }}
+            >
+                <FaChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+            </button>
+            {open ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto rounded-md border border-[#cbd5e1] bg-white py-1 shadow-[0_8px_18px_rgba(15,23,42,0.14)]">
+                    {filteredOptions.length > 0 ? filteredOptions.map((option) => (
+                        <button
+                            key={option.value || 'empty'}
+                            type="button"
+                            className={cn(
+                                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-[#0f172a] hover:bg-[#eff6ff]',
+                                normalizeDeviceSearch(value) === option.value && 'bg-[#dbeafe]',
+                            )}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => selectColor(option.value)}
+                        >
+                            <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]" style={{ backgroundColor: option.hex }} aria-hidden="true" />
+                            <span>{option.label}</span>
+                        </button>
+                    )) : (
+                        <div className="px-3 py-2 text-sm font-semibold text-[#64748b]">Sin coincidencias</div>
+                    )}
+                </div>
+            ) : null}
+        </div>
+    );
 }
 
 function SummaryCard({
@@ -216,16 +371,6 @@ function SummaryFilterCard({
     active?: boolean;
     icon: JSX.Element;
 }): JSX.Element {
-    const iconTone = {
-        blue: 'from-[#2563eb] to-[#22d3ee]',
-        orange: 'from-[#f97316] to-[#fb923c]',
-        purple: 'from-[#a78bfa] via-[#8b5cf6] to-[#6d28d9]',
-        green: 'from-[#22c55e] to-[#16a34a]',
-        red: 'from-[#ef4444] to-[#b91c1c]',
-        cyan: 'from-[#0ea5e9] to-[#0284c7]',
-        yellow: 'from-[#eab308] to-[#facc15]',
-        brown: 'from-[#d6b48c] to-[#a16207]',
-    }[tone];
     const trendTone = {
         blue: 'text-[#1d4ed8]',
         orange: 'text-[#d97706]',
@@ -252,18 +397,18 @@ function SummaryFilterCard({
             href={href}
             preserveScroll
             className={cn(
-                'flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border bg-[#f8fbff] px-3 py-2.5 text-left no-underline shadow-sm transition hover:border-[#2563eb]',
-                active ? 'border-[#2563eb] bg-[#dbeafe]' : 'border-[#b8d3f7]',
+                'grid min-h-[62px] min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 rounded-md border bg-white px-2.5 py-2 text-left no-underline transition hover:border-[#2563eb] hover:bg-[#f8fbff]',
+                active ? 'border-[#2563eb] bg-[#eff6ff] shadow-[inset_0_0_0_1px_rgba(37,99,235,0.18)]' : 'border-[#cbd5e1]',
             )}
         >
-            <div className="text-[0.78rem] font-semibold text-[#1d4ed8]">{label}</div>
-            <div className="flex items-center justify-between gap-2.5">
-                <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
-                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border text-[0.86rem]', iconShellTone, trendTone)}>
-                    {icon}
-                </div>
+            <div className="min-w-0">
+                <div className="truncate text-[0.72rem] font-bold text-[#475569]">{label}</div>
+                <div className="mt-0.5 text-[1.22rem] font-black leading-none text-[#0f172a]">{value}</div>
             </div>
-            <div className={cn('text-[0.82rem] font-semibold', trendTone)}>{trend}</div>
+            <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border text-[0.8rem]', iconShellTone, trendTone)}>
+                {icon}
+            </div>
+            <div className={cn('col-span-2 truncate text-[0.68rem] font-bold', trendTone)}>{trend}</div>
         </Link>
     );
 }
@@ -285,8 +430,47 @@ function FilterPill({ label, href, active }: { label: string; href: string; acti
     );
 }
 
-function cleanQuery(query: Record<string, string | number | undefined>): Record<string, string | number> {
-    return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined && value !== '')) as Record<string, string | number>;
+function ConsultasEmptyState({
+    hasFilters,
+    isTaskQueueView,
+}: {
+    hasFilters: boolean;
+    isTaskQueueView: boolean;
+}): JSX.Element {
+    const title = isTaskQueueView ? 'No hay tareas activas en cola' : 'No hay reparaciones para mostrar';
+    const message = isTaskQueueView
+        ? 'La cola no tiene órdenes activas pendientes. Las tareas cerradas, entregadas o archivadas ya no se muestran en consultas.'
+        : hasFilters
+            ? 'No encontramos tickets con los filtros actuales. Probá limpiar filtros o buscar en entregados.'
+            : 'No hay tickets activos en consultas. Podés crear una nueva orden o revisar entregados.';
+
+    return (
+        <div className="grid justify-items-center gap-3 rounded-lg border border-[#cbd5e1] bg-white px-4 py-8 text-center shadow-sm">
+            <div className="grid gap-1">
+                <h3 className="text-base font-black text-[#0f172a]">{title}</h3>
+                <p className="max-w-xl text-sm font-semibold leading-6 text-[#475569]">{message}</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-2">
+                {hasFilters ? (
+                    <Link href={route('repairs.workbench')} preserveScroll className={buttonClass('soft', 'sm')}>
+                        Limpiar filtros
+                    </Link>
+                ) : null}
+                <Link href={route('repairs.ingress')} className={buttonClass('primary', 'sm')}>
+                    Nueva orden
+                </Link>
+                <Link href={route('repairs.delivered')} className={buttonClass('soft', 'sm')}>
+                    Ver entregados
+                </Link>
+            </div>
+        </div>
+    );
+}
+
+type QueryValue = string | number | string[] | undefined;
+
+function cleanQuery(query: Record<string, QueryValue>): Record<string, string | number | string[]> {
+    return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined && value !== '' && (!Array.isArray(value) || value.length > 0))) as Record<string, string | number | string[]>;
 }
 
 const columnFilterKeys = [
@@ -302,6 +486,22 @@ const columnFilterKeys = [
     'filter_saldo',
     'filter_estado',
 ] as const;
+
+const searchFieldOptions = [
+    { key: 'id', label: 'ID' },
+    { key: 'cliente', label: 'Cliente' },
+    { key: 'dni', label: 'DNI' },
+    { key: 'contacto', label: 'Contacto' },
+    { key: 'modelo', label: 'Modelo' },
+    { key: 'ingreso', label: 'Fecha ingreso' },
+    { key: 'estimada', label: 'Estimada' },
+    { key: 'saldo', label: 'Saldo' },
+    { key: 'estado', label: 'Estado' },
+] as const;
+
+type SearchFieldKey = (typeof searchFieldOptions)[number]['key'];
+
+const defaultSearchFields = searchFieldOptions.map((option) => option.key);
 
 type SortableRepairColumn = 'ticket' | 'cliente' | 'dni' | 'contacto' | 'ingreso' | 'trabajo' | 'modelo' | 'falla' | 'estimada' | 'saldo' | 'estado';
 
@@ -412,9 +612,54 @@ function groupTicketsByEntryDate(tickets: RepairTicketView[]): TicketDateGroup[]
     return Array.from(groups.values());
 }
 
+function splitTaskTickets(tickets: RepairTicketView[]): { pending: RepairTicketView[]; completed: RepairTicketView[] } {
+    const pending: RepairTicketView[] = [];
+    const completed: RepairTicketView[] = [];
+
+    tickets.forEach((ticket) => {
+        const pendingRepairs = ticket.repairs.filter((repair) => !['LISTA', 'CANCELADA'].includes(repair.estado));
+        const completedRepairs = ticket.repairs.filter((repair) => ['LISTA', 'CANCELADA'].includes(repair.estado));
+
+        if (pendingRepairs.length > 0) {
+            pending.push({ ...ticket, repairs: pendingRepairs });
+        }
+
+        if (completedRepairs.length > 0) {
+            completed.push({ ...ticket, repairs: completedRepairs });
+        }
+    });
+
+    return { pending, completed };
+}
+
+function daysSinceDate(value?: string | null): number | null {
+    if (!value) return null;
+
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+
+    const delivered = new Date(year, month - 1, day);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const difference = today.getTime() - delivered.getTime();
+
+    return Math.max(0, Math.floor(difference / 86_400_000));
+}
+
+function deliveredStatusLabel(value?: string | null): string {
+    const days = daysSinceDate(value);
+
+    if (days === null) return 'Entregado';
+    if (days === 0) return 'Entregado hoy';
+    if (days === 1) return 'Entregado hace 1 dia';
+
+    return `Entregado hace ${days} dias`;
+}
+
 export default function WorkbenchPage({
     filters,
     tickets,
+    deliveredSearchTickets,
     summary,
     deliveredSearchMatches,
     states,
@@ -427,14 +672,16 @@ export default function WorkbenchPage({
     nextOrderId,
     pageMode = 'consultas',
     archivedSearchMatches,
+    initialCreateClient = null,
 }: WorkbenchPageProps): JSX.Element {
     const isConsultas = pageMode === 'consultas';
     const isIngreso = pageMode === 'ingreso';
+    const highlightTerm = (filters.q ?? '').trim();
     const filtersForm = useForm({
         q: filters.q ?? '',
         estado: filters.estado ?? '',
         prioridad: filters.prioridad ?? '',
-        summary_range: filters.summary_range ?? 'month',
+        summary_range: filters.summary_range ?? 'quarter',
         summary_from: filters.summary_from ?? '',
         summary_to: filters.summary_to ?? '',
         categoria_filter: filters.categoria_filter ?? '',
@@ -454,9 +701,9 @@ export default function WorkbenchPage({
     });
     const createForm = useForm<WorkbenchCreateFormData>({
         id_orden: String(nextOrderId),
-        nombre_cliente: '',
-        dni: '',
-        contacto: '',
+        nombre_cliente: initialCreateClient?.nombre_cliente ?? '',
+        dni: initialCreateClient ? String(initialCreateClient.dni ?? '') : '',
+        contacto: initialCreateClient?.contacto ?? '',
         jobs: [createEmptyJob(states[0] ?? 'PENDIENTE')],
     });
     const [lookupFeedback, setLookupFeedback] = useState<string>('');
@@ -466,8 +713,22 @@ export default function WorkbenchPage({
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
+    const [activeSearchFields, setActiveSearchFields] = useState<SearchFieldKey[]>(() => {
+        const incoming = filters.q_fields ?? defaultSearchFields;
+
+        return defaultSearchFields.filter((field) => incoming.includes(field));
+    });
+    const gridFilterSubmitTimeout = useRef<number | null>(null);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const ticketDateGroups = groupTicketsByEntryDate(tickets);
+    const isTaskQueueView = filters.prioridad === 'tareas';
+    const taskTickets = splitTaskTickets(tickets);
+
+    useEffect(() => () => {
+        if (gridFilterSubmitTimeout.current !== null) {
+            window.clearTimeout(gridFilterSubmitTimeout.current);
+        }
+    }, []);
 
     const toggleDesktopTicket = (ticketId: number): void => {
         setExpandedDesktopTickets((current) => ({
@@ -475,7 +736,7 @@ export default function WorkbenchPage({
             [ticketId]: !current[ticketId],
         }));
     };
-    const summaryRange = filters.summary_range ?? 'month';
+    const summaryRange = filters.summary_range ?? 'quarter';
     const categoryFilter = String(filters.categoria_filter ?? '');
     const periodOptions = [
         { label: 'Total', value: 'all' },
@@ -497,15 +758,21 @@ export default function WorkbenchPage({
         filters.estado,
         filters.prioridad,
         categoryFilter,
-        summaryRange !== 'month' ? summaryRange : '',
+        summaryRange !== 'quarter' ? summaryRange : '',
         filters.ordenar_por && filters.ordenar_por !== 'ticket' ? filters.ordenar_por : '',
         filters.direccion && filters.direccion !== 'desc' ? filters.direccion : '',
+        activeSearchFields.length !== defaultSearchFields.length ? 'search-fields' : '',
         ...columnFilterKeys.map((key) => filters[key]),
     ].filter((value) => value !== undefined && value !== '').length;
+    const hasActiveConsultasFilters = activeMobileFilters > 0;
     const columnFilterQuery = Object.fromEntries(columnFilterKeys.map((key) => [key, filters[key]])) as Record<(typeof columnFilterKeys)[number], string | undefined>;
-    const filterQuery = (overrides: Record<string, string | number | undefined> = {}): Record<string, string | number> =>
+    const searchFieldsQuery = activeSearchFields.length === defaultSearchFields.length
+        ? undefined
+        : (activeSearchFields.length === 0 ? ['__none'] : activeSearchFields);
+    const filterQuery = (overrides: Record<string, QueryValue> = {}): Record<string, string | number | string[]> =>
         cleanQuery({
             q: filters.q,
+            q_fields: filters.q ? searchFieldsQuery : undefined,
             estado: filters.estado,
             prioridad: filters.prioridad,
             summary_range: summaryRange,
@@ -523,7 +790,7 @@ export default function WorkbenchPage({
 
         router.get(
             route('repairs.workbench'),
-            query !== '' ? { q: query } : {},
+            query !== '' ? cleanQuery({ q: query, q_fields: searchFieldsQuery }) : {},
             { preserveScroll },
         );
     };
@@ -533,17 +800,50 @@ export default function WorkbenchPage({
             cleanQuery({
                 ...filtersForm.data,
                 q: filtersForm.data.q.trim(),
+                q_fields: filtersForm.data.q.trim() !== '' ? searchFieldsQuery : undefined,
             }),
             { preserveScroll: true },
         );
     };
-    const setSingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string): void => {
+    const toggleSearchField = (field: SearchFieldKey): void => {
+        setActiveSearchFields((current) => (
+            current.includes(field)
+                ? current.filter((item) => item !== field)
+                : defaultSearchFields.filter((item) => item === field || current.includes(item))
+        ));
+    };
+    const applySingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string): void => {
+        if (gridFilterSubmitTimeout.current !== null) {
+            window.clearTimeout(gridFilterSubmitTimeout.current);
+            gridFilterSubmitTimeout.current = null;
+        }
+
+        router.get(
+            route('repairs.workbench'),
+            filterQuery(Object.fromEntries(columnFilterKeys.map((filterKey) => [filterKey, filterKey === key ? value || undefined : undefined])) as Record<string, string | undefined>),
+            { preserveScroll: true },
+        );
+    };
+    const setSingleGridFilter = (key: (typeof columnFilterKeys)[number], value: string, apply: 'debounced' | 'immediate' = 'debounced'): void => {
         filtersForm.setData((current) => ({
             ...current,
             ...Object.fromEntries(columnFilterKeys.map((filterKey) => [filterKey, filterKey === key ? value : ''])),
         }));
+
+        if (apply === 'immediate') {
+            applySingleGridFilter(key, value);
+            return;
+        }
+
+        if (gridFilterSubmitTimeout.current !== null) {
+            window.clearTimeout(gridFilterSubmitTimeout.current);
+        }
+
+        gridFilterSubmitTimeout.current = window.setTimeout(() => {
+            applySingleGridFilter(key, value);
+        }, 450);
     };
-    const gridFilterInputClass = 'h-7 w-full min-w-0 rounded-sm border border-[#cbd5e1] bg-white px-1.5 text-[0.68rem] font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb33]';
+    const gridFilterInputClass = 'h-8 w-full min-w-0 rounded-sm border border-[#cbd5e1] bg-white px-1.5 text-[0.72rem] font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb33]';
     const clearGridFilterHref = route(
         'repairs.workbench',
         filterQuery(Object.fromEntries(columnFilterKeys.map((key) => [key, undefined])) as Record<string, undefined>),
@@ -557,7 +857,7 @@ export default function WorkbenchPage({
     };
     const sortHeaderClass = (column: SortableRepairColumn): string =>
         cn(
-            'inline-flex items-center gap-1 text-left text-[0.62rem] font-bold text-[#475569] no-underline hover:text-[#1d4ed8]',
+            'inline-flex items-center gap-1 text-left text-[0.62rem] font-black uppercase text-[#475569] no-underline hover:text-[#1d4ed8]',
             (filters.ordenar_por ?? 'ticket') === column && 'text-[#1d4ed8]',
         );
     const sortIndicator = (column: SortableRepairColumn): string => {
@@ -595,10 +895,14 @@ export default function WorkbenchPage({
     };
 
     const changeJobCategory = (index: number, value: string): void => {
+        const phoneCategory = isPhoneCategory(value);
+
         updateJob(index, (current) => ({
             ...current,
             categorias_reparacion: value,
-            marca: isPhoneCategory(value) ? current.marca : '',
+            marca: phoneCategory ? current.marca : '',
+            unlock_type: phoneCategory ? current.unlock_type : '',
+            unlock_value: phoneCategory ? current.unlock_value : '',
         }));
     };
 
@@ -688,7 +992,7 @@ export default function WorkbenchPage({
 
         if (suggestions.length === 0) {
             return typedModel.length >= 2 && !hasExactDeviceModel(index)
-                ? <span className="text-xs font-semibold text-[#64748b]">Se guardara como nuevo modelo.</span>
+                ? <span className="text-xs font-semibold text-[#64748b]">Se guardará como nuevo modelo.</span>
                 : null;
         }
 
@@ -800,7 +1104,18 @@ export default function WorkbenchPage({
     );
 
     const formatMoney = (value: number): string => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-    const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-semibold text-[#334155]';
+    const transferPriceLabel = (value: string): string => {
+        const amount = Number(value || 0);
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return 'Transferencia: sin monto';
+        }
+
+        return amount > 30000
+            ? `Transferencia: ${formatMoney(Math.round(amount * 1.1))}`
+            : 'Transferencia: mismo importe';
+    };
+    const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-semibold leading-tight text-[#334155]';
     const compactInputClass = ui.repairDenseInput;
     const guidedFieldClass = 'border-[#2563eb] bg-[#eff6ff] ring-1 ring-[#2563eb33]';
     const guidedLabelClass = 'rounded-md border border-[#2563eb] bg-[#eff6ff] p-2 ring-1 ring-[#2563eb33]';
@@ -989,12 +1304,133 @@ export default function WorkbenchPage({
         }
     };
 
+    const renderDesktopDateGroups = (groups: TicketDateGroup[]): JSX.Element[] =>
+        groups.flatMap((group) => [
+            <div key={`desktop-date-group-${group.key}`} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
+                <span>{group.label}</span>
+                <span className="text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'} - {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}</span>
+            </div>,
+            ...group.tickets.flatMap((ticket) => {
+                const expanded = expandedDesktopTickets[ticket.id] ?? false;
+                const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+                return desktopRepairs.map((repair, repairIndex) => (
+                    <RepairDesktopRow
+                        key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                        ticket={ticket}
+                        repair={repair}
+                        serviceCategories={serviceCategories}
+                        serviceTemplates={serviceTemplates}
+                        partInventory={partInventory}
+                        highlightTerm={highlightTerm}
+                        rowIndex={repairIndex}
+                        rowTotal={ticket.repairs.length}
+                        desktopGroupExpanded={expanded}
+                        onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
+                    />
+                ));
+            }),
+        ]);
+
+    const renderMobileDateGroups = (groups: TicketDateGroup[]): JSX.Element[] =>
+        groups.map((group) => (
+            <section key={`mobile-date-group-${group.key}`} className="grid gap-2">
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
+                    <span>{group.label}</span>
+                    <span className="text-xs text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'}</span>
+                </div>
+                {group.tickets.map((ticket) => (
+                    <RepairTicketPanel
+                        key={ticket.id}
+                        ticket={ticket}
+                        states={states}
+                        serviceCategories={serviceCategories}
+                        serviceTemplates={serviceTemplates}
+                        partInventory={partInventory}
+                        highlightTerm={highlightTerm}
+                        allowAddRepair
+                    />
+                ))}
+            </section>
+        ));
+
+    const renderDesktopTaskTickets = (taskTicketsList: RepairTicketView[]): JSX.Element[] =>
+        taskTicketsList.flatMap((ticket) => {
+            const expanded = expandedDesktopTickets[ticket.id] ?? true;
+            const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+            return desktopRepairs.map((repair, repairIndex) => (
+                <RepairDesktopRow
+                    key={`desktop-task-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                    ticket={ticket}
+                    repair={repair}
+                    serviceCategories={serviceCategories}
+                    serviceTemplates={serviceTemplates}
+                    partInventory={partInventory}
+                    highlightTerm={highlightTerm}
+                    rowIndex={repairIndex}
+                    rowTotal={ticket.repairs.length}
+                    desktopGroupExpanded={expanded}
+                    onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
+                />
+            ));
+        });
+
+    const renderMobileTaskTickets = (taskTicketsList: RepairTicketView[]): JSX.Element[] =>
+        taskTicketsList.map((ticket) => (
+            <RepairTicketPanel
+                key={`mobile-task-${ticket.id}`}
+                ticket={ticket}
+                states={states}
+                serviceCategories={serviceCategories}
+                serviceTemplates={serviceTemplates}
+                partInventory={partInventory}
+                highlightTerm={highlightTerm}
+                allowAddRepair
+            />
+        ));
+
+    const renderDesktopDeliveredSearchTickets = (): JSX.Element[] =>
+        deliveredSearchTickets.flatMap((ticket) => (
+            ticket.repairs.map((repair, repairIndex) => (
+                <RepairDesktopRow
+                    key={`desktop-delivered-search-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                    ticket={ticket}
+                    repair={repair}
+                    serviceCategories={serviceCategories}
+                    serviceTemplates={serviceTemplates}
+                    partInventory={partInventory}
+                    readOnly
+                    highlightTerm={highlightTerm}
+                    rowIndex={repairIndex}
+                    rowTotal={ticket.repairs.length}
+                    desktopGroupExpanded
+                    statusLabel={(item) => deliveredStatusLabel(item.fecha_entregado)}
+                />
+            ))
+        ));
+
+    const renderMobileDeliveredSearchTickets = (): JSX.Element[] =>
+        deliveredSearchTickets.map((ticket) => (
+            <RepairTicketPanel
+                key={`mobile-delivered-search-${ticket.id}`}
+                ticket={ticket}
+                states={states}
+                serviceCategories={serviceCategories}
+                serviceTemplates={serviceTemplates}
+                partInventory={partInventory}
+                readOnly
+                highlightTerm={highlightTerm}
+                statusLabel={(repair) => deliveredStatusLabel(repair.fecha_entregado)}
+            />
+        ));
+
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
-            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#1d4ed8] bg-[#174ea6] p-2 text-white shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:hidden">
+            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.10)] xl:hidden">
                 <form
-                    className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
+                    className="grid grid-cols-[minmax(0,1fr)_42px_42px] gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
                         submitCleanSearch(true);
@@ -1002,77 +1438,102 @@ export default function WorkbenchPage({
                 >
                     <input
                         className="min-h-10 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        placeholder="Buscar"
+                        placeholder="Buscar orden"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
                     <button type="submit" className="grid min-h-10 place-items-center rounded-md bg-[#2563eb] text-white" aria-label="Buscar">
                         <FaSearch aria-hidden="true" />
                     </button>
-                    <button type="button" className="relative grid min-h-10 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
+                    <button type="button" className="relative grid min-h-10 min-w-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
                         <FaFilter aria-hidden="true" />
                         {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-md bg-[#ef4444] px-1 text-[0.65rem] font-bold text-white">{activeMobileFilters}</span> : null}
                     </button>
                 </form>
+                <div className="flex flex-wrap gap-1.5">
+                    {searchFieldOptions.map((option) => {
+                        const active = activeSearchFields.includes(option.key);
+
+                        return (
+                            <button
+                                key={option.key}
+                                type="button"
+                                className={cn(
+                                    'min-h-8 rounded-md border px-2 text-[0.68rem] font-bold transition',
+                                    active
+                                        ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                                        : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
+                                )}
+                                onClick={() => toggleSearchField(option.key)}
+                                aria-pressed={active}
+                            >
+                                {option.label}
+                            </button>
+                        );
+                    })}
+                </div>
                 <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-bold text-[#334155]">
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: undefined }))}
+                        href={route('repairs.workbench')}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', !filters.estado && !filters.prioridad ? 'bg-white text-[#1d4ed8] ring-2 ring-[#bfdbfe]' : 'bg-[#eff6ff] text-[#334155]')}
                     >
                         Todas {summary.active}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'PENDIENTE', prioridad: undefined }))}
+                        href={route('repairs.workbench', { estado: 'PENDIENTE' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'PENDIENTE' ? 'bg-white text-[#d97706] ring-2 ring-[#fed7aa]' : 'bg-[#fff7ed] text-[#334155]')}
                     >
                         Pend. {summary.pending}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'LISTA', prioridad: undefined }))}
+                        href={route('repairs.workbench', { estado: 'LISTA' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'LISTA' ? 'bg-white text-[#15803d] ring-2 ring-[#bbf7d0]' : 'bg-[#ecfdf5] text-[#334155]')}
                     >
                         Listas {summary.ready}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'tareas', ordenar_por: undefined, direccion: undefined }))}
+                        href={route('repairs.workbench', { prioridad: 'tareas' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'tareas' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
                         Tareas {summary.tasks}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'vencidas' }))}
+                        href={route('repairs.workbench', { prioridad: 'vencidas' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
                     >
                         Venc. {summary.overdue}
                     </Link>
                     <Link
-                        href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'hoy' }))}
+                        href={route('repairs.workbench', { prioridad: 'hoy' })}
                         preserveScroll
                         className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'hoy' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
                         Hoy {summary.today}
                     </Link>
                 </div>
+                <div className="rounded-md border border-[#dbeafe] bg-[#f8fbff] px-2 py-1 text-[0.72rem] font-black text-[#334155]">
+                    Activas {summary.active} · Tareas {summary.tasks} · Entregadas {summary.delivered}
+                </div>
             </section>
             ) : null}
 
             {isConsultas ? (
-            <section className="hidden rounded-lg border border-[#1d4ed8] bg-[#174ea6] px-3 py-2 text-white shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:block">
+            <section className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 text-[#0f172a] shadow-sm xl:block">
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-semibold text-[#dbeafe]">Periodo</span>
+                        <span className="mr-1 text-[0.78rem] font-black text-[#174ea6]">Período</span>
                         {periodOptions.map((option) => (
                             <FilterPill
                                 key={option.value}
                                 label={option.label}
                                 href={route(
                                     'repairs.workbench',
-                                    filterQuery({
+                                    cleanQuery({
                                         summary_range: option.value,
                                         summary_from: option.value === 'custom' ? filters.summary_from : undefined,
                                         summary_to: option.value === 'custom' ? filters.summary_to : undefined,
@@ -1083,12 +1544,14 @@ export default function WorkbenchPage({
                         ))}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="mr-1 text-[0.78rem] font-semibold text-[#dbeafe]">Categorias</span>
+                        <span className="mr-1 text-[0.78rem] font-black text-[#174ea6]">Categorías</span>
                         {categoryOptions.map((option) => (
                             <FilterPill
                                 key={option.value || 'all'}
                                 label={option.label}
-                                href={route('repairs.workbench', filterQuery({ categoria_filter: option.value || undefined }))}
+                                href={option.value === ''
+                                    ? route('repairs.workbench')
+                                    : route('repairs.workbench', { categoria_filter: option.value })}
                                 active={categoryFilter === option.value}
                             />
                         ))}
@@ -1102,7 +1565,15 @@ export default function WorkbenchPage({
                     className="hidden gap-2 rounded-lg border border-[#b8d3f7] bg-[#f8fbff] p-3 shadow-sm md:grid-cols-[180px_180px_auto] md:items-end xl:grid"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        filtersForm.get(route('repairs.workbench'), { preserveScroll: true });
+                        router.get(
+                            route('repairs.workbench'),
+                            cleanQuery({
+                                ...filtersForm.data,
+                                q: filtersForm.data.q.trim(),
+                                q_fields: filtersForm.data.q.trim() !== '' ? searchFieldsQuery : undefined,
+                            }),
+                            { preserveScroll: true },
+                        );
                     }}
                 >
                     <input type="hidden" name="summary_range" value="custom" />
@@ -1132,18 +1603,10 @@ export default function WorkbenchPage({
                 </form>
             ) : null}
 
-            {isConsultas && deliveredSearchMatches > 0 ? (
-                <div className="rounded-lg border border-[#7dd3fc] bg-[#ecfeff] px-4 py-3 text-sm font-bold text-[#155e75] shadow-sm">
-                    Encontrado en entregados: {deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
-                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.delivered', { q: filters.q ?? '' })}>
-                        Ir a entregados.php
-                    </Link>
-                </div>
-            ) : null}
             {isConsultas && archivedSearchMatches > 0 ? (
                 <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-4 py-3 text-sm font-bold text-[#334155] shadow-sm">
                     Encontrado en archivados: {archivedSearchMatches} {archivedSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}.{' '}
-                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.archived', { q: filters.q ?? '' })}>
+                    <Link className="underline decoration-2 underline-offset-2" href={route('repairs.archived', cleanQuery({ q: filters.q ?? '', q_fields: filters.q ? searchFieldsQuery : undefined }))}>
                         Ir a archivados.php
                     </Link>
                 </div>
@@ -1151,14 +1614,14 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <section className="hidden grid-cols-2 gap-2 md:grid-cols-4 xl:grid xl:grid-cols-9">
-                <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: undefined }))} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
-                <SummaryFilterCard label="Tareas" value={summary.tasks} trend="Cola FIFO" tone="brown" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'tareas', ordenar_por: undefined, direccion: undefined }))} active={filters.prioridad === 'tareas'} icon={<FaClipboardCheck aria-hidden="true" />} />
-                <SummaryFilterCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'PENDIENTE', prioridad: undefined }))} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
-                <SummaryFilterCard label="En reparación" value={summary.inRepair} trend="Espera / repuesto" tone="purple" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'EN REPARACION / ESPERA REPUESTO', prioridad: undefined }))} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
-                <SummaryFilterCard label="Listas" value={summary.ready} trend="Para retirar" tone="green" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'LISTA', prioridad: undefined }))} active={filters.estado === 'LISTA'} icon={<FaCheckCircle aria-hidden="true" />} />
-                <SummaryFilterCard label="Vencidas" value={summary.overdue} trend="Prioridad alta" tone="red" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'vencidas' }))} active={filters.prioridad === 'vencidas'} icon={<FaHourglassEnd aria-hidden="true" />} />
-                <SummaryFilterCard label="Retiran hoy" value={summary.today} trend="Agendadas hoy" tone="yellow" href={route('repairs.workbench', filterQuery({ q: undefined, estado: undefined, prioridad: 'hoy' }))} active={filters.prioridad === 'hoy'} icon={<FaCalendarDay aria-hidden="true" />} />
-                <SummaryFilterCard label="Canceladas" value={summary.cancelled} trend="No continuadas" tone="red" href={route('repairs.workbench', filterQuery({ q: undefined, estado: 'CANCELADA', prioridad: undefined }))} active={filters.estado === 'CANCELADA'} icon={<FaBan aria-hidden="true" />} />
+                <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench')} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
+                <SummaryFilterCard label="Tareas" value={summary.tasks} trend="Cola FIFO" tone="brown" href={route('repairs.workbench', { prioridad: 'tareas' })} active={filters.prioridad === 'tareas'} icon={<FaClipboardCheck aria-hidden="true" />} />
+                <SummaryFilterCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" href={route('repairs.workbench', { estado: 'PENDIENTE' })} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
+                <SummaryFilterCard label="En reparación" value={summary.inRepair} trend="Espera / repuesto" tone="purple" href={route('repairs.workbench', { estado: 'EN REPARACION / ESPERA REPUESTO' })} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
+                <SummaryFilterCard label="Listas" value={summary.ready} trend="Para retirar" tone="green" href={route('repairs.workbench', { estado: 'LISTA' })} active={filters.estado === 'LISTA'} icon={<FaCheckCircle aria-hidden="true" />} />
+                <SummaryFilterCard label="Vencidas" value={summary.overdue} trend="Prioridad alta" tone="red" href={route('repairs.workbench', { prioridad: 'vencidas' })} active={filters.prioridad === 'vencidas'} icon={<FaHourglassEnd aria-hidden="true" />} />
+                <SummaryFilterCard label="Retiran hoy" value={summary.today} trend="Agendadas hoy" tone="yellow" href={route('repairs.workbench', { prioridad: 'hoy' })} active={filters.prioridad === 'hoy'} icon={<FaCalendarDay aria-hidden="true" />} />
+                <SummaryFilterCard label="Canceladas" value={summary.cancelled} trend="No continuadas" tone="red" href={route('repairs.workbench', { estado: 'CANCELADA' })} active={filters.estado === 'CANCELADA'} icon={<FaBan aria-hidden="true" />} />
                 <SummaryFilterCard label="Entregadas" value={summary.delivered} trend="Registradas" tone="cyan" href={route('repairs.delivered')} icon={<FaTruck aria-hidden="true" />} />
             </section>
             ) : null}
@@ -1174,17 +1637,17 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <form
-                className="hidden rounded-lg border border-[#1d4ed8] bg-[#174ea6] px-3 py-3 shadow-[0_6px_18px_rgba(15,61,145,0.18)] xl:block"
+                className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 shadow-sm xl:block"
                 onSubmit={(event) => {
                     event.preventDefault();
                     submitCleanSearch();
                 }}
             >
-                <div className="grid gap-2 md:grid-cols-[minmax(16rem,0.85fr)_200px_180px_160px_auto] md:items-center">
-                    <div className="relative min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-[360px] flex-[0_1_48%]">
                     <input
                         className="min-h-10 w-full rounded-md border border-[#cbd5e1] bg-white py-2 pl-3 pr-10 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        placeholder="Buscar por cliente, ticket, modelo, descripción, contacto o DNI"
+                        placeholder="Buscar por ID, cliente, DNI, contacto o modelo"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
@@ -1196,47 +1659,33 @@ export default function WorkbenchPage({
                             <FaSearch aria-hidden="true" />
                         </button>
                     </div>
-                    <select
-                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        value={filtersForm.data.estado}
-                        onChange={(event) => {
-                            filtersForm.setData('estado', event.target.value);
-                            filtersForm.setData('prioridad', '');
-                        }}
-                    >
-                        <option value="">Todos menos canceladas</option>
-                        {states.map((state) => (
-                            <option key={state} value={state}>
-                                {state}
-                            </option>
-                        ))}
-                    </select>
-                    <select
-                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        value={filtersForm.data.ordenar_por}
-                        onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}
-                        aria-label="Ordenar por"
-                    >
-                        <option value="ticket">Ordenar: ticket</option>
-                        <option value="ingreso">Ordenar: ingreso</option>
-                        <option value="estimada">Ordenar: estimada</option>
-                        <option value="cliente">Ordenar: cliente</option>
-                        <option value="modelo">Ordenar: modelo</option>
-                        <option value="estado">Ordenar: estado</option>
-                        <option value="saldo">Ordenar: saldo</option>
-                    </select>
-                    <select
-                        className="min-h-10 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        value={filtersForm.data.direccion}
-                        onChange={(event) => filtersForm.setData('direccion', event.target.value)}
-                        aria-label="Direccion del orden"
-                    >
-                        <option value="desc">DESCENDENTE</option>
-                        <option value="asc">ASCENDENTE</option>
-                    </select>
-                    <button className="min-h-10 rounded-md border border-[#2563eb] bg-[#2563eb] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#1d4ed8]" type="submit">
-                        Buscar
-                    </button>
+                    <div className="flex min-w-[420px] flex-1 flex-wrap items-center gap-1.5">
+                        {searchFieldOptions.map((option) => {
+                            const active = activeSearchFields.includes(option.key);
+
+                            return (
+                                <button
+                                    key={option.key}
+                                    type="button"
+                                    className={cn(
+                                        'min-h-8 rounded-md border px-2.5 text-[0.72rem] font-bold transition',
+                                        active
+                                            ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                                            : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
+                                    )}
+                                    onClick={() => toggleSearchField(option.key)}
+                                    aria-pressed={active}
+                                >
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 text-[0.72rem] font-black text-[#64748b]">
+                        <span>{visibleRepairs} reparaciones</span>
+                        <span className="h-4 w-px bg-[#cbd5e1]" aria-hidden="true" />
+                        <span>{tickets.length} tickets</span>
+                    </div>
                 </div>
             </form>
             ) : null}
@@ -1247,10 +1696,18 @@ export default function WorkbenchPage({
                         className="max-h-[86vh] w-full overflow-y-auto rounded-t-lg bg-white p-4 shadow-lg"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            filtersForm.get(route('repairs.workbench'), {
-                                preserveScroll: true,
-                                onFinish: () => setMobileFiltersOpen(false),
-                            });
+                            router.get(
+                                route('repairs.workbench'),
+                                cleanQuery({
+                                    ...filtersForm.data,
+                                    q: filtersForm.data.q.trim(),
+                                    q_fields: filtersForm.data.q.trim() !== '' ? searchFieldsQuery : undefined,
+                                }),
+                                {
+                                    preserveScroll: true,
+                                    onFinish: () => setMobileFiltersOpen(false),
+                                },
+                            );
                         }}
                     >
                         <div className="mb-3 flex items-center justify-between gap-3">
@@ -1281,7 +1738,7 @@ export default function WorkbenchPage({
 
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
-                                    Categoria
+                                    Categoría
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.categoria_filter} onChange={(event) => filtersForm.setData('categoria_filter', event.target.value)}>
                                         {categoryOptions.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
                                     </select>
@@ -1322,7 +1779,7 @@ export default function WorkbenchPage({
                                     </select>
                                 </label>
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
-                                    Direccion
+                                    Dirección
                                     <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.direccion} onChange={(event) => filtersForm.setData('direccion', event.target.value)}>
                                         <option value="desc">DESCENDENTE</option>
                                         <option value="asc">ASCENDENTE</option>
@@ -1336,6 +1793,7 @@ export default function WorkbenchPage({
                                     <option value="">Todas</option>
                                     <option value="con_senia">Con seña</option>
                                     <option value="sin_senia">Sin seña</option>
+                                    <option value="pagado">Pagado</option>
                                 </select>
                             </label>
                         </div>
@@ -1439,7 +1897,7 @@ export default function WorkbenchPage({
 
                                     <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
                                         <div className={fieldPanelPurple}>
-                                            <label className={repairLabelClass}>Categoria<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
+                                            <label className={repairLabelClass}>Categoría<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
                                         </div>
                                         {isPhoneCategory(job.categorias_reparacion) ? (
                                             <div className={guidedPanelClass(fieldPanelPurple, `job-${index}-brand`)}>
@@ -1456,9 +1914,29 @@ export default function WorkbenchPage({
                                                 </label>
                                             </div>
                                         ) : null}
+                                        {isPhoneCategory(job.categorias_reparacion) ? (
+                                            <div className={fieldPanelPurple}>
+                                                <label className={repairLabelClass}>
+                                                    Desbloqueo
+                                                    <PhoneUnlockFields
+                                                        unlockType={job.unlock_type}
+                                                        unlockValue={job.unlock_value}
+                                                        onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                                        selectClassName={compactInputClass}
+                                                        inputClassName={compactInputClass}
+                                                    />
+                                                </label>
+                                            </div>
+                                        ) : null}
                                         <div className={guidedPanelClass(fieldPanelBlue, `job-${index}-model`)}>
                                             <label className={repairLabelClass}>Modelo / equipo<input className={guidedInputClass(`job-${index}-model`)} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} /></label>
                                             {renderDeviceModelSuggestions(index)}
+                                        </div>
+                                        <div className={fieldPanelBlue}>
+                                            <label className={repairLabelClass}>
+                                                Color
+                                                <RepairColorCombobox className={compactInputClass} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
+                                            </label>
                                         </div>
                                         <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'md:col-span-2')}>
                                             <label className={repairLabelClass}>Tipo de servicio / descripcion de la falla *</label>
@@ -1474,10 +1952,13 @@ export default function WorkbenchPage({
                                             <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
                                         </div>
                                         <div className={guidedPanelClass(fieldPanelGreen, `job-${index}-amount`)}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Vacio queda en 0.</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(job.monto)}</span></label>
                                         </div>
-                                        <div className={fieldPanelGreen}>
+                                        <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
                                             <label className={repairLabelClass}>Seña ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
+                                        </div>
+                                        <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
+                                            <label className={repairLabelClass}>Medio de seña<select className={compactInputClass} value={job.senia_method} onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
                                         </div>
                                         <div className={guidedPanelClass(fieldPanelAmber, `job-${index}-date`)}>
                                             <label className={repairLabelClass}>Fecha estimada<input className={guidedInputClass(`job-${index}-date`)} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
@@ -1709,12 +2190,22 @@ export default function WorkbenchPage({
                                                 ))}
                                             </select>
                                         ) : null}
+                                        {isPhoneCategory(job.categorias_reparacion) ? (
+                                            <PhoneUnlockFields
+                                                unlockType={job.unlock_type}
+                                                unlockValue={job.unlock_value}
+                                                onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                                selectClassName={ui.input}
+                                                inputClassName={ui.input}
+                                            />
+                                        ) : null}
                                         <input
                                             className={ui.input}
                                             placeholder="Modelo"
                                             value={job.modelo}
                                             onChange={(event) => changeJobModel(index, event.target.value)}
                                         />
+                                        <RepairColorCombobox className={ui.input} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
                                         {renderDeviceModelSuggestions(index)}
                                         <textarea
                                             className={`${ui.textarea} ${ui.repairFull}`}
@@ -1736,6 +2227,9 @@ export default function WorkbenchPage({
                                             onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))}
                                         />
+                                        <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-[#475569]">
+                                            {transferPriceLabel(job.monto)}
+                                        </div>
                                         <input
                                             className={ui.input}
                                             placeholder="Seña"
@@ -1744,6 +2238,14 @@ export default function WorkbenchPage({
                                             onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))}
                                         />
+                                        <select
+                                            className={ui.input}
+                                            value={job.senia_method}
+                                            onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}
+                                        >
+                                            <option value="efectivo">Seña en efectivo</option>
+                                            <option value="transferencia">Seña por transferencia</option>
+                                        </select>
                                         <input
                                             className={ui.input}
                                             type="date"
@@ -1812,19 +2314,19 @@ export default function WorkbenchPage({
 
             {isConsultas ? (
             <section className="grid gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-[0.92rem] font-semibold text-[#475569]">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-[0.84rem] font-bold text-[#475569] xl:hidden">
                     <span>Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}.</span>
-                    <span>Consulta técnica</span>
+                    <span className="hidden sm:inline">Consulta técnica</span>
                 </div>
                 <div className="hidden w-full overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
                     <div className="w-full min-w-0">
                         <form onSubmit={(event) => { event.preventDefault(); submitGridFilters(); }}>
-                            <div className={cn('grid w-full items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#eef4fb] [&>*]:min-w-0 [&>*]:px-1.5 [&>*]:py-1.5', repairDesktopTableGridClass)}>
-                                <label className="grid gap-1">
+                            <div className={cn('sticky top-0 z-10 grid w-full items-stretch divide-x divide-[#cbd5e1] border-b border-[#cbd5e1] bg-[#f1f5f9] shadow-[0_1px_0_rgba(15,23,42,0.04)] [&>*]:min-w-0 [&>*]:px-1.5 [&>*]:py-1.5', repairDesktopTableGridClass)}>
+                                <label className="sticky left-0 z-20 grid gap-1 bg-[#f1f5f9] shadow-[1px_0_0_#cbd5e1]">
                                     <Link href={sortHeaderHref('ticket')} preserveScroll className={cn(sortHeaderClass('ticket'), 'justify-center')}>ID {sortIndicator('ticket')}</Link>
                                     <input className={cn(gridFilterInputClass, 'text-center')} inputMode="numeric" placeholder="ID" value={filtersForm.data.filter_id} onChange={(event) => setSingleGridFilter('filter_id', event.target.value)} />
                                 </label>
-                                <label className="grid gap-1">
+                                <label className="sticky left-[6.8rem] z-20 grid gap-1 bg-[#f1f5f9] shadow-[1px_0_0_#cbd5e1]">
                                     <Link href={sortHeaderHref('cliente')} preserveScroll className={sortHeaderClass('cliente')}>Cliente {sortIndicator('cliente')}</Link>
                                     <input className={gridFilterInputClass} placeholder="Cliente" value={filtersForm.data.filter_cliente} onChange={(event) => setSingleGridFilter('filter_cliente', event.target.value)} />
                                 </label>
@@ -1838,7 +2340,7 @@ export default function WorkbenchPage({
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('ingreso')} preserveScroll className={sortHeaderClass('ingreso')}>Ingreso {sortIndicator('ingreso')}</Link>
-                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_ingreso} onChange={(event) => setSingleGridFilter('filter_ingreso', event.target.value)} aria-label="Filtrar por fecha de ingreso" />
+                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_ingreso} onChange={(event) => setSingleGridFilter('filter_ingreso', event.target.value, 'immediate')} aria-label="Filtrar por fecha de ingreso" />
                                 </label>
                                 <span className="grid content-start gap-1 text-center text-[0.62rem] font-bold text-[#475569]">
                                     Imagen
@@ -1853,19 +2355,20 @@ export default function WorkbenchPage({
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('estimada')} preserveScroll className={sortHeaderClass('estimada')}>Estimada {sortIndicator('estimada')}</Link>
-                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_estimada} onChange={(event) => setSingleGridFilter('filter_estimada', event.target.value)} aria-label="Filtrar por fecha estimada" />
+                                    <input className={gridFilterInputClass} type="date" value={filtersForm.data.filter_estimada} onChange={(event) => setSingleGridFilter('filter_estimada', event.target.value, 'immediate')} aria-label="Filtrar por fecha estimada" />
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('saldo')} preserveScroll className={sortHeaderClass('saldo')}>Saldo {sortIndicator('saldo')}</Link>
-                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_saldo} onChange={(event) => setSingleGridFilter('filter_saldo', event.target.value)} aria-label="Filtrar por saldo o seña">
+                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_saldo} onChange={(event) => setSingleGridFilter('filter_saldo', event.target.value, 'immediate')} aria-label="Filtrar por saldo o seña">
                                         <option value="">Saldo</option>
                                         <option value="con_senia">Con seña</option>
                                         <option value="sin_senia">Sin seña</option>
+                                        <option value="pagado">Pagado</option>
                                     </select>
                                 </label>
                                 <label className="grid gap-1">
                                     <Link href={sortHeaderHref('estado')} preserveScroll className={cn(sortHeaderClass('estado'), 'justify-center')}>Estado {sortIndicator('estado')}</Link>
-                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_estado} onChange={(event) => setSingleGridFilter('filter_estado', event.target.value)} aria-label="Filtrar por estado">
+                                    <select className={gridFilterInputClass} value={filtersForm.data.filter_estado} onChange={(event) => setSingleGridFilter('filter_estado', event.target.value, 'immediate')} aria-label="Filtrar por estado">
                                         <option value="">Estado</option>
                                         {states.map((state) => <option key={state} value={state}>{state}</option>)}
                                     </select>
@@ -1881,59 +2384,85 @@ export default function WorkbenchPage({
                         </form>
                         <div className="grid bg-white">
                             {tickets.length > 0 ? (
-                                ticketDateGroups.flatMap((group) => [
-                                    <div key={`desktop-date-group-${group.key}`} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
-                                        <span>{group.label}</span>
-                                        <span className="text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'} - {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}</span>
-                                    </div>,
-                                    ...group.tickets.flatMap((ticket) => {
-                                        const expanded = expandedDesktopTickets[ticket.id] ?? false;
-                                        const desktopRepairs = expanded ? ticket.repairs : ticket.repairs.slice(0, 1);
-
-                                        return desktopRepairs.map((repair, repairIndex) => (
-                                            <RepairDesktopRow
-                                                key={`desktop-table-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
-                                                ticket={ticket}
-                                                repair={repair}
-                                                serviceCategories={serviceCategories}
-                                                serviceTemplates={serviceTemplates}
-                                                partInventory={partInventory}
-                                                rowIndex={repairIndex}
-                                                rowTotal={ticket.repairs.length}
-                                                desktopGroupExpanded={expanded}
-                                                onToggleDesktopGroup={repairIndex === 0 && ticket.repairs.length > 1 ? () => toggleDesktopTicket(ticket.id) : undefined}
-                                            />
-                                        ));
-                                    }),
-                                ])
+                                isTaskQueueView ? (
+                                    <>
+                                        <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-[#0f172a] bg-[#f8fafc] px-3 py-2 text-xs font-black text-[#0f172a]">
+                                            <span>Tareas para hoy</span>
+                                            <span>{taskTickets.pending.reduce((total, ticket) => total + ticket.repairs.length, 0)} pendiente{taskTickets.pending.length === 1 ? '' : 's'}</span>
+                                        </div>
+                                        {taskTickets.pending.length > 0 ? renderDesktopTaskTickets(taskTickets.pending) : (
+                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">No quedan tareas pendientes.</div>
+                                        )}
+                                        <div className="bg-[#f1f5f9] py-3">
+                                            <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-xs font-black text-white">
+                                                <span>Completadas</span>
+                                                <span className="text-[#cbd5e1]">{taskTickets.completed.reduce((total, ticket) => total + ticket.repairs.length, 0)} terminada{taskTickets.completed.length === 1 ? '' : 's'}</span>
+                                            </div>
+                                        </div>
+                                        {taskTickets.completed.length > 0 ? renderDesktopTaskTickets(taskTickets.completed) : (
+                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">Todavía no hay tareas listas o canceladas.</div>
+                                        )}
+                                    </>
+                                ) : renderDesktopDateGroups(ticketDateGroups)
                             ) : (
-                                <div className="px-4 py-8 text-center text-sm font-bold text-[#64748b]">No hay tickets activos para los filtros actuales.</div>
+                                <div className="p-3">
+                                    <ConsultasEmptyState hasFilters={hasActiveConsultasFilters} isTaskQueueView={isTaskQueueView} />
+                                </div>
                             )}
+                            {isConsultas && deliveredSearchTickets.length > 0 ? (
+                                <>
+                                    <div className="bg-[#f1f5f9] py-3">
+                                        <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-xs font-black text-white">
+                                            <span>Encontrado en entregados</span>
+                                            <span className="text-[#cbd5e1]">{deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}</span>
+                                        </div>
+                                    </div>
+                                    {renderDesktopDeliveredSearchTickets()}
+                                </>
+                            ) : null}
                         </div>
                     </div>
                 </div>
 
                 <div className="grid gap-3 xl:hidden">
-                    {ticketDateGroups.map((group) => (
-                        <section key={`mobile-date-group-${group.key}`} className="grid gap-2">
-                            <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
-                                <span>{group.label}</span>
-                                <span className="text-xs text-[#dbeafe]">{group.count} ticket{group.count === 1 ? '' : 's'}</span>
+                    {isTaskQueueView ? (
+                        <>
+                            <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-2">
+                                <div className="flex items-center justify-between gap-2 border-b border-[#cbd5e1] px-1 pb-2 text-sm font-black text-[#0f172a]">
+                                    <span>Tareas para hoy</span>
+                                    <span>{taskTickets.pending.reduce((total, ticket) => total + ticket.repairs.length, 0)}</span>
+                                </div>
+                                {taskTickets.pending.length > 0 ? renderMobileTaskTickets(taskTickets.pending) : (
+                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">No quedan tareas pendientes.</div>
+                                )}
+                            </section>
+                            <div className="bg-[#f1f5f9] py-3">
+                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-sm font-black text-white">
+                                    <span>Completadas</span>
+                                    <span className="text-xs text-[#cbd5e1]">{taskTickets.completed.reduce((total, ticket) => total + ticket.repairs.length, 0)}</span>
+                                </div>
                             </div>
-                            {group.tickets.map((ticket) => (
-                                <RepairTicketPanel
-                                    key={ticket.id}
-                                    ticket={ticket}
-                                    states={states}
-                                    serviceCategories={serviceCategories}
-                                    serviceTemplates={serviceTemplates}
-                                    partInventory={partInventory}
-                                    allowAddRepair
-                                />
-                            ))}
-                        </section>
-                    ))}
-                    {tickets.length === 0 ? <div className="rounded-lg border border-[#cbd5e1] bg-white p-6 text-center font-semibold text-[#475569] shadow-sm">No hay tickets activos para los filtros actuales.</div> : null}
+                            <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2">
+                                {taskTickets.completed.length > 0 ? renderMobileTaskTickets(taskTickets.completed) : (
+                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">Todavía no hay tareas listas o canceladas.</div>
+                                )}
+                            </section>
+                        </>
+                    ) : renderMobileDateGroups(ticketDateGroups)}
+                    {tickets.length === 0 ? <ConsultasEmptyState hasFilters={hasActiveConsultasFilters} isTaskQueueView={isTaskQueueView} /> : null}
+                    {isConsultas && deliveredSearchTickets.length > 0 ? (
+                        <>
+                            <div className="bg-[#f1f5f9] py-3">
+                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-sm font-black text-white">
+                                    <span>Encontrado en entregados</span>
+                                    <span className="text-xs text-[#cbd5e1]">{deliveredSearchMatches}</span>
+                                </div>
+                            </div>
+                            <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2">
+                                {renderMobileDeliveredSearchTickets()}
+                            </section>
+                        </>
+                    ) : null}
                 </div>
             </section>
             ) : null}

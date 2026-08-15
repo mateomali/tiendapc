@@ -44,6 +44,9 @@ class StoreController extends Controller
                 'offer_price',
                 'offer_start_at',
                 'offer_end_at',
+                'cash_discount_percentage',
+                'cash_discount_mode',
+                'cash_price',
                 'image_url',
                 'image_url_2',
                 'image_url_3',
@@ -54,7 +57,9 @@ class StoreController extends Controller
             ->sellable()
             ->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('is_hidden', false));
 
-        if ($filters['selectedCategory'] !== '') {
+        if ($filters['selectedCategories'] !== []) {
+            $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->whereIn('slug', $filters['selectedCategories']));
+        } elseif ($filters['selectedCategory'] !== '') {
             $query->whereHas('category', fn ($categoryQuery) => $categoryQuery->where('slug', $filters['selectedCategory']));
         }
 
@@ -135,6 +140,7 @@ class StoreController extends Controller
             'filters' => [
                 'query' => $filters['query'],
                 'selectedCategory' => $filters['selectedCategory'],
+                'selectedCategories' => $filters['selectedCategories'],
                 'selectedGroup' => $filters['selectedGroup'],
                 'order' => $filters['order'],
                 'onlyNew' => $filters['onlyNew'],
@@ -277,6 +283,12 @@ class StoreController extends Controller
                 'unitPriceLabel' => $this->money((int) $item['unit_price']),
                 'subtotal' => (int) $item['subtotal'],
                 'subtotalLabel' => $this->money((int) $item['subtotal']),
+                'cashUnitPrice' => $item['cash_unit_price'],
+                'cashUnitPriceLabel' => $item['cash_unit_price'] !== null ? $this->money((int) $item['cash_unit_price']) : '',
+                'cashSubtotal' => $item['cash_subtotal'],
+                'cashSubtotalLabel' => $item['cash_subtotal'] !== null ? $this->money((int) $item['cash_subtotal']) : '',
+                'cashDiscountPercentage' => $item['cash_discount_percentage'],
+                'cashDiscountNote' => (string) ($item['cash_discount_note'] ?? ''),
                 'hasOffer' => false,
                 'updateAction' => route('cart.update'),
                 'removeAction' => route('cart.remove'),
@@ -284,6 +296,7 @@ class StoreController extends Controller
         })->values();
 
         $total = $cartService->total();
+        $cashTotal = collect($cartService->items())->sum(fn (array $item): int => (int) ($item['cash_subtotal'] ?? $item['subtotal']));
 
         return Inertia::render('Store/CartPage', [
             'kind' => 'cart',
@@ -301,6 +314,9 @@ class StoreController extends Controller
             'totalItems' => $items->sum('qty'),
             'total' => $total,
             'totalLabel' => $this->money($total),
+            'cashTotal' => $cashTotal,
+            'cashTotalLabel' => $this->money($cashTotal),
+            'hasCashDiscount' => $cashTotal < $total,
             'clearAction' => route('cart.clear'),
             'continueShoppingUrl' => route('store.catalog'),
             'checkoutWhatsappUrl' => $this->buildCartWhatsappUrl($items, $total),
@@ -308,18 +324,23 @@ class StoreController extends Controller
     }
 
     /**
-     * @return array{query: string, selectedCategory: string, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool}
+     * @return array{query: string, selectedCategory: string, selectedCategories: array<int, string>, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool}
      */
     private function catalogFilters(Request $request): array
     {
         $selectedCategory = trim((string) ($request->query('categoria', $request->query('category', ''))));
+        $selectedCategories = array_values(array_unique(array_filter(
+            array_map(static fn ($slug): string => trim((string) $slug), (array) $request->query('categorias', [])),
+            static fn (string $slug): bool => $slug !== '',
+        )));
         $selectedGroup = strtolower(trim((string) $request->query('grupo', '')));
         $query = trim((string) $request->query('q', ''));
         $order = trim((string) $request->query('orden', $request->query('order', 'fecha_ingreso')));
 
         return [
             'query' => $query,
-            'selectedCategory' => $selectedCategory,
+            'selectedCategory' => $selectedCategories === [] ? $selectedCategory : '',
+            'selectedCategories' => $selectedCategories,
             'selectedGroup' => $selectedGroup,
             'order' => in_array($order, ['fecha_ingreso', 'precio_asc', 'precio_desc'], true) ? $order : 'fecha_ingreso',
             'onlyNew' => $this->truthy($request->query('novedades', $request->query('only_new', false))),
@@ -330,7 +351,7 @@ class StoreController extends Controller
 
     /**
      * @param Collection<int, Category> $categories
-     * @param array{query: string, selectedCategory: string, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
+     * @param array{query: string, selectedCategory: string, selectedCategories: array<int, string>, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
      * @param Collection<int, Product> $products
      * @return array<int, array{id: int, name: string, slug: string, groupKey: string, productCount: int, url: string, isSelected: bool}>
      */
@@ -348,8 +369,9 @@ class StoreController extends Controller
                     'productCount' => (int) ($productCountsByCategory->get($category->id) ?? 0),
                     'url' => route($catalogRouteName, $this->catalogQuery([
                         'categoria' => $category->slug,
+                        'categorias' => null,
                     ], $filters)),
-                    'isSelected' => $filters['selectedCategory'] === $category->slug,
+                    'isSelected' => $filters['selectedCategory'] === $category->slug || in_array($category->slug, $filters['selectedCategories'], true),
                 ];
             })
             ->values()
@@ -448,6 +470,7 @@ class StoreController extends Controller
     {
         $images = $this->productImages($product);
         $displayPrice = $product->effectivePrice();
+        $cashPrice = $product->cashPrice();
         $discountPercentage = $product->offerIsActive() && $product->price > 0
             ? (int) round((1 - ($displayPrice / $product->price)) * 100)
             : 0;
@@ -469,6 +492,10 @@ class StoreController extends Controller
             'offerPriceLabel' => $product->offerIsActive() && $product->offer_price !== null ? $this->money((int) $product->offer_price) : '',
             'displayPrice' => $displayPrice,
             'displayPriceLabel' => $this->money($displayPrice),
+            'cashPrice' => $cashPrice,
+            'cashPriceLabel' => $cashPrice !== null ? $this->money($cashPrice) : '',
+            'cashDiscountPercentage' => $cashPrice !== null ? $product->cashDiscountPercentage() : 0,
+            'cashDiscountNote' => $cashPrice !== null ? $product->cashDiscountNote() : '',
             'hasOffer' => $product->offerIsActive(),
             'discountPercentage' => $discountPercentage,
             'isNew' => $product->created_at !== null && $product->created_at->greaterThanOrEqualTo($newSince),
@@ -479,7 +506,7 @@ class StoreController extends Controller
             'shortDescription' => $product->short_description,
             'addToCartAction' => route('cart.add'),
             'removeFromCartAction' => route('cart.remove'),
-            'buyWhatsappUrl' => $this->buildWhatsappUrl('Hola! quiero comprar el siguiente articulo: ' . $product->name . ' - $' . $this->money($displayPrice) . ', esta disponible?'),
+            'buyWhatsappUrl' => $this->buildWhatsappUrl($this->productWhatsappMessage($product, $displayPrice, $cashPrice)),
         ];
     }
 
@@ -487,6 +514,7 @@ class StoreController extends Controller
     {
         $images = $this->productImages($product);
         $displayPrice = $product->effectivePrice();
+        $cashPrice = $product->cashPrice();
         $plainDescription = trim(strip_tags((string) $product->description));
         $words = preg_split('/\s+/', $plainDescription, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $wordLimit = max(40, min(1000, (int) SiteGlobalConfig::value('product_detail_description_word_limit', '100')));
@@ -507,6 +535,10 @@ class StoreController extends Controller
             'priceLabel' => $this->money($basePrice),
             'offerPriceLabel' => $hasOffer && $product->offer_price !== null ? $this->money((int) $product->offer_price) : '',
             'displayPriceLabel' => $this->money($displayPrice),
+            'cashPrice' => $cashPrice,
+            'cashPriceLabel' => $cashPrice !== null ? $this->money($cashPrice) : '',
+            'cashDiscountPercentage' => $cashPrice !== null ? $product->cashDiscountPercentage() : 0,
+            'cashDiscountNote' => $cashPrice !== null ? $product->cashDiscountNote() : '',
             'hasOffer' => $hasOffer,
             'discountPercentage' => $discountPercentage,
             'isNew' => $product->created_at !== null && $product->created_at->greaterThanOrEqualTo($newSince),
@@ -516,8 +548,19 @@ class StoreController extends Controller
             'hasLongDescription' => count($words) > $wordLimit,
             'cartQty' => $cartQty,
             'addToCartAction' => route('cart.add'),
-            'whatsappUrl' => $this->buildWhatsappUrl('Hola que tal, estoy interesado en comprar el siguiente articulo: ' . $product->name . ' - $' . $this->money($displayPrice) . ' esta disponible?'),
+            'whatsappUrl' => $this->buildWhatsappUrl($this->productWhatsappMessage($product, $displayPrice, $cashPrice)),
         ];
+    }
+
+    private function productWhatsappMessage(Product $product, int $displayPrice, ?int $cashPrice): string
+    {
+        $message = 'Hola! quiero comprar el siguiente articulo: ' . $product->name . '. Precio: $' . $this->money($displayPrice);
+
+        if ($cashPrice !== null) {
+            $message .= '. Oferta en efectivo: $' . $this->money($cashPrice) . ' (' . $product->cashDiscountNote() . ')';
+        }
+
+        return $message . ', esta disponible?';
     }
 
     /**
@@ -540,10 +583,21 @@ class StoreController extends Controller
         $lines = ["ME GUSTARIA COMPRAR LO SIGUIENTE:"];
 
         foreach ($items as $item) {
-            $lines[] = '- ' . $item['name'] . ' x' . $item['qty'] . ' ($' . $item['subtotalLabel'] . ')';
+            $line = '- ' . $item['name'] . ' x' . $item['qty'] . ' | precio: $' . $item['subtotalLabel'];
+
+            if (($item['cashSubtotal'] ?? null) !== null) {
+                $line .= ' | oferta en efectivo: $' . $item['cashSubtotalLabel'];
+            }
+
+            $lines[] = $line;
         }
 
         $lines[] = 'TOTAL: $' . $this->money($total);
+        $cashTotal = $items->sum(fn (array $item): int => (int) ($item['cashSubtotal'] ?? $item['subtotal']));
+        if ($cashTotal < $total) {
+            $lines[] = 'TOTAL OFERTA EN EFECTIVO: $' . $this->money($cashTotal);
+            $lines[] = 'Oferta en efectivo al retirar en el local.';
+        }
 
         return $this->buildWhatsappUrl(implode("\n", $lines));
     }
@@ -585,14 +639,15 @@ class StoreController extends Controller
     }
 
     /**
-     * @param array<string, string|int|null> $overrides
-     * @param array{query: string, selectedCategory: string, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
-     * @return array<string, string|int>
+     * @param array<string, string|int|array<int, string>|null> $overrides
+     * @param array{query: string, selectedCategory: string, selectedCategories: array<int, string>, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
+     * @return array<string, string|int|array<int, string>>
      */
     private function catalogQuery(array $overrides, array $filters): array
     {
         $query = [
             'categoria' => $filters['selectedCategory'] !== '' ? $filters['selectedCategory'] : null,
+            'categorias' => $filters['selectedCategories'] !== [] ? $filters['selectedCategories'] : null,
             'grupo' => $filters['selectedGroup'] !== '' ? $filters['selectedGroup'] : null,
             'q' => $filters['query'] !== '' ? $filters['query'] : null,
             'orden' => $filters['order'] !== 'fecha_ingreso' ? $filters['order'] : null,
@@ -605,7 +660,7 @@ class StoreController extends Controller
             $query[$key] = $value;
         }
 
-        return array_filter($query, static fn ($value) => $value !== null && $value !== '');
+        return array_filter($query, static fn ($value) => $value !== null && $value !== '' && $value !== []);
     }
 
     private function safeRouteConfigValue(string $key, string $default): string

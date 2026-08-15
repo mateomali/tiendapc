@@ -37,6 +37,10 @@ class DatabaseSeeder extends Seeder
         SiteGlobalConfig::putValue('footer_map_url', 'https://maps.google.com/maps?q=sudoku%20merlo&t=m&z=13&output=embed&iwloc=near');
         SiteGlobalConfig::putValue('footer_cta_title', 'Queres consultar algo?');
         SiteGlobalConfig::putValue('footer_cta_text', 'Escribinos por WhatsApp:');
+        SiteGlobalConfig::putValue('product_cash_discount_enabled', '1');
+        SiteGlobalConfig::putValue('product_cash_discount_threshold', '20000');
+        SiteGlobalConfig::putValue('product_cash_discount_percentage', '10');
+        SiteGlobalConfig::putValue('product_cash_discount_note', 'Oferta en efectivo al retirar en el local.');
 
         if (! User::query()->exists()) {
             User::query()->create([

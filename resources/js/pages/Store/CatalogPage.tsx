@@ -1,6 +1,7 @@
 ﻿import { Link, router } from '@inertiajs/react';
 import type { FocusEvent } from 'react';
 import { useEffect, useState } from 'react';
+import { PaymentMethodsLine } from '../../components/PaymentMethodsLine';
 import { SiteLayout } from '../../layouts/SiteLayout';
 import type { AnnouncementItem, CatalogCategory, CatalogGroup, CatalogProduct, HeaderSearchState, SharedPageProps } from '../../types';
 import {
@@ -17,10 +18,8 @@ import {
     catalogCartQtyTrackClass,
     catalogCategoryRowClass,
     catalogCategoryClass,
-    catalogFeaturedChipClass,
     catalogGridClass,
     catalogImageClass,
-    catalogImageBadgesClass,
     catalogImageDetailsPillClass,
     catalogImageLinkClass,
     catalogImageNewBadgeClass,
@@ -47,6 +46,7 @@ interface CatalogPageProps extends SharedPageProps {
     filters: {
         query: string;
         selectedCategory: string;
+        selectedCategories: string[];
         selectedGroup: string;
         order: string;
         onlyNew: boolean;
@@ -160,14 +160,6 @@ function SortIcon(): JSX.Element {
     );
 }
 
-function StarIcon(): JSX.Element {
-    return (
-        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-            <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3z" />
-        </svg>
-    );
-}
-
 function CloseIcon(): JSX.Element {
     return (
         <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -183,6 +175,17 @@ function CartIcon({ size = 14 }: { size?: number }): JSX.Element {
             <path d="M3 4h2l2.2 9.2a1 1 0 0 0 .97.8h8.98a1 1 0 0 0 .97-.76L20 7H7.2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             <circle cx="10" cy="19" r="1.6" fill="currentColor" />
             <circle cx="17" cy="19" r="1.6" fill="currentColor" />
+        </svg>
+    );
+}
+
+function CashIcon(): JSX.Element {
+    return (
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true" className="h-4 w-4 fill-none stroke-current stroke-2 [stroke-linecap:round] [stroke-linejoin:round]">
+            <rect x="3" y="6" width="18" height="12" rx="2" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="M6 9h1" />
+            <path d="M17 15h1" />
         </svg>
     );
 }
@@ -218,10 +221,11 @@ function CatalogToolbarButton({ ariaLabel, tooltip, isActive, onClick, children 
 
 function buildCatalogQuery(
     filters: CatalogPageProps['filters'],
-    overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
+    overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedCategories' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
 ): Record<string, string | number> {
     const nextFilters = {
         selectedCategory: filters.selectedCategory,
+        selectedCategories: filters.selectedCategories,
         selectedGroup: filters.selectedGroup,
         query: filters.query,
         order: filters.order,
@@ -233,6 +237,7 @@ function buildCatalogQuery(
 
     return {
         ...(nextFilters.selectedCategory !== '' ? { categoria: nextFilters.selectedCategory } : {}),
+        ...nextFilters.selectedCategories.reduce<Record<string, string>>((carry, slug, index) => ({ ...carry, [`categorias[${index}]`]: slug }), {}),
         ...(nextFilters.selectedGroup !== '' ? { grupo: nextFilters.selectedGroup } : {}),
         ...(nextFilters.query !== '' ? { q: nextFilters.query } : {}),
         ...(nextFilters.order !== 'fecha_ingreso' ? { orden: nextFilters.order } : {}),
@@ -295,13 +300,7 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
     };
 
     const activeImage = product.images[imageIndex] ?? product.imageUrl;
-    const cardTone: StoreTone = product.hasOffer
-        ? 'offer'
-        : product.isFeatured
-          ? 'featured'
-          : product.isNew
-            ? 'new'
-            : 'regular';
+    const cardTone: StoreTone = product.hasOffer ? 'offer' : product.isNew ? 'new' : 'regular';
 
     return (
         <article
@@ -339,14 +338,6 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
                     }}
                 />
                 {product.isNew ? <span className={`${catalogNewChipClass} ${catalogImageNewBadgeClass}`}>NOVEDAD!</span> : null}
-                {product.isFeatured ? (
-                    <div className={catalogImageBadgesClass}>
-                        <span />
-                        <span className={catalogFeaturedChipClass} aria-label="Mas vendido">
-                            <span aria-hidden="true">★</span>MAS VENDIDO!
-                        </span>
-                    </div>
-                ) : null}
                 <span className={catalogImageDetailsPillClass}>Más detalles</span>
             </Link>
 
@@ -358,18 +349,29 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
                     {product.name}
                 </Link>
 
-                <div className={`${catalogPriceBoxClass} ${catalogPriceBoxToneClass(cardTone)}`}>
-                    {product.hasOffer ? (
-                        <>
-                            <span className={catalogPriceBeforeClass}>
-                                ANTES <span className={catalogPriceBeforeValueClass}>${product.priceLabel}</span>
-                            </span>
+                {product.cashPrice ? (
+                    <div className="grid justify-items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-center leading-tight text-emerald-900">
+                        <span className="inline-flex items-center gap-1 text-[0.62rem] font-black uppercase tracking-[0.045em] text-emerald-700">
+                            Oferta en efectivo
+                            <CashIcon />
+                        </span>
+                        <strong className="catalog-preview-price-font text-[1.74rem] font-black leading-none text-emerald-950 [font-variant-numeric:tabular-nums] max-[560px]:text-[1.42rem]">${product.cashPriceLabel}</strong>
+                        <PaymentMethodsLine priceLabel={product.displayPriceLabel} />
+                    </div>
+                ) : (
+                    <div className={`${catalogPriceBoxClass} ${catalogPriceBoxToneClass(cardTone)}`}>
+                        {product.hasOffer ? (
+                            <>
+                                <span className={catalogPriceBeforeClass}>
+                                    ANTES <span className={catalogPriceBeforeValueClass}>${product.priceLabel}</span>
+                                </span>
+                                <strong className={catalogPriceClass}>${product.displayPriceLabel}</strong>
+                            </>
+                        ) : (
                             <strong className={catalogPriceClass}>${product.displayPriceLabel}</strong>
-                        </>
-                    ) : (
-                        <strong className={catalogPriceClass}>${product.displayPriceLabel}</strong>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
 
                 <div className={catalogActionsClass}>
                     <button
@@ -508,15 +510,6 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
                     ) : null}
                 </div>
 
-                {product.isFeatured ? (
-                    <div className={catalogImageBadgesClass}>
-                        <span />
-                        <span className={catalogFeaturedChipClass} aria-label="Mas vendido">
-                            <span aria-hidden="true">★</span>MAS VENDIDO!
-                        </span>
-                    </div>
-                ) : null}
-
                 <span className={catalogImageDetailsPillClass}>Más detalles</span>
             </Link>
 
@@ -535,9 +528,20 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
                             Antes <span className="line-through">${product.priceLabel}</span>
                         </span>
                     ) : null}
-                    <strong className="catalog-preview-price-font text-[1.78rem] font-extrabold leading-none text-black [font-variant-numeric:tabular-nums] max-[860px]:text-[1.55rem] max-[560px]:text-[1.34rem]">
-                        ${product.displayPriceLabel}
-                    </strong>
+                    {product.cashPrice ? (
+                        <div className="grid w-full justify-items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 leading-tight text-emerald-900">
+                            <span className="inline-flex items-center gap-1 text-[0.58rem] font-black uppercase tracking-[0.045em] text-emerald-700">
+                                Oferta en efectivo
+                                <CashIcon />
+                            </span>
+                            <strong className="catalog-preview-price-font text-[1.62rem] font-black leading-none text-emerald-950 [font-variant-numeric:tabular-nums] max-[560px]:text-[1.34rem]">${product.cashPriceLabel}</strong>
+                            <PaymentMethodsLine priceLabel={product.displayPriceLabel} />
+                        </div>
+                    ) : (
+                        <strong className="catalog-preview-price-font text-[1.78rem] font-extrabold leading-none text-black [font-variant-numeric:tabular-nums] max-[860px]:text-[1.55rem] max-[560px]:text-[1.34rem]">
+                            ${product.displayPriceLabel}
+                        </strong>
+                    )}
                 </div>
 
                 <div className="mt-auto grid gap-1.5 pt-1">
@@ -596,7 +600,7 @@ export default function CatalogPage({
     const selectedCategoryItem = categories.find((category) => category.slug === filters.selectedCategory);
     const activeGroupKey = filters.selectedGroup !== '' ? filters.selectedGroup : selectedCategoryItem?.groupKey ?? '';
     const visibleCategories = activeGroupKey === '' ? categories : categories.filter((category) => category.groupKey === activeGroupKey);
-    const isFiltered = activeGroupKey !== '' || filters.selectedCategory !== '' || filters.onlyNew || filters.onlyOffers || filters.onlyFeatured || filters.order !== 'fecha_ingreso';
+    const isFiltered = activeGroupKey !== '' || filters.selectedCategory !== '' || filters.selectedCategories.length > 0 || filters.onlyNew || filters.onlyOffers || filters.onlyFeatured || filters.order !== 'fecha_ingreso';
     const ProductCard = previewCardGrid ? CatalogProductPreviewCard : CatalogProductCard;
 
     const updateGridColumns = (columns: CatalogGridColumns): void => {
@@ -605,7 +609,7 @@ export default function CatalogPage({
     };
 
     const goToCatalogFilters = (
-        overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
+        overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedCategories' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
     ): void => {
         router.get(filters.clearUrl, buildCatalogQuery(filters, overrides), { preserveScroll: true, preserveState: true });
     };
@@ -629,7 +633,7 @@ export default function CatalogPage({
         });
     };
 
-    const applyMobileProductFilter = (filter: 'offers' | 'featured' | 'all'): void => {
+    const applyMobileProductFilter = (filter: 'offers' | 'all'): void => {
         if (filter === 'all') {
             router.get(filters.clearUrl, {}, { preserveScroll: true, preserveState: false });
             setMobilePanel(null);
@@ -639,9 +643,10 @@ export default function CatalogPage({
         router.get(filters.clearUrl, buildCatalogQuery(filters, {
             selectedGroup: '',
             selectedCategory: '',
+            selectedCategories: [],
             onlyNew: false,
             onlyOffers: filter === 'offers',
-            onlyFeatured: filter === 'featured',
+            onlyFeatured: false,
         }), { preserveScroll: true, preserveState: false });
         setMobilePanel(null);
     };
@@ -663,6 +668,7 @@ export default function CatalogPage({
                         goToCatalogFilters({
                             selectedGroup: nextGroupKey,
                             selectedCategory: '',
+                            selectedCategories: [],
                         });
                     }}
                 >
@@ -693,6 +699,7 @@ export default function CatalogPage({
                             goToCatalogFilters({
                                 selectedGroup: selected?.groupKey ?? activeGroupKey,
                                 selectedCategory: selectedSlug,
+                                selectedCategories: [],
                             });
                         }}
                     >
@@ -845,12 +852,6 @@ export default function CatalogPage({
                                             <button type="button" className={catalog.mobileSheetOptionButton(filters.onlyOffers)} onClick={() => applyMobileProductFilter('offers')}>
                                                 <span aria-hidden="true">🔥</span>
                                                 Ofertas
-                                            </button>
-                                            <button type="button" className={catalog.mobileSheetOptionButton(filters.onlyFeatured)} onClick={() => applyMobileProductFilter('featured')}>
-                                                <span className={catalogOrderIconClass}>
-                                                    <StarIcon />
-                                                </span>
-                                                Destacados
                                             </button>
                                             <button type="button" className={catalog.mobileSheetOptionButton(!filters.onlyOffers && !filters.onlyFeatured)} onClick={() => applyMobileProductFilter('all')}>
                                                 <span className={catalogOrderIconClass}>

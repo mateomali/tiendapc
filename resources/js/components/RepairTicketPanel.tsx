@@ -9,6 +9,7 @@ import {
     FaChevronDown,
     FaDollyFlatbed,
     FaEdit,
+    FaEllipsisH,
     FaImage,
     FaImages,
     FaInfoCircle,
@@ -21,6 +22,7 @@ import {
     FaWhatsapp,
 } from 'react-icons/fa';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
+import { PhoneUnlockFields, phoneUnlockLabel } from './PhoneUnlockFields';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
 import { cn, formatAmountInput, formatCurrency } from '../utils';
@@ -45,7 +47,7 @@ interface ServiceTemplateOption {
 }
 
 export const repairDesktopTableGridClass =
-    'grid-cols-[6.8rem_minmax(5.5rem,0.44fr)_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_6rem_4.6rem_6rem_minmax(20.1rem,1.29fr)]';
+    'grid-cols-[6.8rem_7.6rem_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_6rem_4.6rem_6rem_minmax(12.4rem,0.82fr)]';
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
@@ -56,6 +58,8 @@ interface RepairTicketPanelProps {
     allowAddRepair?: boolean;
     readOnly?: boolean;
     archived?: boolean;
+    statusLabel?: (repair: RepairOrderView) => string;
+    highlightTerm?: string;
 }
 
 interface RepairUpdateFormData {
@@ -66,6 +70,7 @@ interface RepairUpdateFormData {
     contacto: string;
     marca: string;
     modelo: string;
+    color: string;
     descripcion: string;
     observaciones: string;
     info: string;
@@ -78,6 +83,8 @@ interface RepairUpdateFormData {
     repuesto_pedido: boolean;
     inventory_part_id: string;
     categorias_reparacion: string;
+    unlock_type: string;
+    unlock_value: string;
     images: File[] | null;
     final_images: File[] | null;
 }
@@ -85,22 +92,34 @@ interface RepairUpdateFormData {
 interface AddRepairFormData {
     marca: string;
     modelo: string;
+    color: string;
     tipo_servicio: string;
     descripcion: string;
     observaciones: string;
     monto: string;
     senia: string;
+    senia_method: string;
     fecha_estimada: string;
     repuesto: string;
     repuesto_pedido: boolean;
     inventory_part_id: string;
     categorias_reparacion: string;
+    unlock_type: string;
+    unlock_value: string;
     images: File[] | null;
 }
 
 interface PaymentFormData {
     amount: string;
+    payment_type: string;
     method: string;
+    notes: string;
+    paid_at: string;
+}
+
+interface IncrementFormData {
+    amount: string;
+    payment_type: string;
     notes: string;
     paid_at: string;
 }
@@ -108,6 +127,24 @@ interface PaymentFormData {
 type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
 
 const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
+const repairColorOptions = [
+    { value: '', label: 'Sin color', hex: '#f8fafc' },
+    { value: 'NEGRO', label: 'Negro', hex: '#111827' },
+    { value: 'BLANCO', label: 'Blanco', hex: '#ffffff' },
+    { value: 'GRIS', label: 'Gris', hex: '#6b7280' },
+    { value: 'PLATA', label: 'Plata', hex: '#c0c0c0' },
+    { value: 'AZUL', label: 'Azul', hex: '#2563eb' },
+    { value: 'CELESTE', label: 'Celeste', hex: '#38bdf8' },
+    { value: 'ROJO', label: 'Rojo', hex: '#dc2626' },
+    { value: 'VERDE', label: 'Verde', hex: '#16a34a' },
+    { value: 'AMARILLO', label: 'Amarillo', hex: '#facc15' },
+    { value: 'DORADO', label: 'Dorado', hex: '#d97706' },
+    { value: 'ROSA', label: 'Rosa', hex: '#f472b6' },
+    { value: 'VIOLETA', label: 'Violeta', hex: '#7c3aed' },
+    { value: 'NARANJA', label: 'Naranja', hex: '#f97316' },
+    { value: 'MARRON', label: 'Marron', hex: '#7c2d12' },
+    { value: 'BEIGE', label: 'Beige', hex: '#d6b48c' },
+] as const;
 
 function isPhoneCategoryValue(serviceCategories: ServiceCategoryOption[], value: string | number | null | undefined): boolean {
     const category = serviceCategories.find((item) => String(item.value) === String(value));
@@ -126,23 +163,64 @@ function compactStatus(status: string): string {
 function repairStatusHeaderClass(status: string): string {
     const normalized = normalizeStatus(status);
 
-    if (normalized === 'LISTA') return 'bg-[#16a34a] text-white';
-    if (normalized === 'CANCELADA') return 'bg-[#dc2626] text-white';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#6d28d9] text-white';
-    if (normalized === 'PENDIENTE') return 'bg-[#facc15] text-[#111827]';
+    if (normalized === 'LISTA') return 'border-l-4 border-l-[#198754] bg-[#f8fafc] text-[#0f172a]';
+    if (normalized === 'CANCELADA') return 'border-l-4 border-l-[#dc3545] bg-[#f8fafc] text-[#0f172a]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-4 border-l-[#6d28d9] bg-[#f8fafc] text-[#0f172a]';
+    if (normalized === 'PENDIENTE') return 'border-l-4 border-l-[#d97706] bg-[#f8fafc] text-[#0f172a]';
 
-    return 'bg-[#64748b] text-white';
+    return 'border-l-4 border-l-[#64748b] bg-[#f8fafc] text-[#0f172a]';
 }
 
 function repairStatusBadgeClass(status: string): string {
     const normalized = normalizeStatus(status);
 
-    if (normalized === 'LISTA') return 'bg-[#198754] text-white';
-    if (normalized === 'CANCELADA') return 'bg-[#dc3545] text-white';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#6d28d9] text-white';
-    if (normalized === 'PENDIENTE') return 'bg-[#ffc107] text-[#111827]';
+    if (normalized === 'LISTA') return 'rounded-full border border-[#86efac] bg-[#dcfce7] text-[#166534]';
+    if (normalized === 'CANCELADA') return 'rounded-full border border-[#fecdd3] bg-[#fff1f2] text-[#be123c]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'rounded-full border border-[#c4b5fd] bg-[#f5f3ff] text-[#5b21b6]';
+    if (normalized === 'PENDIENTE') return 'rounded-full border border-[#fde68a] bg-[#fef3c7] text-[#92400e]';
 
-    return 'bg-[#6c757d] text-white';
+    return 'rounded-full border border-[#cbd5e1] bg-[#f1f5f9] text-[#475569]';
+}
+
+function repairStatusDotClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'bg-[#16a34a]';
+    if (normalized === 'CANCELADA') return 'bg-[#dc2626]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#7c3aed]';
+    if (normalized === 'PENDIENTE') return 'bg-[#f59e0b]';
+
+    return 'bg-[#64748b]';
+}
+
+function repairStatusRailClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'border-l-[#16a34a]';
+    if (normalized === 'CANCELADA') return 'border-l-[#dc2626]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-[#7c3aed]';
+    if (normalized === 'PENDIENTE') return 'border-l-[#f59e0b]';
+
+    return 'border-l-[#64748b]';
+}
+
+function repairStatusRailFillClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'before:bg-[#16a34a]';
+    if (normalized === 'CANCELADA') return 'before:bg-[#dc2626]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'before:bg-[#7c3aed]';
+    if (normalized === 'PENDIENTE') return 'before:bg-[#f59e0b]';
+
+    return 'before:bg-[#64748b]';
+}
+
+function compactStatusLabel(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'REPARACIÓN';
+
+    return compactStatus(status);
 }
 
 function repairStatusSelectClass(status: string): string {
@@ -156,12 +234,23 @@ function repairStatusSelectClass(status: string): string {
     return 'border-[#6c757d] bg-slate-100 text-slate-800';
 }
 
+function repairStatusTextClass(status: string): string {
+    const normalized = normalizeStatus(status);
+
+    if (normalized === 'LISTA') return 'text-[#198754]';
+    if (normalized === 'CANCELADA') return 'text-[#dc3545]';
+    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'text-[#6d28d9]';
+    if (normalized === 'PENDIENTE') return 'text-[#b45309]';
+
+    return 'text-[#64748b]';
+}
+
 function desktopGroupedRepairClass(index: number): string {
     const tones = [
         'border-l-[#1d4ed8] bg-white',
-        'border-l-[#7c3aed] bg-[#fbfaff]',
-        'border-l-[#0f766e] bg-[#f8fffd]',
-        'border-l-[#b45309] bg-[#fffdf8]',
+        'border-l-[#2563eb] bg-[#f8fbff]',
+        'border-l-[#2563eb] bg-white',
+        'border-l-[#2563eb] bg-[#f8fbff]',
     ];
 
     return tones[index % tones.length];
@@ -181,6 +270,18 @@ function formatLegacyDate(value?: string | null): string {
     return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
+function transferPriceLabel(value: string | number | null | undefined): string {
+    const amount = Number(value || 0);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+        return 'Transferencia: sin monto';
+    }
+
+    return amount > 30000
+        ? `Transferencia: ${formatCurrency(Math.round(amount * 1.1))}`
+        : 'Transferencia: mismo importe';
+}
+
 function seniaBadgeLabel(monto: number, senia: number): string | null {
     if (senia <= 0) return null;
     if (monto > 0 && senia >= monto) return null;
@@ -192,7 +293,7 @@ function SeniaBadge({ label }: { label: string | null }): JSX.Element | null {
     if (!label) return null;
 
     return (
-        <span className="inline-flex w-fit items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[0.65rem] font-black text-amber-900">
+        <span className="inline-flex w-fit items-center rounded-full border border-orange-300 bg-orange-50 px-2 py-0.5 text-[0.65rem] font-black text-orange-900">
             {label}
         </span>
     );
@@ -220,6 +321,31 @@ function deliveredDetailLabel(value?: string | null): string {
     if (days === 1) return 'Entregada hace 1 dia';
 
     return `Entregada hace ${days} dias`;
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function HighlightText({ value, term }: { value: string | number | null | undefined; term?: string }): JSX.Element {
+    const text = value === null || value === undefined ? '' : String(value);
+    const query = (term ?? '').trim();
+
+    if (text === '' || query === '') {
+        return <>{text}</>;
+    }
+
+    const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'ig'));
+
+    return (
+        <>
+            {parts.map((part, index) => (
+                part.toLowerCase() === query.toLowerCase()
+                    ? <mark key={`${part}-${index}`} className="rounded-sm bg-[#fde047] px-0.5 font-black text-[#111827]">{part}</mark>
+                    : <span key={`${part}-${index}`}>{part}</span>
+            ))}
+        </>
+    );
 }
 
 function isToday(value?: string | null): boolean {
@@ -317,6 +443,161 @@ function displayRepairModel(repair: RepairOrderView): string {
     return `${brand} ${model}`.trim();
 }
 
+function repairColorHex(color?: string | null): string {
+    const normalized = normalizeRepairText(color);
+    const option = repairColorOptions.find((item) => item.value === normalized);
+
+    return option?.hex ?? '#94a3b8';
+}
+
+function RepairColorSwatch({ color }: { color?: string | null }): JSX.Element | null {
+    const label = (color ?? '').trim();
+
+    if (label === '') {
+        return null;
+    }
+
+    return (
+        <span
+            className="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]"
+            style={{ backgroundColor: repairColorHex(label) }}
+            title={label}
+            aria-label={`Color ${label}`}
+        />
+    );
+}
+
+function RepairModelLabel({ repair, term }: { repair: RepairOrderView; term?: string }): JSX.Element {
+    const model = displayRepairModel(repair);
+
+    return (
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate"><HighlightText value={model || '-'} term={term} /></span>
+            {(repair.color ?? '').trim() !== '' ? <span className="shrink-0 text-[#64748b]">-</span> : null}
+            <RepairColorSwatch color={repair.color} />
+        </span>
+    );
+}
+
+function repairColorLabel(color?: string | null): string {
+    const normalized = normalizeRepairText(color);
+    const option = repairColorOptions.find((item) => item.value === normalized);
+
+    return option?.label ?? (color ?? '');
+}
+
+function RepairColorCombobox({
+    className,
+    value,
+    onChange,
+    disabled,
+}: {
+    className: string;
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+}): JSX.Element {
+    const [open, setOpen] = useState(false);
+    const [showAllColors, setShowAllColors] = useState(false);
+    const [query, setQuery] = useState(repairColorLabel(value));
+    const normalizedQuery = normalizeRepairText(query);
+    const selectedColor = repairColorHex(value);
+    const filteredOptions = showAllColors || normalizedQuery === ''
+        ? repairColorOptions
+        : repairColorOptions.filter((option) => normalizeRepairText(option.label).includes(normalizedQuery) || option.value.includes(normalizedQuery));
+
+    const selectColor = (nextValue: string): void => {
+        onChange(nextValue);
+        setQuery(repairColorLabel(nextValue));
+        setShowAllColors(false);
+        setOpen(false);
+    };
+
+    return (
+        <div className="relative">
+            <span
+                className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]"
+                style={{ backgroundColor: normalizeRepairText(value) === '' ? '#f8fafc' : selectedColor }}
+                aria-hidden="true"
+            />
+            <input
+                className={cn(className, 'pl-9 pr-9')}
+                value={open ? query : repairColorLabel(value)}
+                placeholder="Color"
+                disabled={disabled}
+                onFocus={() => {
+                    setQuery(repairColorLabel(value));
+                    setShowAllColors(false);
+                }}
+                onChange={(event) => {
+                    setQuery(event.target.value);
+                    setShowAllColors(false);
+                    setOpen(true);
+                }}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter' && filteredOptions[0]) {
+                        event.preventDefault();
+                        selectColor(filteredOptions[0].value);
+                    }
+                    if (event.key === 'Escape') {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        setQuery(repairColorLabel(value));
+                    }
+                }}
+                onBlur={() => {
+                    window.setTimeout(() => {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        setQuery(repairColorLabel(value));
+                    }, 120);
+                }}
+            />
+            <button
+                type="button"
+                className="absolute right-2 top-1/2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[#475569] hover:bg-[#e2e8f0] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                aria-label="Mostrar colores"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                    if (open && showAllColors) {
+                        setOpen(false);
+                        setShowAllColors(false);
+                        return;
+                    }
+
+                    setQuery(repairColorLabel(value));
+                    setShowAllColors(true);
+                    setOpen(true);
+                }}
+            >
+                <FaChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+            </button>
+            {open && !disabled ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto rounded-md border border-[#cbd5e1] bg-white py-1 shadow-[0_8px_18px_rgba(15,23,42,0.14)]">
+                    {filteredOptions.length > 0 ? filteredOptions.map((option) => (
+                        <button
+                            key={option.value || 'empty'}
+                            type="button"
+                            className={cn(
+                                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-[#0f172a] hover:bg-[#eff6ff]',
+                                normalizeRepairText(value) === option.value && 'bg-[#dbeafe]',
+                            )}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => selectColor(option.value)}
+                        >
+                            <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]" style={{ backgroundColor: option.hex }} aria-hidden="true" />
+                            <span>{option.label}</span>
+                        </button>
+                    )) : (
+                        <div className="px-3 py-2 text-sm font-semibold text-[#64748b]">Sin coincidencias</div>
+                    )}
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
 function descriptionWithoutRepeatedModel(description?: string | null, model?: string | null, brand?: string | null): string {
     const rawDescription = (description ?? '').trim();
     const rawModel = (model ?? '').trim();
@@ -396,11 +677,17 @@ function FieldSummary({
     label,
     value,
     strong = false,
+    labelClassName,
+    valueClassName,
+    className,
     onClick,
 }: {
     label: string;
     value: ReactNode;
     strong?: boolean;
+    labelClassName?: string;
+    valueClassName?: string;
+    className?: string;
     onClick?: () => void;
 }): JSX.Element {
     const Wrapper = onClick ? 'button' : 'div';
@@ -409,13 +696,15 @@ function FieldSummary({
         <Wrapper
             type={onClick ? 'button' : undefined}
             className={cn(
-                'grid min-w-0 gap-0.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-left',
-                onClick && 'cursor-pointer transition hover:border-[#94a3b8] hover:bg-[#f8fafc]',
+                'grid min-w-0 gap-0.5 rounded-md px-3 py-2 text-left',
+                className ? 'border' : 'border border-slate-200 bg-white',
+                onClick && (className ? 'cursor-pointer transition hover:border-[#94a3b8]' : 'cursor-pointer transition hover:border-[#94a3b8] hover:bg-[#f8fafc]'),
+                className,
             )}
             onClick={onClick}
         >
-            <span className="text-[0.72rem] font-semibold text-slate-500">{label}</span>
-            <span className={cn('text-sm text-[#0f172a]', strong && 'font-black')}>{value}</span>
+            <span className={cn('text-[0.72rem] font-semibold', labelClassName ?? 'text-slate-500')}>{label}</span>
+            <span className={cn('text-sm', valueClassName ?? 'text-[#0f172a]', strong && 'font-black')}>{value}</span>
         </Wrapper>
     );
 }
@@ -423,7 +712,7 @@ function FieldSummary({
 function PaymentStatus({ monto, senia }: { monto: number; senia: number }): JSX.Element {
     if (monto <= 0 && senia <= 0) {
         return (
-            <span className="inline-flex w-fit items-center rounded-md border border-amber-200 bg-amber-100 px-2.5 py-1 text-[0.68rem] font-bold text-amber-900">
+            <span className="inline-flex w-fit items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[0.68rem] font-bold text-sky-800">
                 COTIZAR
             </span>
         );
@@ -431,7 +720,7 @@ function PaymentStatus({ monto, senia }: { monto: number; senia: number }): JSX.
 
     if (monto > 0 && senia >= monto) {
         return (
-            <span className="inline-flex w-fit items-center rounded-md border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-bold text-emerald-800">
+            <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[0.68rem] font-bold text-emerald-800">
                 PAGADO
             </span>
         );
@@ -451,7 +740,7 @@ function EditField({
 }): JSX.Element {
     return (
         <label className="grid min-w-0 gap-1.5">
-            <span className="text-[0.83rem] font-black text-[#0f172a]">{label}</span>
+            <span className="text-[0.83rem] font-black leading-tight text-[#0f172a]">{label}</span>
             {children}
             {note ? <span className="text-[0.75rem] font-semibold text-slate-500">{note}</span> : null}
         </label>
@@ -651,16 +940,20 @@ function AddRepairModal({
     const form = useForm<AddRepairFormData>({
         marca: '',
         modelo: '',
+        color: '',
         tipo_servicio: '',
         descripcion: '',
         observaciones: 'sin observaciones',
         monto: '0',
         senia: '0',
+        senia_method: 'efectivo',
         fecha_estimada: today,
         repuesto: '',
         repuesto_pedido: false,
         inventory_part_id: '',
         categorias_reparacion: '4',
+        unlock_type: '',
+        unlock_value: '',
         images: null,
     });
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -708,10 +1001,14 @@ function AddRepairModal({
     };
 
     const changeCategory = (value: string): void => {
+        const phoneCategory = isPhoneCategoryValue(serviceCategories, value);
+
         form.setData((current) => ({
             ...current,
             categorias_reparacion: value,
-            marca: isPhoneCategoryValue(serviceCategories, value) ? current.marca : '',
+            marca: phoneCategory ? current.marca : '',
+            unlock_type: phoneCategory ? current.unlock_type : '',
+            unlock_value: phoneCategory ? current.unlock_value : '',
         }));
     };
 
@@ -810,8 +1107,22 @@ function AddRepairModal({
                                 </select>
                             </EditField>
                         ) : null}
+                        {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
+                            <EditField label="Desbloqueo">
+                                <PhoneUnlockFields
+                                    unlockType={form.data.unlock_type}
+                                    unlockValue={form.data.unlock_value}
+                                    onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                    selectClassName={ui.input}
+                                    inputClassName={ui.input}
+                                />
+                            </EditField>
+                        ) : null}
                         <EditField label="Modelo">
                             <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
+                        </EditField>
+                        <EditField label="Color">
+                            <RepairColorCombobox className={ui.input} value={form.data.color} onChange={(value) => form.setData('color', value)} />
                         </EditField>
                         <EditField label="Tipo de servicio">
                             <select className={ui.input} value="" onChange={(event) => applyDescriptionOption(event.target.value)}>
@@ -828,15 +1139,22 @@ function AddRepairModal({
                 </EditSection>
 
                 <EditSection title="Agenda e importes">
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]">
                         <EditField label="Fecha estimada">
                             <input className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                         </EditField>
                         <EditField label="Monto">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                            <span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
                         </EditField>
                         <EditField label="Seña">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
+                        </EditField>
+                        <EditField label="Medio de seña">
+                            <select className={ui.input} value={form.data.senia_method} onChange={(event) => form.setData('senia_method', event.target.value)}>
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                            </select>
                         </EditField>
                     </div>
                 </EditSection>
@@ -948,6 +1266,8 @@ function RepairEditCard({
     desktopGroupExpanded = true,
     onToggleDesktopGroup,
     archived = false,
+    statusLabel,
+    highlightTerm,
 }: {
     repair: RepairOrderView;
     serviceCategories: ServiceCategoryOption[];
@@ -961,6 +1281,8 @@ function RepairEditCard({
     desktopGroupExpanded?: boolean;
     onToggleDesktopGroup?: () => void;
     archived?: boolean;
+    statusLabel?: (repair: RepairOrderView) => string;
+    highlightTerm?: string;
 }): JSX.Element {
     const initialBrand = inferredRepairBrand(repair);
     const form = useForm<RepairUpdateFormData>({
@@ -971,6 +1293,7 @@ function RepairEditCard({
         contacto: repair.contacto ?? '',
         marca: initialBrand,
         modelo: repair.modelo ?? '',
+        color: repair.color ?? '',
         descripcion: repair.descripcion ?? '',
         observaciones: repair.observaciones ?? '',
         info: ticket.info ?? '',
@@ -983,17 +1306,27 @@ function RepairEditCard({
         repuesto_pedido: Boolean(repair.repuesto_pedido),
         inventory_part_id: repair.inventory_part_id ? String(repair.inventory_part_id) : '',
         categorias_reparacion: String(repair.categorias_reparacion ?? 4),
+        unlock_type: repair.unlock_type ?? '',
+        unlock_value: repair.unlock_value ?? '',
         images: null,
         final_images: null,
     });
     const paymentForm = useForm<PaymentFormData>({
         amount: '',
-        method: '',
+        payment_type: 'senia',
+        method: 'efectivo',
+        notes: '',
+        paid_at: todayInputValue(),
+    });
+    const incrementForm = useForm<IncrementFormData>({
+        amount: '',
+        payment_type: 'incremento',
         notes: '',
         paid_at: todayInputValue(),
     });
     const [editOpen, setEditOpen] = useState(false);
     const [infoOpen, setInfoOpen] = useState(false);
+    const [quickOpen, setQuickOpen] = useState(false);
     const [inlineOpen, setInlineOpen] = useState(false);
     const [deliveryOpen, setDeliveryOpen] = useState(false);
     const [deliveryVia, setDeliveryVia] = useState<DeliveryVia>('dni');
@@ -1014,7 +1347,9 @@ function RepairEditCard({
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'LISTA'].includes(repair.estado);
     const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
     const nextStatus = nextQuickStatus(repair.estado);
-    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni);
+    const displayStatus = statusLabel?.(repair) ?? compactStatus(repair.estado);
+    const unlockLabel = phoneUnlockLabel(repair.unlock_type, repair.unlock_value);
+    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni || unlockLabel);
     const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
@@ -1035,6 +1370,11 @@ function RepairEditCard({
         ? partInventory.find((part) => String(part.id) === form.data.inventory_part_id) ?? null
         : null;
     const payments = repair.payments ?? [];
+    const incrementAmountText = incrementForm.data.amount.trim();
+    const incrementConceptText = incrementForm.data.notes.trim();
+    const incrementAmount = Number(incrementAmountText || 0);
+    const hasPendingIncrementInput = incrementAmountText !== '' || incrementConceptText !== '';
+    const hasCompletePendingIncrement = incrementAmountText !== '' && incrementConceptText !== '' && Number.isFinite(incrementAmount) && incrementAmount > 0;
     const assignedInventoryModel = form.data.inventory_part_id !== ''
         ? selectedInventoryPart?.model ?? repair.inventory_part_model ?? null
         : null;
@@ -1062,21 +1402,64 @@ function RepairEditCard({
         setPartSearch('');
     };
 
-    const submitEdit = (event: FormEvent<HTMLFormElement>): void => {
-        event.preventDefault();
+    const postEdit = (overrideMonto?: number): void => {
         if (!repair.actions?.update) return;
+
+        form.transform((data) => overrideMonto === undefined
+            ? data
+            : ({
+                ...data,
+                monto: formatAmountInput(overrideMonto),
+            }));
 
         form.post(repair.actions.update, {
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {
+                if (overrideMonto !== undefined) {
+                    form.setData('monto', formatAmountInput(overrideMonto));
+                }
                 form.reset('images', 'final_images');
                 setImagePreviews([]);
                 setFinalImagePreviews([]);
                 setEditOpen(false);
                 setInlineOpen(false);
             },
+            onFinish: () => {
+                form.transform((data) => data);
+            },
         });
+    };
+
+    const submitEdit = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        if (!repair.actions?.update) return;
+
+        if (hasPendingIncrementInput) {
+            if (!hasCompletePendingIncrement) {
+                window.alert('Para guardar el incremento, completa concepto e importe mayor a 0.');
+                return;
+            }
+
+            if (!repair.actions?.addPayment) {
+                window.alert('No se encontro la accion para registrar incrementos.');
+                return;
+            }
+
+            const nextAmount = monto + incrementAmount;
+
+            incrementForm.post(repair.actions.addPayment, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    incrementForm.reset('amount', 'notes');
+                    postEdit(nextAmount);
+                },
+            });
+
+            return;
+        }
+
+        postEdit();
     };
 
     const submitInfo = (event: FormEvent<HTMLFormElement>): void => {
@@ -1099,9 +1482,23 @@ function RepairEditCard({
         });
     };
 
+    const submitIncrement = (): void => {
+        if (!repair.actions?.addPayment) return;
+
+        const nextAmount = Number.isFinite(incrementAmount) ? monto + incrementAmount : monto;
+
+        incrementForm.post(repair.actions.addPayment, {
+            preserveScroll: true,
+            onSuccess: () => {
+                incrementForm.reset('amount', 'notes');
+                form.setData('monto', formatAmountInput(nextAmount));
+            },
+        });
+    };
+
     const deletePayment = (action?: string): void => {
         if (!action) return;
-        if (window.confirm('Eliminar esta seña del historial?')) {
+        if (window.confirm('Eliminar este movimiento del historial?')) {
             router.post(action, {}, { preserveScroll: true });
         }
     };
@@ -1153,6 +1550,10 @@ function RepairEditCard({
         }
     };
 
+    const openQuickView = (): void => {
+        setQuickOpen(true);
+    };
+
     const openDeliveryModal = (): void => {
         form.setData('fecha_entregado', form.data.fecha_entregado || todayInputValue());
         setDeliveryOpen(true);
@@ -1164,10 +1565,14 @@ function RepairEditCard({
     };
 
     const changeInlineCategory = (value: string): void => {
+        const phoneCategory = isPhoneCategoryValue(serviceCategories, value);
+
         form.setData((current) => ({
             ...current,
             categorias_reparacion: value,
-            marca: isPhoneCategoryValue(serviceCategories, value) ? current.marca : '',
+            marca: phoneCategory ? current.marca : '',
+            unlock_type: phoneCategory ? current.unlock_type : '',
+            unlock_value: phoneCategory ? current.unlock_value : '',
         }));
     };
 
@@ -1254,7 +1659,7 @@ function RepairEditCard({
         <form
             className={cn(
                 'grid gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3',
-                mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(150px,1fr)_96px_128px_126px_124px_124px_minmax(160px,1.05fr)_138px_112px_142px]',
+                mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(150px,1fr)_96px_128px_126px_124px_124px_minmax(150px,1fr)_106px_138px_112px_142px]',
             )}
             onSubmit={submitEdit}
         >
@@ -1279,14 +1684,48 @@ function RepairEditCard({
                 <input className={ui.repairDenseInput} value={form.data.marca} onChange={(event) => form.setData('marca', event.target.value.toUpperCase())} placeholder="Marca" />
             )}
             <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} placeholder="Modelo" />
+            <RepairColorCombobox className={ui.repairDenseInput} value={form.data.color} onChange={(value) => form.setData('color', value)} />
             <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
-            <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
+            <label className="grid min-w-0 gap-1">
+                <input className={ui.repairDenseInput} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} placeholder="Monto" />
+                <span className="text-[0.68rem] font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
+            </label>
             <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
                 {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
             </select>
+            <div className={cn('grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2', mobile ? 'col-span-2 grid-cols-1' : 'col-span-full grid-cols-[minmax(180px,1fr)_120px_140px_auto] items-end')}>
+                <input
+                    className={ui.repairDenseInput}
+                    placeholder="Concepto de incremento"
+                    value={incrementForm.data.notes}
+                    onChange={(event) => incrementForm.setData('notes', event.target.value)}
+                />
+                <input
+                    className={ui.repairDenseInput}
+                    inputMode="decimal"
+                    placeholder="Importe"
+                    value={incrementForm.data.amount}
+                    onFocus={() => incrementForm.data.amount.trim() === '0' ? incrementForm.setData('amount', '') : undefined}
+                    onChange={(event) => incrementForm.setData('amount', event.target.value)}
+                />
+                <input
+                    className={ui.repairDenseInput}
+                    type="date"
+                    value={incrementForm.data.paid_at}
+                    onChange={(event) => incrementForm.setData('paid_at', event.target.value)}
+                />
+                <button
+                    type="button"
+                    className={buttonClass('soft', 'sm', 'min-h-9 whitespace-nowrap border-[#f59e0b] bg-[#f59e0b] px-3 text-white hover:bg-[#d97706]')}
+                    disabled={incrementForm.processing || incrementForm.data.amount.trim() === '' || incrementForm.data.notes.trim() === ''}
+                    onClick={submitIncrement}
+                >
+                    Registrar incremento
+                </button>
+            </div>
             <div className={cn('flex gap-2', mobile ? 'col-span-2' : 'col-span-full justify-end')}>
                 <button type="button" className={buttonClass('soft', 'sm')} onClick={cancelInlineEdit}>Cancelar</button>
-                <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>
+                <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing || incrementForm.processing}>
                     <FaSave aria-hidden="true" /> Guardar
                 </button>
             </div>
@@ -1310,7 +1749,7 @@ function RepairEditCard({
                 <>
                     <FaImage className="absolute text-slate-400" aria-hidden="true" />
                     <img src={firstImage.thumbnailUrl || firstImage.url} alt={firstImage.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
-                    {galleryImages.length > 1 ? <span className="absolute right-1 top-1 rounded-md bg-slate-950/75 px-1.5 py-0.5 text-[0.68rem] font-bold text-white">+{galleryImages.length - 1}</span> : null}
+                    {galleryImages.length > 1 ? <span className="absolute right-1 top-1 rounded-full bg-slate-950/75 px-1.5 py-0.5 text-[0.68rem] font-bold text-white">+{galleryImages.length - 1}</span> : null}
                 </>
             ) : (
                 <FaImage aria-hidden="true" />
@@ -1318,15 +1757,124 @@ function RepairEditCard({
         </button>
     );
 
-    const ActionButtons = ({ mobile = false, showGeneralTicketActions = true }: { mobile?: boolean; showGeneralTicketActions?: boolean }): JSX.Element => {
+    const ActionButtons = ({ mobile = false, showGeneralTicketActions = true, showOrderActions = showGeneralTicketActions }: { mobile?: boolean; showGeneralTicketActions?: boolean; showOrderActions?: boolean }): JSX.Element => {
         const iconOnly = true;
         const base = mobile
-            ? 'grid h-9 w-9 place-items-center rounded-xl text-[0.78rem] no-underline shadow-sm'
+            ? 'grid h-9 w-9 place-items-center rounded-md text-[0.78rem] no-underline'
             : 'grid h-7 w-7 place-items-center rounded-md text-[0.72rem] no-underline shadow-sm transition hover:brightness-95';
+        const menuItem = 'flex min-h-8 items-center gap-2 rounded-md border border-[#cbd5e1] bg-white px-2.5 py-1.5 text-left text-[0.72rem] font-black text-[#334155] no-underline transition hover:bg-[#f8fafc]';
         const groupClass = mobile
             ? 'flex items-center gap-1.5'
             : 'flex items-center gap-1 border-l border-[#cbd5e1] pl-1.5 first:border-l-0 first:pl-0';
         const showWorkflowActions = (!readOnly && canAddToTasks && Boolean(repair.actions?.addToTasks)) || canMarkReady || canDeliver;
+        const hasSecondaryDesktopActions = !mobile && (
+            showGeneralTicketActions
+            || showOrderActions
+            || canCancel
+            || Boolean(repair.actions?.archive && !repair.archivado_at)
+            || Boolean(repair.actions?.delete)
+        );
+
+        if (!mobile) {
+            return (
+                <div className="flex flex-wrap items-center justify-end gap-1">
+                    {showWorkflowActions ? (
+                        <span className={groupClass}>
+                            {!readOnly && canAddToTasks && repair.actions?.addToTasks ? (
+                                <button
+                                    type="button"
+                                    className={cn(base, 'relative border border-[#d6b48c] bg-[#d6b48c] text-[#3f2a16]')}
+                                    onClick={addToTasks}
+                                    title={repair.taskQueuePosition ? `Quitar de tareas: posicion ${repair.taskQueuePosition}` : 'Agregar a tareas'}
+                                >
+                                    <FaClipboardCheck aria-hidden="true" />
+                                    {repair.taskQueuePosition ? (
+                                        <span className="absolute -right-1.5 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full border border-white bg-[#3f2a16] px-1 text-[0.58rem] font-black leading-none text-white">
+                                            {repair.taskQueuePosition}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            ) : null}
+                            {canMarkReady ? (
+                                <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
+                                    <FaCheckCircle aria-hidden="true" />
+                                </button>
+                            ) : null}
+                            {canDeliver ? (
+                                <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
+                                    <FaDollyFlatbed aria-hidden="true" />
+                                </button>
+                            ) : null}
+                        </span>
+                    ) : null}
+                    <span className={groupClass}>
+                        {showGeneralTicketActions ? (
+                            <button
+                                type="button"
+                                className={cn(base, hasInfo ? 'border border-[#0f766e] bg-[#0f766e] text-white' : 'border border-[#cbd5e1] bg-white text-[#334155]')}
+                                onClick={() => setInfoOpen(true)}
+                                title={hasInfo ? 'Info cargada' : 'Agregar info'}
+                            >
+                                <FaInfoCircle aria-hidden="true" />
+                            </button>
+                        ) : null}
+                        <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
+                            <FaEdit aria-hidden="true" />
+                        </button>
+                        {showOrderActions ? (
+                            <>
+                                <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparación">
+                                    <FaPlus aria-hidden="true" />
+                                </button>
+                                <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
+                                    <FaReceipt aria-hidden="true" />
+                                </Link>
+                                {ticket.whatsappUrl ? (
+                                    <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')} title="WhatsApp">
+                                        <FaWhatsapp aria-hidden="true" />
+                                    </a>
+                                ) : (
+                                    <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
+                                        <FaWhatsapp aria-hidden="true" />
+                                    </span>
+                                )}
+                            </>
+                        ) : null}
+                    </span>
+                    {hasSecondaryDesktopActions ? (
+                        <details className="relative">
+                            <summary className={cn(base, 'cursor-pointer list-none border border-[#cbd5e1] bg-white text-[#334155] [&::-webkit-details-marker]:hidden')} title="Mas acciones">
+                                <FaEllipsisH aria-hidden="true" />
+                            </summary>
+                            <div className="absolute right-0 top-8 z-40 grid w-[11.5rem] gap-1 rounded-md border border-[#cbd5e1] bg-white p-1.5 shadow-lg">
+                                {showOrderActions ? (
+                                    <>
+                                        <a href={ticket.trackingUrl} className={menuItem}>
+                                            <FaArrowRight aria-hidden="true" /> Seguimiento
+                                        </a>
+                                    </>
+                                ) : null}
+                                {canCancel ? (
+                                    <button type="button" className={cn(menuItem, 'border-[#fed7aa] bg-[#fff7ed] text-[#92400e]')} onClick={cancelRepair}>
+                                        <FaTimes aria-hidden="true" /> Cancelar
+                                    </button>
+                                ) : null}
+                                {!readOnly && repair.actions?.archive && !repair.archivado_at ? (
+                                    <button type="button" className={cn(menuItem, 'border-[#cbd5e1] bg-[#f8fafc] text-[#475569]')} onClick={() => router.post(repair.actions?.archive ?? '', {}, { preserveScroll: true })}>
+                                        <FaArchive aria-hidden="true" /> Archivar
+                                    </button>
+                                ) : null}
+                                {repair.actions?.delete ? (
+                                    <button type="button" className={cn(menuItem, 'border-[#fecdd3] bg-[#fff1f2] text-[#be123c]')} onClick={deleteRepair}>
+                                        <FaTrashAlt aria-hidden="true" /> Eliminar
+                                    </button>
+                                ) : null}
+                            </div>
+                        </details>
+                    ) : null}
+                </div>
+            );
+        }
 
         return (
             <div className={cn(mobile ? 'flex flex-wrap justify-end gap-1.5' : 'flex flex-wrap items-center justify-end gap-1')}>
@@ -1373,13 +1921,13 @@ function RepairEditCard({
                     <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                         <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                     </button>
-                    {showGeneralTicketActions ? (
+                    {showOrderActions ? (
                         <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparacion">
                             <FaPlus aria-hidden="true" />{iconOnly ? null : 'Agregar reparacion'}
                         </button>
                     ) : null}
                 </span>
-                {showGeneralTicketActions ? (
+                {showOrderActions ? (
                     <span className={groupClass}>
                         <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
                             <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
@@ -1421,6 +1969,88 @@ function RepairEditCard({
 
     const modals = (
         <>
+            {quickOpen ? (
+                <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45" role="dialog" aria-modal="true">
+                    <button type="button" className="min-w-0 flex-1 cursor-default" aria-label="Cerrar vista rápida" onClick={() => setQuickOpen(false)} />
+                    <aside className="h-full w-full max-w-[520px] overflow-y-auto border-l border-[#cbd5e1] bg-white shadow-lg">
+                        <header className="sticky top-0 z-10 border-b border-[#cbd5e1] bg-white px-4 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-xs font-black uppercase text-[#2563eb]">Ticket #{repair.id} · Trabajo {repair.reparacion}</div>
+                                    <h3 className="mt-1 truncate text-xl font-black text-[#0f172a]">{repair.nombre_cliente}</h3>
+                                    <p className="text-sm font-bold text-[#475569]">{repairDisplayModel || 'Sin modelo'} · {displayStatus}</p>
+                                </div>
+                                <button type="button" className="grid h-9 w-9 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setQuickOpen(false)} title="Cerrar">
+                                    <FaTimes aria-hidden="true" />
+                                </button>
+                            </div>
+                        </header>
+                        <div className="grid gap-3 p-4 text-sm">
+                            <section className="grid grid-cols-2 gap-2">
+                                <FieldSummary label="DNI" value={<HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} />} />
+                                <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto || '-'} term={highlightTerm} />} />
+                                <FieldSummary label="Ingreso" value={<HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} />} />
+                                <FieldSummary label="Estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black text-[#92400e]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black text-[#be123c]">{overdueText}</span> : null}</>} />
+                                <FieldSummary label="Monto" value={formatCurrency(monto)} strong />
+                                <FieldSummary label="Seña" value={senia > 0 ? formatCurrency(senia) : '-'} />
+                            </section>
+                            <section className="grid gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] p-3">
+                                <div className="text-xs font-black uppercase text-[#475569]">Falla</div>
+                                <p className="whitespace-pre-wrap font-semibold text-[#0f172a]"><HighlightText value={displayDescription} term={highlightTerm} /></p>
+                            </section>
+                            {repair.repuesto ? (
+                                <section className="grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-3">
+                                    <div className="text-xs font-black uppercase text-[#92400e]">Repuesto</div>
+                                    <p className="whitespace-pre-wrap font-semibold text-[#7c2d12]"><HighlightText value={repair.repuesto} term={highlightTerm} /></p>
+                                </section>
+                            ) : null}
+                            {ticket.info ? (
+                                <section className="grid gap-2 rounded-md border border-[#99f6e4] bg-[#f0fdfa] p-3">
+                                    <div className="text-xs font-black uppercase text-[#0f766e]">Info interna</div>
+                                    <p className="whitespace-pre-wrap font-semibold text-[#134e4a]">{ticket.info}</p>
+                                </section>
+                            ) : null}
+                            {payments.length > 0 ? (
+                                <section className="grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-3">
+                                    <div className="text-xs font-black uppercase text-[#475569]">Movimientos</div>
+                                    {payments.slice(0, 5).map((payment) => (
+                                        <div key={payment.id} className="flex items-center justify-between gap-2 border-t border-[#e2e8f0] pt-2 first:border-t-0 first:pt-0">
+                                            <span className="font-bold text-[#334155]">{payment.payment_type} · {payment.method}</span>
+                                            <span className="font-black text-[#0f172a]">{formatCurrency(payment.amount)}</span>
+                                        </div>
+                                    ))}
+                                </section>
+                            ) : null}
+                            {galleryImages.length > 0 ? (
+                                <section className="grid gap-2">
+                                    <div className="text-xs font-black uppercase text-[#475569]">Imágenes</div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {galleryImages.slice(0, 6).map((image, imageIndex) => (
+                                            <button key={`${image.filename}-${imageIndex}`} type="button" className="aspect-square overflow-hidden rounded-md border border-[#cbd5e1] bg-[#f1f5f9]" onClick={() => setGalleryIndex(imageIndex)}>
+                                                <img src={image.thumbnailUrl || image.url} alt={image.filename} className="h-full w-full object-cover" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </section>
+                            ) : null}
+                            {!readOnly ? (
+                                <div className="sticky bottom-0 -mx-4 -mb-4 grid grid-cols-2 gap-2 border-t border-[#cbd5e1] bg-white p-4">
+                                    <button type="button" className={buttonClass('primary', 'sm')} onClick={() => { setQuickOpen(false); setEditOpen(true); }}>
+                                        Editar
+                                    </button>
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setQuickOpen(false); setInfoOpen(true); }}>
+                                        Info
+                                    </button>
+                                    {ticket.ticketUrl ? <Link href={ticket.ticketUrl} className={buttonClass('soft', 'sm')}>Ticket</Link> : null}
+                                    {ticket.trackingUrl ? <a href={ticket.trackingUrl} className={buttonClass('soft', 'sm')}>Seguimiento</a> : null}
+                                    {ticket.whatsappUrl ? <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={buttonClass('soft', 'sm')}>WhatsApp</a> : null}
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setQuickOpen(false); onAddRepair(); }}>Agregar reparación</button>
+                                </div>
+                            ) : null}
+                        </div>
+                    </aside>
+                </div>
+            ) : null}
             {infoOpen ? (
                 <ModalShell title={`Info interna orden #${ticket.id}`} onClose={() => setInfoOpen(false)}>
                     <form className="grid gap-3" onSubmit={submitInfo}>
@@ -1471,36 +2101,79 @@ function RepairEditCard({
                                 <EditField label="Modelo">
                                     <input className={changedInputClass(form.data.modelo, repair.modelo ?? '')} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} disabled={readOnly} />
                                 </EditField>
+                                <EditField label="Color">
+                                    <RepairColorCombobox className={changedInputClass(form.data.color, repair.color ?? '')} value={form.data.color} onChange={(value) => form.setData('color', value)} disabled={readOnly} />
+                                </EditField>
                                 <EditField label="Categoria">
-                                    <select className={changedInputClass(form.data.categorias_reparacion, String(repair.categorias_reparacion ?? 4))} value={form.data.categorias_reparacion} onChange={(event) => form.setData('categorias_reparacion', event.target.value)} disabled={readOnly}>
+                                    <select className={changedInputClass(form.data.categorias_reparacion, String(repair.categorias_reparacion ?? 4))} value={form.data.categorias_reparacion} onChange={(event) => changeInlineCategory(event.target.value)} disabled={readOnly}>
                                         {serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
                                     </select>
                                 </EditField>
+                                {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
+                                    <EditField label="Desbloqueo">
+                                        <PhoneUnlockFields
+                                            unlockType={form.data.unlock_type}
+                                            unlockValue={form.data.unlock_value}
+                                            onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                            selectClassName={changedInputClass(form.data.unlock_type, repair.unlock_type ?? '')}
+                                            inputClassName={changedInputClass(form.data.unlock_value, repair.unlock_value ?? '')}
+                                            disabled={readOnly}
+                                        />
+                                    </EditField>
+                                ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
-                                    <div className="grid gap-2">
-                                        <EditField label="Monto ($)">
-                                            <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
-                                        </EditField>
-                                        {!readOnly ? (
+                                    <EditField label="Monto ($)">
+                                        <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
+                                        <span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
+                                    </EditField>
+                                    <EditField label="Pagado ($)">
+                                        <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
+                                    </EditField>
+                                </div>
+                                {!readOnly ? (
+                                    <div className="grid gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3">
+                                        <div className="grid items-end gap-2 [grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr))]">
                                             <EditField label="Importe de seña">
                                                 <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
                                             </EditField>
-                                        ) : null}
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <EditField label="Pagado ($)">
-                                            <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
-                                        </EditField>
-                                        {!readOnly ? (
+                                            <EditField label="Medio">
+                                                <select className={changedInputClass(paymentForm.data.method, 'efectivo', undefined, false)} value={paymentForm.data.method || 'efectivo'} onChange={(event) => paymentForm.setData('method', event.target.value)}>
+                                                    <option value="efectivo">Efectivo</option>
+                                                    <option value="transferencia">Transferencia</option>
+                                                </select>
+                                            </EditField>
                                             <EditField label="Fecha de seña">
                                                 <input className={changedInputClass(paymentForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={paymentForm.data.paid_at} onChange={(event) => paymentForm.setData('paid_at', event.target.value)} />
                                             </EditField>
-                                        ) : null}
+                                            <button type="button" className={buttonClass('primary', 'sm', 'min-h-9 w-full whitespace-nowrap px-4')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
+                                                Registrar seña
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : null}
+                                {!readOnly ? (
+                                    <div className="grid gap-2 rounded-lg border border-[#fed7aa] bg-[#fff7ed] p-3">
+                                        <div className="grid gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.7fr)]">
+                                            <EditField label="Concepto de incremento">
+                                                <input className={changedInputClass(incrementForm.data.notes, '', undefined, false)} placeholder="Ej: pin de carga" value={incrementForm.data.notes} onChange={(event) => incrementForm.setData('notes', event.target.value)} />
+                                            </EditField>
+                                            <EditField label="Importe ($)">
+                                                <input className={changedInputClass(incrementForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="0" value={incrementForm.data.amount} onFocus={() => incrementForm.data.amount.trim() === '0' ? incrementForm.setData('amount', '') : undefined} onChange={(event) => incrementForm.setData('amount', event.target.value)} />
+                                            </EditField>
+                                        </div>
+                                        <div className="grid gap-2 sm:grid-cols-[minmax(9rem,0.65fr)_minmax(11rem,auto)] sm:items-end">
+                                            <EditField label="Fecha de incremento">
+                                                <input className={changedInputClass(incrementForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={incrementForm.data.paid_at} onChange={(event) => incrementForm.setData('paid_at', event.target.value)} />
+                                            </EditField>
+                                            <button type="button" className={buttonClass('soft', 'sm', 'min-h-9 whitespace-nowrap border-[#f59e0b] bg-[#f59e0b] px-3 text-white hover:bg-[#d97706]')} disabled={incrementForm.processing || incrementForm.data.amount.trim() === '' || incrementForm.data.notes.trim() === ''} onClick={submitIncrement}>
+                                                Registrar incremento
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : null}
                                 <details className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
                                     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
-                                        <span className="font-black text-[#0f172a]">Historial de pagos ({payments.length})</span>
+                                        <span className="font-black text-[#0f172a]">Historial de pagos e incrementos ({payments.length})</span>
                                         <span className="flex items-center gap-2 font-black text-[#0f172a]">
                                             {formatCurrency(senia)}
                                             <FaChevronDown className="text-xs text-[#64748b]" aria-hidden="true" />
@@ -1509,43 +2182,37 @@ function RepairEditCard({
                                     <div className="grid gap-3 border-t border-[#e2e8f0] p-3">
                                         {payments.length > 0 ? (
                                             <div className="grid gap-1">
-                                                {payments.map((payment) => (
-                                                    <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
+                                                {payments.map((payment) => {
+                                                    const isIncrement = payment.payment_type === 'incremento';
+                                                    const detail = isIncrement ? payment.notes || 'Sin concepto' : 'Seña registrada';
+
+                                                    return (
+                                                        <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
                                                         <div className="min-w-0">
-                                                            <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - seña</strong>
-                                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{[payment.method, payment.notes].filter(Boolean).join(' - ') || 'Sin detalle'}</span>
+                                                            <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - {isIncrement ? 'incremento' : 'seña'}</strong>
+                                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{detail}</span>
                                                         </div>
-                                                        <span className="font-black text-[#0f172a]">{formatCurrency(payment.amount)}</span>
+                                                        <span className={cn('font-black', isIncrement ? 'text-[#b45309]' : 'text-[#0f172a]')}>{isIncrement ? '+' : ''}{formatCurrency(payment.amount)}</span>
                                                         {!readOnly ? (
                                                             <button
                                                                 type="button"
                                                                 className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md text-xs font-black text-[#dc2626] transition hover:bg-[#fee2e2]"
                                                                 onClick={() => deletePayment(payment.deleteAction)}
-                                                                title="Eliminar seña"
-                                                                aria-label="Eliminar seña"
+                                                                title="Eliminar movimiento"
+                                                                aria-label="Eliminar movimiento"
                                                             >
                                                                 <FaTimes aria-hidden="true" />
                                                             </button>
                                                         ) : null}
                                                     </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
                                             <span className="rounded-md border border-dashed border-[#cbd5e1] bg-white px-3 py-3 text-center text-sm font-semibold text-[#64748b]">Sin pagos registrados.</span>
                                         )}
                                     </div>
                                 </details>
-                                {!readOnly ? (
-                                    <div className="grid gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                                        <div className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
-                                            <input className={changedInputClass(paymentForm.data.method, '', undefined, false)} placeholder="Metodo" value={paymentForm.data.method} onChange={(event) => paymentForm.setData('method', event.target.value)} />
-                                            <input className={changedInputClass(paymentForm.data.notes, '', undefined, false)} placeholder="Nota" value={paymentForm.data.notes} onChange={(event) => paymentForm.setData('notes', event.target.value)} />
-                                            <button type="button" className={buttonClass('primary', 'sm')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
-                                                Registrar seña
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Fecha de ingreso">
                                         <input className={changedInputClass(form.data.fecha, repair.fecha ?? '')} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} disabled={readOnly} />
@@ -1661,7 +2328,7 @@ function RepairEditCard({
                         ) : null}
                         <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setEditOpen(false)}>Cerrar</button>
-                            <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>
+                            <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing || incrementForm.processing}>
                                 <FaSave aria-hidden="true" /> Guardar Cambios
                             </button>
                         </div>
@@ -1726,9 +2393,16 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fafc] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-rose-50', isToday(repair.fecha_estimada) && 'bg-amber-50')}>
-                    <div className="grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 text-center">
-                        {showDesktopTicketData ? <strong className="text-base leading-none text-[#0f172a]">#{repair.id}</strong> : <span className="text-slate-300">-</span>}
+                <div className={cn('group/repair-row grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] focus-within:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
+                    <div className="sticky left-0 z-[2] grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 bg-inherit text-center shadow-[1px_0_0_#cbd5e1]">
+                        {showDesktopTicketData ? (
+                            <button type="button" className="text-base font-black leading-none text-[#0f172a]" onClick={openQuickView}>#<HighlightText value={repair.id} term={highlightTerm} /></button>
+                        ) : (
+                            <button type="button" className="grid gap-0.5 text-left" onClick={openQuickView}>
+                                <span className="text-[0.58rem] font-black uppercase text-[#2563eb]">Trabajo</span>
+                                <span className="text-sm font-black text-[#0f172a]">{rowIndex + 1}/{rowTotal}</span>
+                            </button>
+                        )}
                         {showDesktopTicketData && rowTotal > 1 && onToggleDesktopGroup ? (
                             <button
                                 type="button"
@@ -1741,44 +2415,45 @@ function RepairEditCard({
                             </button>
                         ) : <span className="block h-6 w-[2.35rem]" aria-hidden="true" />}
                     </div>
-                    <button type="button" className="flex items-center text-left font-black uppercase text-[#0f172a]" onClick={openInlineEditor} title={repair.nombre_cliente}>{showDesktopTicketData ? repair.nombre_cliente : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? (repair.dni === 12345678 ? 'SIN DNI' : repair.dni) : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={repair.contacto || '-'}>{showDesktopTicketData ? (repair.contacto || '-') : ''}</button>
-                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openInlineEditor}>{showDesktopTicketData ? formatLegacyDate(repair.fecha) : ''}</button>
+                    <button type="button" className="sticky left-[6.8rem] z-[2] flex items-center bg-inherit text-left font-black uppercase text-[#0f172a] shadow-[1px_0_0_#cbd5e1]" onClick={openQuickView} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : <span className="text-[0.68rem] text-[#64748b]">Mismo ticket</span>}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView} title={repair.contacto || '-'}>{showDesktopTicketData ? <HighlightText value={repair.contacto || '-'} term={highlightTerm} /> : ''}</button>
+                    <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} /> : ''}</button>
                     <div className="flex items-center justify-center"><Thumb large /></div>
                     <div className="grid content-center gap-1 text-left">
                         {rowTotal > 1 ? (
                             <div className="flex min-w-0 items-center gap-2">
-                                <button type="button" className="min-w-0 text-left text-[0.62rem] font-black text-[#2563eb]" onClick={openInlineEditor} title={desktopWorkLabel}>
+                                <button type="button" className="min-w-0 text-left text-[0.62rem] font-black text-[#2563eb]" onClick={openQuickView} title={desktopWorkLabel}>
                                     {desktopWorkLabel}
                                 </button>
                             </div>
                         ) : null}
-                        <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openInlineEditor} title={repairDisplayModel || '-'}>
-                            {repairDisplayModel || '-'}
+                        <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openQuickView} title={repairDisplayModel || '-'}>
+                            <RepairModelLabel repair={repair} term={highlightTerm} />
                         </button>
                     </div>
-                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openInlineEditor} title={displayDescription}>
-                        <span className="line-clamp-2">{displayDescription}</span>
+                    <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openQuickView} title={displayDescription}>
+                        <span className="line-clamp-2"><HighlightText value={displayDescription} term={highlightTerm} /></span>
                     </button>
-                    <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openInlineEditor}>
-                        <span className="whitespace-nowrap">{formatLegacyDate(repair.fecha_estimada)}</span>
-                        {isToday(repair.fecha_estimada) ? <span className="w-fit rounded bg-[#ffc107] px-1 text-[0.65rem] font-black leading-tight text-[#111827]">Hoy</span> : null}
-                        {overdueText ? <span className="w-fit rounded bg-[#dc3545] px-1 text-[0.65rem] font-black leading-tight text-white">{overdueText}</span> : null}
+                    <button type="button" className="grid content-center gap-1 text-left font-semibold text-[#334155]" onClick={openQuickView}>
+                        <span className="whitespace-nowrap"><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} /></span>
+                        {isToday(repair.fecha_estimada) ? <span className="w-fit rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black leading-tight text-[#92400e]">Hoy</span> : null}
+                        {overdueText ? <span className="w-fit rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black leading-tight text-[#be123c]">{overdueText}</span> : null}
                     </button>
-                    <button type="button" className="grid content-center gap-1 text-left font-black text-[#0f172a]" onClick={openInlineEditor}>
+                    <button type="button" className="grid content-center gap-1 text-left font-black text-[#0f172a]" onClick={openQuickView}>
                         <PaymentStatus monto={monto} senia={senia} />
                         <SeniaBadge label={seniaLabel} />
                     </button>
-                    <div className="flex items-center justify-center">
+                    <div className={cn('relative flex items-center justify-center pl-2 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full', repairStatusRailFillClass(repair.estado))}>
                         <button
                             type="button"
-                            className={cn('rounded-md px-2.5 py-1 text-[0.68rem] font-bold', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
+                            className={cn('inline-flex min-w-[5.8rem] items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[0.64rem] font-black uppercase leading-none', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
                             onClick={cycleDesktopStatus}
                             disabled={readOnly || !canCycleStatus || form.processing}
-                            title={!readOnly && canCycleStatus ? `Cambiar a ${compactStatus(nextStatus)}` : compactStatus(repair.estado)}
+                            title={!readOnly && canCycleStatus ? `${displayStatus}. Cambiar a ${compactStatusLabel(nextStatus)}` : displayStatus}
                         >
-                            {compactStatus(repair.estado)}
+                            <span className={cn('h-2 w-2 rounded-full', repairStatusDotClass(repair.estado))} aria-hidden="true" />
+                            <HighlightText value={compactStatusLabel(displayStatus)} term={highlightTerm} />
                         </button>
                     </div>
                     <div className="flex items-center justify-end">
@@ -1795,6 +2470,11 @@ function RepairEditCard({
                                     <button type="button" className="rounded-md border border-[#f59e0b] bg-[#fff7ed] px-2 py-1 text-[0.66rem] font-black uppercase text-[#92400e] transition hover:bg-[#ffedd5]" onClick={moveBackToConsultas}>
                                         A consultas
                                     </button>
+                                ) : null}
+                                {rowIndex === 0 && ticket.newOrderUrl ? (
+                                    <Link href={ticket.newOrderUrl} className="rounded-md border border-[#111827] bg-[#111827] px-2 py-1 text-[0.66rem] font-black uppercase text-white no-underline transition hover:bg-[#0b1220]">
+                                        Nueva orden
+                                    </Link>
                                 ) : null}
                                 {archived && repair.actions?.delete ? (
                                     <button type="button" className="rounded-md border border-[#fecdd3] bg-[#fff1f2] px-2 py-1 text-[0.66rem] font-black uppercase text-[#be123c] transition hover:bg-[#ffe4e6]" onClick={deleteRepair}>
@@ -1819,28 +2499,28 @@ function RepairEditCard({
 
     return (
         <>
-            <details className="overflow-hidden rounded-lg border border-[#cbd5e1] bg-white shadow-sm">
-                <summary className={cn('cursor-pointer list-none px-2.5 py-2', repairStatusHeaderClass(repair.estado))}>
+            <details className="overflow-hidden rounded-md border border-[#cbd5e1] bg-white">
+                <summary className={cn('cursor-pointer list-none border-b border-[#e2e8f0] px-2.5 py-2', repairStatusHeaderClass(repair.estado))}>
                     <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                             <div className="mb-1 flex items-center gap-1.5">
-                                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.66rem] font-bold text-[#0f172a]">#{repair.id}</span>
-                                <span className="rounded-md bg-white/80 px-1.5 py-0.5 text-[0.66rem] font-bold text-[#1d4ed8]">{rowIndex + 1}/{rowTotal}</span>
-                                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[0.62rem] font-bold text-[#0f172a]">{compactStatus(repair.estado)}</span>
+                                <span className="text-[0.68rem] font-bold text-[#0f172a]">#{repair.id}</span>
+                                <span className="text-[0.68rem] font-bold text-[#64748b]">{rowIndex + 1}/{rowTotal}</span>
+                                <span className={cn('rounded-full border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
-                            <h4 className="truncate text-[0.96rem] font-black leading-tight">{repairDisplayModel || 'Sin modelo'}</h4>
-                            <p className="truncate text-[0.78rem] font-bold opacity-90">{displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription}</p>
+                            <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
+                            <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
-                                <span className="rounded-md bg-white/85 px-1.5 py-0.5 text-[#0f172a]">{formatLegacyDate(repair.fecha_estimada)}</span>
-                                {isToday(repair.fecha_estimada) ? <span className="rounded-md bg-[#ffc107] px-1.5 py-0.5 text-[#111827]">Hoy</span> : null}
-                                {overdueText ? <span className="rounded-md bg-[#dc3545] px-1.5 py-0.5 text-white">{overdueText}</span> : null}
-                                <span className="rounded-md border border-[#111827] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
+                                <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>
+                                {isToday(repair.fecha_estimada) ? <span className="rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 py-0.5 text-[#92400e]">Hoy</span> : null}
+                                {overdueText ? <span className="rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 py-0.5 text-[#be123c]">{overdueText}</span> : null}
+                                <span className="rounded-full border border-[#cbd5e1] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
                                     Saldo: <PaymentStatus monto={monto} senia={senia} />
                                 </span>
                                 <SeniaBadge label={seniaLabel} />
                             </div>
                         </div>
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-white/25 ring-1 ring-white/35">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]">
                             <FaChevronDown aria-hidden="true" />
                         </span>
                     </div>
@@ -1863,13 +2543,14 @@ function RepairEditCard({
                         </div>
                     ) : null}
                     <div className="grid grid-cols-2 gap-1.5">
-                        {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={repair.dni} onClick={openInlineEditor} /> : null}
-                        {repair.contacto ? <FieldSummary label="Contacto" value={repair.contacto} onClick={openInlineEditor} /> : null}
+                        {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={<HighlightText value={repair.dni} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
+                        {repair.contacto ? <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
-                        <FieldSummary label="F. estimada" value={<>{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded bg-[#ffc107] px-1 text-[0.65rem] font-black text-[#111827]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded bg-[#dc3545] px-1 text-[0.65rem] font-black text-white">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
-                        <FieldSummary label="Estado" value={compactStatus(repair.estado)} onClick={openInlineEditor} />
+                        <FieldSummary label="F. estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black text-[#92400e]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black text-[#be123c]">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
+                        <FieldSummary label="Estado" value={<HighlightText value={displayStatus} term={highlightTerm} />} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
+                        {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                     </div>
                     {readOnly && repair.actions?.deliver ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={openDeliveryModal}>
@@ -1881,6 +2562,11 @@ function RepairEditCard({
                             Devolver a consultas
                         </button>
                     ) : null}
+                    {readOnly && rowIndex === 0 && ticket.newOrderUrl ? (
+                        <Link href={ticket.newOrderUrl} className={buttonClass('primary', 'sm', 'w-full')}>
+                            <FaPlus aria-hidden="true" /> Agregar a nueva orden
+                        </Link>
+                    ) : null}
                     {readOnly && archived && repair.actions?.delete ? (
                         <button type="button" className={buttonClass('danger', 'sm', 'w-full')} onClick={deleteRepair}>
                             Eliminar
@@ -1890,15 +2576,16 @@ function RepairEditCard({
                         <details className="rounded-lg border border-slate-200 bg-slate-50">
                             <summary className="cursor-pointer px-3 py-2 text-sm font-black text-[#1d4ed8]"><FaImages className="mr-1 inline" aria-hidden="true" />Ver mas</summary>
                             <div className="grid gap-2 p-3 text-sm">
-                                <FieldSummary label="F. ingreso" value={formatLegacyDate(repair.fecha)} onClick={openInlineEditor} />
-                                {repair.descripcion ? <FieldSummary label="Descripcion" value={repair.descripcion} onClick={openInlineEditor} /> : null}
+                                <FieldSummary label="F. ingreso" value={<HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} />} onClick={openInlineEditor} />
+                                {repair.descripcion ? <FieldSummary label="Descripcion" value={<HighlightText value={repair.descripcion} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.repuesto ? <FieldSummary label="Repuesto" value={repair.repuesto} onClick={openInlineEditor} /> : null}
+                                {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                                 {repair.observaciones ? <FieldSummary label="Observaciones" value={repair.observaciones} onClick={openInlineEditor} /> : null}
                             </div>
                         </details>
                     ) : null}
                     {!readOnly && inlineOpen ? <InlineEditor mobile /> : null}
-                    {!readOnly && !inlineOpen ? <ActionButtons mobile showGeneralTicketActions={rowIndex === 0} /> : null}
+                    {!readOnly && !inlineOpen ? <ActionButtons mobile showGeneralTicketActions={rowIndex === 0} showOrderActions={false} /> : null}
                 </div>
             </details>
             {modals}
@@ -1918,6 +2605,8 @@ export function RepairDesktopRow({
     desktopGroupExpanded = true,
     onToggleDesktopGroup,
     archived = false,
+    statusLabel,
+    highlightTerm,
 }: {
     ticket: RepairTicketView;
     repair: RepairOrderView;
@@ -1930,6 +2619,8 @@ export function RepairDesktopRow({
     desktopGroupExpanded?: boolean;
     onToggleDesktopGroup?: () => void;
     archived?: boolean;
+    statusLabel?: (repair: RepairOrderView) => string;
+    highlightTerm?: string;
 }): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
 
@@ -1947,6 +2638,8 @@ export function RepairDesktopRow({
                 desktopGroupExpanded={desktopGroupExpanded}
                 onToggleDesktopGroup={onToggleDesktopGroup}
                 archived={archived}
+                statusLabel={statusLabel}
+                highlightTerm={highlightTerm}
                 onAddRepair={() => setAddOpen(true)}
             />
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
@@ -1963,26 +2656,30 @@ export function RepairTicketPanel({
     allowAddRepair = false,
     readOnly = false,
     archived = false,
+    statusLabel,
+    highlightTerm,
 }: RepairTicketPanelProps): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
     const [desktopGroupExpanded, setDesktopGroupExpanded] = useState(false);
     const desktopRepairs = desktopGroupExpanded ? ticket.repairs : ticket.repairs.slice(0, 1);
 
     return (
-        <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-xl max-xl:border-2 max-xl:border-[#94a3b8] max-xl:bg-[#eef4fb] max-xl:p-2 max-xl:shadow-[0_2px_8px_rgba(15,23,42,0.12)]')}>
-            <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between max-xl:border-[#94a3b8] max-xl:bg-white">
-                <div className="min-w-0">
-                    <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs">Ticket #{ticket.id}</p>
-                    <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl">{ticket.nombre_cliente}</h3>
-                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.78rem] font-semibold text-[#475569] md:gap-2 md:text-sm">
+        <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-lg max-xl:border max-xl:border-[#64748b] max-xl:bg-white max-xl:p-2 max-xl:shadow-[0_2px_6px_rgba(15,23,42,0.10)]')}>
+            <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between max-xl:border-0 max-xl:border-b max-xl:border-[#e2e8f0] max-xl:bg-white max-xl:p-0 max-xl:pb-2">
+                <div className="min-w-0 max-xl:grid max-xl:gap-2">
+                    <div className="max-xl:rounded-lg max-xl:border max-xl:border-[#111827] max-xl:bg-[#111827] max-xl:px-3 max-xl:py-2">
+                        <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs max-xl:text-[0.68rem] max-xl:font-black max-xl:uppercase max-xl:text-[#cbd5e1]">Ticket #{ticket.id}</p>
+                        <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl max-xl:text-[1.22rem] max-xl:font-black max-xl:uppercase max-xl:leading-tight max-xl:text-white">{ticket.nombre_cliente}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.78rem] font-semibold text-[#475569] md:gap-2 md:text-sm max-xl:gap-1.5 max-xl:text-[0.73rem]">
                         <span>DNI: {ticket.dni}</span>
-                        <span>Contacto: {ticket.contacto || 'Sin dato'}</span>
+                        {ticket.contacto ? <span>Contacto: {ticket.contacto}</span> : null}
                         <span>Fecha: {formatLegacyDate(ticket.fecha)}</span>
-                        <span>Reparaciones: {ticket.repairsCount}</span>
-                        <span>Total: {formatCurrency(ticket.totalMonto)}</span>
+                        {ticket.repairsCount > 1 ? <span>Reparaciones: {ticket.repairsCount}</span> : null}
+                        <span>Total: {ticket.totalMonto > 0 ? formatCurrency(ticket.totalMonto) : 'Cotizar'}</span>
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                <div className="hidden flex-wrap items-center gap-1.5 md:gap-2 xl:flex">
                     <Link href={ticket.ticketUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#111827] bg-[#111827] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
                         Ticket tecnico
                     </Link>
@@ -2034,6 +2731,8 @@ export function RepairTicketPanel({
                                 desktopGroupExpanded={desktopGroupExpanded}
                                 onToggleDesktopGroup={index === 0 && ticket.repairs.length > 1 ? () => setDesktopGroupExpanded((expanded) => !expanded) : undefined}
                                 archived={archived}
+                                statusLabel={statusLabel}
+                                highlightTerm={highlightTerm}
                                 onAddRepair={() => setAddOpen(true)}
                             />
                         ))}
@@ -2041,7 +2740,7 @@ export function RepairTicketPanel({
                 </div>
             </div>
 
-            <div className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#dbeafe] p-2 xl:hidden">
+            <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 xl:hidden">
                 {ticket.repairs.map((repair, index) => (
                     <RepairEditCard
                         key={`mobile-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
@@ -2054,9 +2753,30 @@ export function RepairTicketPanel({
                         rowIndex={index}
                         rowTotal={ticket.repairs.length}
                         archived={archived}
+                        statusLabel={statusLabel}
+                        highlightTerm={highlightTerm}
                         onAddRepair={() => setAddOpen(true)}
                     />
                 ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 xl:hidden">
+                <Link href={ticket.ticketUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#111827] bg-[#111827] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220]">
+                    Ticket tecnico
+                </Link>
+                <a href={ticket.trackingUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#0d6efd] bg-[#0d6efd] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b5ed7]">
+                    Seguimiento
+                </a>
+                {ticket.whatsappUrl ? (
+                    <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#25D366] bg-[#25D366] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#128C7E]">
+                        WhatsApp cliente
+                    </a>
+                ) : null}
+                {allowAddRepair && !readOnly ? (
+                    <button type="button" className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-[#8b5cf6] bg-[#8b5cf6] px-2.5 py-1.5 text-[0.78rem] font-bold text-white transition hover:bg-[#7c3aed]" onClick={() => setAddOpen(true)}>
+                        <FaPlus aria-hidden="true" />Agregar reparacion
+                    </button>
+                ) : null}
             </div>
 
             {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}

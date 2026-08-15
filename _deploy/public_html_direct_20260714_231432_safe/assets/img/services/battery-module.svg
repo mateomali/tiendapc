@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Cambio de baterias y modulos">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1c4fb6"/>
+      <stop offset="100%" stop-color="#148ed0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="500" rx="28" fill="url(#bg4)"/>
+  <rect x="88" y="72" width="624" height="356" rx="30" fill="#0d2f77" opacity="0.3"/>
+  <rect x="170" y="128" width="214" height="246" rx="18" fill="#eff6ff"/>
+  <rect x="196" y="154" width="162" height="194" rx="10" fill="#d7e8ff"/>
+  <rect x="456" y="148" width="176" height="214" rx="18" fill="#f8fbff"/>
+  <rect x="632" y="232" width="22" height="50" rx="8" fill="#ffffff"/>
+  <rect x="478" y="172" width="132" height="166" rx="10" fill="#cdf0da"/>
+  <rect x="498" y="196" width="92" height="118" rx="8" fill="#22a35f"/>
+  <path d="M528 240h32m-16-16v32" stroke="#ffffff" stroke-width="10" stroke-linecap="round"/>
+  <text x="400" y="64" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="34" font-weight="800" fill="#ffffff">BATERIAS Y MODULOS</text>
+</svg>

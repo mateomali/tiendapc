@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
-import { FaArchive, FaChartBar, FaClipboardCheck, FaDatabase, FaExternalLinkAlt, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaTools } from 'react-icons/fa';
+import { FaArchive, FaChartBar, FaClipboardCheck, FaCog, FaDatabase, FaExternalLinkAlt, FaHistory, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaStickyNote, FaTools } from 'react-icons/fa';
 import { FlashMessages } from '../components/FlashMessages';
 import type { SharedPageProps } from '../types';
 import { cn } from '../utils';
@@ -50,6 +50,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     const directNavItems: NavItem[] = [
         { href: route('repairs.workbench'), label: 'Consultas', shortLabel: 'Cons.', match: '/consulta', icon: <FaSearch aria-hidden="true" /> },
         { href: route('repairs.ingress'), label: 'Nueva Orden', shortLabel: 'Ingreso', match: '/ingreso', icon: <FaInbox aria-hidden="true" /> },
+        ...(hasZiggyRoute('repairs.annotations') ? [{ href: route('repairs.annotations'), label: 'Anotaciones', shortLabel: 'Notas', match: '/anotaciones', icon: <FaStickyNote aria-hidden="true" /> }] : []),
         ...(hasZiggyRoute('tasks.index') ? [{ href: route('tasks.index'), label: 'Tareas', shortLabel: 'Tareas', match: '/tareas', icon: <FaClipboardCheck aria-hidden="true" /> }] : []),
     ];
 
@@ -66,8 +67,10 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
             label: 'Control',
             items: [
                 ...(hasZiggyRoute('repairs.metrics') ? [{ href: route('repairs.metrics'), label: 'Metricas', shortLabel: 'Met.', match: '/metricas', icon: <FaChartBar aria-hidden="true" /> }] : []),
+                ...(hasZiggyRoute('repairs.log') ? [{ href: route('repairs.log'), label: 'Log', shortLabel: 'Log', match: '/log', icon: <FaHistory aria-hidden="true" /> }] : []),
                 { href: route('repairs.delivered'), label: 'Entregados', shortLabel: 'Entreg.', match: '/entregados', icon: <FaTools aria-hidden="true" /> },
                 ...(hasZiggyRoute('repairs.archived') ? [{ href: route('repairs.archived'), label: 'Archivados', shortLabel: 'Arch.', match: '/archivados', icon: <FaArchive aria-hidden="true" /> }] : []),
+                ...(auth.user && hasZiggyRoute('admin.settings.index') ? [{ href: route('admin.settings.index'), label: 'Configuracion', shortLabel: 'Config.', match: '/admin/configuracion', icon: <FaCog aria-hidden="true" /> }] : []),
             ],
         },
         {
@@ -87,7 +90,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     const newOrderActiveClasses = 'border-[#bae6fd] bg-[#0ea5e9] text-white shadow-sm';
     const navMenuClasses = 'relative shrink-0';
     const navMenuButtonClasses = 'flex min-h-8 cursor-pointer items-center justify-between gap-2 rounded-md border border-white/15 bg-white/10 px-2.5 py-1.5 text-[0.72rem] font-black text-[#eaf2ff] transition hover:border-[#7fb4ff] hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#bfdbfe] xl:min-h-9 xl:px-3 xl:text-[0.82rem]';
-    const navMenuPanelClasses = 'absolute left-0 z-40 mt-1 grid min-w-[12rem] gap-1 rounded-md border border-white/20 bg-[#123f91] p-1.5 shadow-[0_12px_24px_rgba(8,24,60,0.24)]';
+    const navMenuPanelClasses = 'fixed left-3 right-3 top-[5.9rem] z-50 grid max-h-[60vh] gap-1 overflow-y-auto rounded-md border border-white/20 bg-[#123f91] p-1.5 shadow-[0_12px_24px_rgba(8,24,60,0.24)] xl:absolute xl:left-0 xl:right-auto xl:top-auto xl:mt-1 xl:min-w-[12rem] xl:overflow-visible';
 
     return (
         <>
@@ -99,7 +102,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                             <Link href={route('repairs.workbench')} className="mr-auto inline-flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1 text-[0.8rem] font-bold text-white no-underline transition hover:text-[#dbeafe] xl:mr-3 xl:min-h-9 xl:px-2 xl:text-[0.95rem]">
                                 <FaTools className="shrink-0" aria-hidden="true" />
                                 <span className="truncate xl:hidden">{title}</span>
-                                <span className="hidden xl:inline">Gestion de Ordenes</span>
+                                <span className="hidden xl:inline">Gestión de Órdenes</span>
                             </Link>
                             <div className="xl:hidden">
                                 {auth.user ? (
@@ -119,7 +122,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                                         <span>Salir</span>
                                     </Link>
                                 ) : (
-                                    <Link href={route('repairs.workbench')} className={cn(navLinkClasses, 'bg-white/10')} aria-label="Acceso tecnico" title="Acceso tecnico">
+                                    <Link href={route('repairs.workbench')} className={cn(navLinkClasses, 'bg-white/10')} aria-label="Acceso técnico" title="Acceso técnico">
                                         <FaExternalLinkAlt aria-hidden="true" />
                                         <span>Acceso</span>
                                     </Link>
@@ -206,7 +209,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                         ) : (
                             <Link href={route('repairs.workbench')} className={cn(navLinkClasses, 'ml-auto !hidden xl:!inline-flex')}>
                                 <FaExternalLinkAlt aria-hidden="true" />
-                                <span>Acceso tecnico</span>
+                                <span>Acceso técnico</span>
                             </Link>
                         )}
                     </nav>

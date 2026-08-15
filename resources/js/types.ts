@@ -29,6 +29,21 @@ export interface SiteLayoutData {
     navItems: LayoutNavItem[];
     cartUrl: string;
     repairUrl: string;
+    startupNotice?: {
+        enabled: boolean;
+        title: string;
+        body: string;
+        imageUrl: string;
+        mobileImageUrl: string;
+        backgroundImageUrl: string;
+        backgroundColor: string;
+        textColor: string;
+        titleSize: number;
+        bodySize: number;
+        buttonLabel: string;
+        buttonUrl: string;
+        version: string;
+    };
     footer: LayoutFooter;
 }
 
@@ -112,6 +127,10 @@ export interface CatalogProduct {
     offerPriceLabel: string;
     displayPrice: number;
     displayPriceLabel: string;
+    cashPrice?: number | null;
+    cashPriceLabel: string;
+    cashDiscountPercentage: number;
+    cashDiscountNote: string;
     hasOffer: boolean;
     discountPercentage: number;
     isNew: boolean;
@@ -135,6 +154,10 @@ export interface ProductDetail {
     priceLabel: string;
     offerPriceLabel: string;
     displayPriceLabel: string;
+    cashPrice?: number | null;
+    cashPriceLabel: string;
+    cashDiscountPercentage: number;
+    cashDiscountNote: string;
     hasOffer: boolean;
     discountPercentage: number;
     isNew: boolean;
@@ -162,6 +185,12 @@ export interface CartLine {
     unitPriceLabel: string;
     subtotal: number;
     subtotalLabel: string;
+    cashUnitPrice?: number | null;
+    cashUnitPriceLabel: string;
+    cashSubtotal?: number | null;
+    cashSubtotalLabel: string;
+    cashDiscountPercentage: number;
+    cashDiscountNote: string;
     hasOffer: boolean;
     updateAction: string;
     removeAction: string;
@@ -187,6 +216,9 @@ export interface RepairOrderView {
     contacto?: string | null;
     marca?: string | null;
     modelo?: string | null;
+    color?: string | null;
+    unlock_type?: string | null;
+    unlock_value?: string | null;
     descripcion?: string | null;
     observaciones?: string | null;
     info?: string | null;
@@ -274,6 +306,7 @@ export interface RepairTicketView {
     ticketUrl: string;
     whatsappUrl?: string | null;
     addRepairAction?: string | null;
+    newOrderUrl?: string | null;
     repairs: RepairOrderView[];
 }
 
@@ -320,6 +353,11 @@ export interface PublicRepairStatusView {
     variant: string;
     message: string;
     announcedAt?: string | null;
+    queue?: {
+        position: number;
+        total: number;
+        message: string;
+    } | null;
     pickup?: {
         title: string;
         address: string;

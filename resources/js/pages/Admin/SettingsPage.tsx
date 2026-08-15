@@ -1,6 +1,8 @@
 import { useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { AdminLayout } from '../../layouts/AdminLayout';
 import { buttonClass, ui } from '../../ui';
+import { cn } from '../../utils';
 
 interface SettingsPageProps {
     settings: Record<string, string>;
@@ -12,6 +14,10 @@ interface SettingsFormPayload {
 }
 
 const labels: Record<string, { label: string; hint: string; multiline?: boolean }> = {
+    product_sku_enabled: {
+        label: 'Trabajar con SKU',
+        hint: 'Muestra los campos SKU en la carga y edicion de productos.',
+    },
     whatsapp_number: {
         label: 'WhatsApp principal',
         hint: 'Se usa en carrito, footer, servicios y contacto.',
@@ -58,113 +64,238 @@ const labels: Record<string, { label: string; hint: string; multiline?: boolean 
         label: 'Limite descripcion detalle',
         hint: 'Cantidad de palabras antes de truncar la descripcion larga.',
     },
+    product_cash_discount_enabled: {
+        label: 'Precio efectivo en productos',
+        hint: 'Activa el precio especial por pago en efectivo para articulos del catalogo.',
+    },
+    product_cash_discount_threshold: {
+        label: 'Aplicar desde',
+        hint: 'Precio minimo del producto para mostrar descuento en efectivo.',
+    },
+    product_cash_discount_percentage: {
+        label: 'Descuento global',
+        hint: 'Porcentaje por defecto. Cada producto puede sobrescribirlo.',
+    },
+    product_cash_discount_note: {
+        label: 'Texto precio efectivo',
+        hint: 'Mensaje que acompana el precio especial en catalogo, carrito y WhatsApp.',
+        multiline: true,
+    },
+    repair_cash_discount_enabled: {
+        label: 'Precio efectivo en reparaciones',
+        hint: 'Activa el calculo de precio lista y precio efectivo en tickets tecnicos.',
+    },
+    repair_cash_discount_threshold: {
+        label: 'Aplicar desde',
+        hint: 'Monto minimo de reparacion para mostrar precio lista y efectivo.',
+    },
+    repair_cash_discount_percentage: {
+        label: 'Diferencia porcentual',
+        hint: 'Porcentaje usado para calcular el precio lista desde el precio efectivo.',
+    },
+    repair_cash_discount_note: {
+        label: 'Texto del ticket tecnico',
+        hint: 'Mensaje que se imprime cuando aplica el precio efectivo.',
+        multiline: true,
+    },
 };
 
 export default function SettingsPage({ settings, whatsappDisplay }: SettingsPageProps): JSX.Element {
+    const [activeSection, setActiveSection] = useState<'site' | 'products' | 'repairs' | 'maintenance'>('site');
     const form = useForm<SettingsFormPayload>({
         settings,
     });
 
-    const orderedKeys = Object.keys(labels);
+    const siteKeys = [
+        'whatsapp_number',
+        'reparaciones_url',
+        'footer_address',
+        'footer_hours',
+        'footer_map_url',
+        'footer_cta_title',
+        'footer_cta_text',
+        'catalog_empty_text',
+        'catalog_new_days',
+        'catalog_product_image_rotation_ms',
+        'product_detail_description_word_limit',
+    ];
+    const repairTicketKeys = [
+        'repair_cash_discount_enabled',
+        'repair_cash_discount_threshold',
+        'repair_cash_discount_percentage',
+        'repair_cash_discount_note',
+    ];
+    const productCashKeys = [
+        'product_sku_enabled',
+        'product_cash_discount_enabled',
+        'product_cash_discount_threshold',
+        'product_cash_discount_percentage',
+        'product_cash_discount_note',
+    ];
+    const sectionButtons = [
+        { key: 'site', label: 'Sitio' },
+        { key: 'products', label: 'Productos' },
+        { key: 'repairs', label: 'Reparaciones' },
+        { key: 'maintenance', label: 'Mantenimiento' },
+    ] as const;
+
+    const renderSettingField = (key: string): JSX.Element => {
+        const meta = labels[key];
+        const value = form.data.settings[key] ?? '';
+
+        return (
+            <label key={key} className={ui.field}>
+                <span className={ui.fieldLabel}>{meta.label}</span>
+                {key === 'repair_cash_discount_enabled' || key === 'product_cash_discount_enabled' || key === 'product_sku_enabled' ? (
+                    <select
+                        className={ui.input}
+                        value={value}
+                        onChange={(event) =>
+                            form.setData('settings', {
+                                ...form.data.settings,
+                                [key]: event.target.value,
+                            })
+                        }
+                    >
+                        <option value="1">Activado</option>
+                        <option value="0">Desactivado</option>
+                    </select>
+                ) : meta.multiline ? (
+                    <textarea
+                        className={ui.textarea}
+                        value={value}
+                        onChange={(event) =>
+                            form.setData('settings', {
+                                ...form.data.settings,
+                                [key]: event.target.value,
+                            })
+                        }
+                    />
+                ) : (
+                    <input
+                        className={ui.input}
+                        type={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' || key === 'catalog_new_days' || key === 'catalog_product_image_rotation_ms' || key === 'product_detail_description_word_limit' ? 'number' : 'text'}
+                        min={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' ? '0' : undefined}
+                        step={key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_percentage' ? '0.1' : undefined}
+                        value={value}
+                        onChange={(event) =>
+                            form.setData('settings', {
+                                ...form.data.settings,
+                                [key]: event.target.value,
+                            })
+                        }
+                    />
+                )}
+                <small className={ui.fieldHint}>{meta.hint}</small>
+            </label>
+        );
+    };
 
     return (
         <AdminLayout title="Configuracion">
             <div className={ui.pageStack}>
-                <section className={ui.heroCard}>
-                    <div className={ui.heroTitleWrap}>
-                        <p className={ui.eyebrow}>Parametros legacy</p>
-                        <h2 className={ui.heroTitle}>Configuracion operativa del sitio</h2>
-                        <p className={ui.heroText}>
-                            Este formulario deja atras el key/value generico y trabaja con las claves funcionales del
-                            sistema original.
-                        </p>
-                    </div>
-                    <div className={ui.heroActions}>
-                        <div className={ui.previewPill}>
-                            <span>WhatsApp actual</span>
-                            <strong className="ml-2 block text-lg font-black text-ink-950">{whatsappDisplay}</strong>
+                <section className={`${ui.sectionCardTight} grid gap-3`}>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h2 className="text-xl font-black text-ink-950">Configuracion</h2>
+                            <p className={ui.inlineCaption}>WhatsApp actual: {whatsappDisplay}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 rounded-lg border border-sky-100 bg-white p-1 sm:grid-cols-4">
+                            {sectionButtons.map((section) => (
+                                <button
+                                    key={section.key}
+                                    type="button"
+                                    className={cn(
+                                        'min-h-9 rounded-md px-3 text-sm font-black text-ink-800',
+                                        activeSection === section.key ? 'bg-brand-600 text-white' : 'bg-white hover:bg-sky-50',
+                                    )}
+                                    onClick={() => setActiveSection(section.key)}
+                                >
+                                    {section.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
                 </section>
 
-                <form
-                    className={ui.sectionCard}
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        form.post(route('admin.settings.save'));
-                    }}
-                >
-                    <div className={ui.cardHeading}>
-                        <div className={ui.cardTitleWrap}>
-                            <p className={ui.eyebrow}>Contrato del sitio</p>
-                            <h3 className={ui.cardTitle}>Claves curadas</h3>
+                {activeSection !== 'maintenance' ? (
+                    <form
+                        className={ui.sectionCard}
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            form.post(route('admin.settings.save'));
+                        }}
+                    >
+                    {activeSection === 'site' ? (
+                        <div className="grid gap-3">
+                            <div className={ui.cardHeading}>
+                                <div className={ui.cardTitleWrap}>
+                                    <h3 className={ui.cardTitle}>Sitio y catalogo</h3>
+                                </div>
+                            </div>
+                            <div className={ui.settingsGrid}>
+                                {siteKeys.map(renderSettingField)}
+                            </div>
                         </div>
-                    </div>
-                    <div className={ui.settingsGrid}>
-                        {orderedKeys.map((key) => {
-                            const meta = labels[key];
-                            const value = form.data.settings[key] ?? '';
+                    ) : null}
 
-                            return (
-                                <label key={key} className={ui.field}>
-                                    <span className={ui.fieldLabel}>{meta.label}</span>
-                                    {meta.multiline ? (
-                                        <textarea
-                                            className={ui.textarea}
-                                            value={value}
-                                            onChange={(event) =>
-                                                form.setData('settings', {
-                                                    ...form.data.settings,
-                                                    [key]: event.target.value,
-                                                })
-                                            }
-                                        />
-                                    ) : (
-                                        <input
-                                            className={ui.input}
-                                            value={value}
-                                            onChange={(event) =>
-                                                form.setData('settings', {
-                                                    ...form.data.settings,
-                                                    [key]: event.target.value,
-                                                })
-                                            }
-                                        />
-                                    )}
-                                    <small className={ui.fieldHint}>{meta.hint}</small>
-                                </label>
-                            );
-                        })}
-                    </div>
+                    {activeSection === 'products' ? (
+                        <div className="grid gap-3">
+                            <div className={ui.cardHeading}>
+                                <div className={ui.cardTitleWrap}>
+                                    <h3 className={ui.cardTitle}>Productos</h3>
+                                </div>
+                            </div>
+                            <div className={ui.settingsGrid}>
+                                {productCashKeys.map(renderSettingField)}
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {activeSection === 'repairs' ? (
+                        <div className="grid gap-3">
+                            <div className={ui.cardHeading}>
+                                <div className={ui.cardTitleWrap}>
+                                    <h3 className={ui.cardTitle}>Reparaciones</h3>
+                                </div>
+                            </div>
+                            <div className={ui.settingsGrid}>
+                                {repairTicketKeys.map(renderSettingField)}
+                            </div>
+                        </div>
+                    ) : null}
+
                     <div className={ui.inlineActions}>
                         <button className={buttonClass('primary')} type="submit" disabled={form.processing}>
                             Guardar configuracion
                         </button>
                     </div>
-                </form>
+                    </form>
+                ) : null}
 
-                <form
-                    className={ui.sectionCard}
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        form.post(route('admin.settings.clear_cache'));
-                    }}
-                >
-                    <div className={ui.cardHeading}>
-                        <div className={ui.cardTitleWrap}>
-                            <p className={ui.eyebrow}>Mantenimiento</p>
-                            <h3 className={ui.cardTitle}>Limpiar cache del panel</h3>
+                {activeSection === 'maintenance' ? (
+                    <form
+                        className={ui.sectionCard}
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            form.post(route('admin.settings.clear_cache'));
+                        }}
+                    >
+                        <div className={ui.cardHeading}>
+                            <div className={ui.cardTitleWrap}>
+                                <h3 className={ui.cardTitle}>Limpiar cache del panel</h3>
+                            </div>
                         </div>
-                    </div>
-                    <p className={ui.inlineCaption}>
-                        Limpia config, rutas y vistas compiladas despues de cambios operativos o importaciones.
-                    </p>
-                    <div className={ui.inlineActions}>
-                        <button className={buttonClass('soft')} type="submit">
-                            Limpiar cache
-                        </button>
-                    </div>
-                </form>
+                        <p className={ui.inlineCaption}>
+                            Limpia config, rutas y vistas compiladas despues de cambios operativos o importaciones.
+                        </p>
+                        <div className={ui.inlineActions}>
+                            <button className={buttonClass('soft')} type="submit">
+                                Limpiar cache
+                            </button>
+                        </div>
+                    </form>
+                ) : null}
             </div>
         </AdminLayout>
     );

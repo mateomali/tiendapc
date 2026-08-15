@@ -14,7 +14,7 @@ export default function TechLoginPage(): JSX.Element {
                 <input type="hidden" name="_token" value={csrfToken} />
                 <div className="grid gap-1 text-center">
                     <p className={repairUi.eyebrow}>Reparaciones</p>
-                    <h1 className="text-2xl font-black leading-tight tracking-tight text-[#0f172a]">Acceso tecnico</h1>
+                    <h1 className="text-2xl font-black leading-tight tracking-tight text-[#0f172a]">Acceso técnico</h1>
                 </div>
                 {flash.error ? <div className="rounded-xl border border-[#fecdd3] bg-[#fff1f2] px-3 py-2 text-sm font-bold text-[#be123c]">{flash.error}</div> : null}
                 {flash.success ? <div className="rounded-xl border border-[#bbf7d0] bg-[#ecfdf5] px-3 py-2 text-sm font-bold text-[#166534]">{flash.success}</div> : null}
@@ -33,6 +33,9 @@ export default function TechLoginPage(): JSX.Element {
                 <button className={repairButtonClass('primary', 'default', 'w-full')} type="submit">
                     Ingresar
                 </button>
+                <p className="text-center text-xs font-semibold leading-5 text-[#64748b]">
+                    Panel privado para gestionar consultas, órdenes y estados de reparación.
+                </p>
             </form>
         </div>
     );

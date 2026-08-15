@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Services\RepairService;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('queues a repair row, moves it to in repair, and removes it from the queue when ready', function (): void {
+it('queues a repair row, moves it to in repair, and moves it to completed when ready', function (): void {
     $user = User::factory()->create(['role' => 'admin']);
     $repair = RepairOrder::query()->create([
         'id' => 987,
@@ -90,10 +90,11 @@ it('queues a repair row, moves it to in repair, and removes it from the queue wh
         ->assertInertia(fn ($page) => $page
             ->component('Admin/TasksPage')
             ->has('items', 2)
-            ->where('items.0.clientName', 'Cliente Segundo')
-            ->where('items.1.clientName', 'Cliente Tarea')
-            ->where('items.1.ticketId', 987)
-            ->where('items.1.status', 'EN REPARACION')
+            ->where('items.0.nombre_cliente', 'Cliente Segundo')
+            ->where('items.1.nombre_cliente', 'Cliente Tarea')
+            ->where('items.1.id', 987)
+            ->where('items.1.repairs.0.estado', 'EN REPARACION')
+            ->has('completedItems', 0)
         );
 
     $this->actingAs($user)
@@ -101,11 +102,29 @@ it('queues a repair row, moves it to in repair, and removes it from the queue wh
         ->assertRedirect()
         ->assertSessionHas('success');
 
-    expect($item->refresh()->completed_at)->not->toBeNull();
     expect($repair->refresh()->estado)->toBe('LISTA');
+    expect(RepairTaskItem::query()
+        ->whereKey($item->id)
+        ->exists())->toBeFalse();
+    expect(RepairTaskItem::query()
+        ->where('repair_order_registro_id', $repair->registro_id)
+        ->whereNull('completed_at')
+        ->count())->toBe(1);
+
+    $this->actingAs($user)
+        ->get(route('tasks.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Admin/TasksPage')
+            ->has('items', 1)
+            ->where('items.0.nombre_cliente', 'Cliente Segundo')
+            ->has('completedItems', 1)
+            ->where('completedItems.0.nombre_cliente', 'Cliente Tarea')
+            ->where('completedItems.0.repairs.0.estado', 'LISTA')
+        );
 });
 
-it('removes a repair from tasks when the grid changes it to ready', function (): void {
+it('moves a repair to completed tasks when the grid changes it to ready', function (): void {
     $repair = RepairOrder::query()->create([
         'id' => 989,
         'reparacion' => 1,
@@ -129,7 +148,15 @@ it('removes a repair from tasks when the grid changes it to ready', function ():
 
     app(RepairService::class)->updateState($repair, 'LISTA');
 
-    expect($item->refresh()->completed_at)->not->toBeNull();
+    expect(RepairTaskItem::query()
+        ->whereKey($item->id)
+        ->exists())->toBeFalse();
+    expect(RepairTaskItem::query()
+        ->where('repair_order_registro_id', $repair->registro_id)
+        ->whereDate('task_date', now()->toDateString())
+        ->whereNull('completed_at')
+        ->count())->toBe(1);
+    expect($repair->refresh()->estado)->toBe('LISTA');
 });
 
 it('filters consultation tickets by assigned tasks in fifo order', function (): void {
@@ -203,4 +230,65 @@ it('filters consultation tickets by assigned tasks in fifo order', function (): 
             ->where('tickets.0.repairs.0.taskQueuePosition', 1)
             ->where('tickets.1.id', 991)
             ->where('tickets.1.repairs.0.taskQueuePosition', 2));
+});
+
+it('returns no consultations when search has no active global fields', function (): void {
+    RepairOrder::query()->create([
+        'id' => 994,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Sin Campo',
+        'dni' => 30111228,
+        'contacto' => '1122334461',
+        'modelo' => 'Notebook',
+        'descripcion' => 'No debe aparecer',
+        'monto' => 15000,
+        'senia' => 0,
+        'fecha_estimada' => now()->toDateString(),
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+        'categorias_reparacion' => 2,
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', [
+            'q' => 'Cliente Sin Campo',
+            'q_fields' => ['__none'],
+        ]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 0));
+});
+
+it('returns delivered tickets alongside consultation search results', function (): void {
+    RepairOrder::query()->create([
+        'id' => 995,
+        'reparacion' => 1,
+        'fecha' => now()->subDays(6)->toDateString(),
+        'nombre_cliente' => 'Cliente Entregado Busqueda',
+        'dni' => 30111229,
+        'contacto' => '1122334462',
+        'modelo' => 'Notebook',
+        'descripcion' => 'Equipo entregado',
+        'monto' => 15000,
+        'senia' => 15000,
+        'fecha_estimada' => now()->subDays(5)->toDateString(),
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'fecha_entregado' => now()->subDays(3)->toDateString(),
+        'categorias_reparacion' => 2,
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => '995']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 0)
+            ->where('deliveredSearchMatches', 1)
+            ->has('deliveredSearchTickets', 1)
+            ->where('deliveredSearchTickets.0.id', 995)
+            ->where('deliveredSearchTickets.0.repairs.0.entregado', 'si')
+            ->where('deliveredSearchTickets.0.repairs.0.fecha_entregado', now()->subDays(3)->toDateString()));
 });

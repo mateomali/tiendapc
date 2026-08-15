@@ -38,6 +38,18 @@ class RepairService
         'EN REPARACION / ESPERA REPUESTO',
     ];
 
+    private const GLOBAL_SEARCH_FIELDS = [
+        'id',
+        'cliente',
+        'dni',
+        'contacto',
+        'modelo',
+        'ingreso',
+        'estimada',
+        'saldo',
+        'estado',
+    ];
+
     public const SERVICE_TEMPLATES = [
         'revision' => [
             'label' => 'Revision / diagnostico',
@@ -266,6 +278,9 @@ class RepairService
                     'contacto' => $payload['contacto'] ?? null,
                     'marca' => $this->detectDeviceBrandFromRepairText((string) ($job['modelo'] ?? ''), (string) $job['descripcion'], (string) ($job['marca'] ?? '')),
                     'modelo' => $model,
+                    'color' => $job['color'],
+                    'unlock_type' => $job['unlock_type'],
+                    'unlock_value' => $job['unlock_value'],
                     'descripcion' => $this->uppercaseFailure((string) $job['descripcion']),
                     'observaciones' => $job['observaciones'],
                     'info' => $info !== '' ? $info : null,
@@ -289,7 +304,7 @@ class RepairService
                     $this->consumeInventoryReservation($order);
                 }
 
-                $this->addInitialPayment($order, $job['senia']);
+                $this->addInitialPayment($order, $job['senia'], $job['senia_method'] ?? null);
                 $this->recordEvent($order, 'CREADA', null, $order->estado);
                 $firstOrder ??= $order;
             }
@@ -324,6 +339,9 @@ class RepairService
                 'contacto' => $order->contacto,
                 'marca' => $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? '')),
                 'modelo' => $model,
+                'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
+                'unlock_type' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['type'],
+                'unlock_value' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['value'],
                 'descripcion' => $this->uppercaseFailure((string) $payload['descripcion']),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $order->info,
@@ -343,7 +361,7 @@ class RepairService
                 'imagen' => implode('|', $storedImages),
             ]);
 
-            $this->addInitialPayment($repair, $payload['senia'] ?? 0);
+            $this->addInitialPayment($repair, $payload['senia'] ?? 0, $payload['senia_method'] ?? null);
             $this->recordEvent($repair, 'CREADA', null, $repair->estado);
 
             return $repair;
@@ -552,6 +570,9 @@ class RepairService
                 'fecha' => $payload['fecha'] ?? $order->fecha,
                 'marca' => $brand,
                 'modelo' => $model,
+                'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
+                'unlock_type' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['type'],
+                'unlock_value' => $this->normalizeUnlockData($payload, (int) ($payload['categorias_reparacion'] ?? 4))['value'],
                 'descripcion' => $this->uppercaseFailure((string) ($payload['descripcion'] ?? '')),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $info !== '' ? $info : null,
@@ -575,14 +596,10 @@ class RepairService
 
             if (Str::upper((string) $order->estado) === 'LISTA') {
                 $this->consumeInventoryReservation($order);
-                $this->syncTaskQueueForState($order, 'LISTA');
             }
+            $this->syncTaskQueueForState($order, (string) $order->estado);
 
             $this->recordEvent($order, $order->entregado === 'si' ? 'ACTUALIZADA_ENTREGADA' : 'ACTUALIZADA', $previousState, $order->estado);
-
-            if ($previousState !== $order->estado) {
-                $this->recordEvent($order, 'CAMBIO_ESTADO', $previousState, $order->estado);
-            }
 
             if ($oldOrderId !== $newOrderId) {
                 $this->recordEvent($order, 'RENUMERADA', $previousState, $order->estado);
@@ -718,11 +735,11 @@ class RepairService
         $staleOrders = RepairOrder::query()
             ->where('entregado', 'no')
             ->whereNull('archivado_at')
-            ->whereDate('fecha', '<=', now()->subDays(45)->toDateString())
+            ->whereDate('fecha', '<=', now()->subDays(60)->toDateString())
             ->get();
 
         foreach ($staleOrders as $order) {
-            $this->archive($order, 'automatico_45_dias');
+            $this->archive($order, 'automatico_60_dias');
         }
 
         return $staleOrders->count();
@@ -745,18 +762,26 @@ class RepairService
     public function addPayment(RepairOrder $order, array $payload): RepairOrder
     {
         return DB::transaction(function () use ($order, $payload): RepairOrder {
+            $paymentType = $payload['payment_type'] ?? 'senia';
+            $amount = (float) $payload['amount'];
+
             RepairPayment::query()->create([
                 'orden_id' => $order->id,
                 'reparacion' => $order->reparacion,
-                'amount' => (float) $payload['amount'],
-                'payment_type' => 'senia',
-                'method' => $payload['method'] ?? null,
+                'amount' => $amount,
+                'payment_type' => $paymentType,
+                'method' => $paymentType === 'incremento' ? null : ($payload['method'] ?? 'efectivo'),
                 'notes' => $payload['notes'] ?? null,
                 'paid_at' => $payload['paid_at'] ?? now()->toDateString(),
             ]);
 
-            $this->syncPaymentTotal($order);
-            $this->recordEvent($order, 'PAGO_REGISTRADO', $order->estado, $order->estado);
+            if ($paymentType === 'incremento') {
+                $order->forceFill(['monto' => max(0, (float) $order->monto + $amount)])->save();
+                $this->recordEvent($order, 'INCREMENTO_REGISTRADO', $order->estado, $order->estado);
+            } else {
+                $this->syncPaymentTotal($order);
+                $this->recordEvent($order, 'PAGO_REGISTRADO', $order->estado, $order->estado);
+            }
 
             return $order->refresh();
         });
@@ -769,9 +794,18 @@ class RepairService
         }
 
         return DB::transaction(function () use ($order, $payment): RepairOrder {
+            $isIncrement = $payment->payment_type === 'incremento';
+            $amount = (float) $payment->amount;
+
             $payment->delete();
-            $this->syncPaymentTotal($order);
-            $this->recordEvent($order, 'SENA_ELIMINADA', $order->estado, $order->estado);
+
+            if ($isIncrement) {
+                $order->forceFill(['monto' => max(0, (float) $order->monto - $amount)])->save();
+                $this->recordEvent($order, 'INCREMENTO_ELIMINADO', $order->estado, $order->estado);
+            } else {
+                $this->syncPaymentTotal($order);
+                $this->recordEvent($order, 'SENA_ELIMINADA', $order->estado, $order->estado);
+            }
 
             return $order->refresh();
         });
@@ -892,6 +926,10 @@ class RepairService
     {
         return $payments
             ->filter(function (RepairPayment $payment) use ($since): bool {
+                if ($payment->payment_type !== 'senia') {
+                    return false;
+                }
+
                 if ($since === null) {
                     return true;
                 }
@@ -930,13 +968,11 @@ class RepairService
 
         if (Str::upper($state) === 'LISTA') {
             $this->consumeInventoryReservation($order->refresh());
-            $this->syncTaskQueueForState($order, $state);
         }
+        $this->syncTaskQueueForState($order, $state);
 
-        $this->recordEvent($order, $event, $previousState, $state);
-
-        if ($previousState !== $state) {
-            $this->recordEvent($order, 'CAMBIO_ESTADO', $previousState, $state);
+        if ($event !== 'CAMBIO_ESTADO_DIRECTO') {
+            $this->recordEvent($order, $event, $previousState, $state);
         }
 
         return $order->refresh();
@@ -944,14 +980,34 @@ class RepairService
 
     private function syncTaskQueueForState(RepairOrder $order, string $state): void
     {
-        if (Str::upper($state) !== 'LISTA') {
+        if (! in_array(Str::upper($state), ['LISTA', 'CANCELADA'], true)) {
             return;
         }
 
-        RepairTaskItem::query()
+        $task = RepairTaskItem::query()
             ->where('repair_order_registro_id', $order->registro_id)
             ->whereNull('completed_at')
-            ->update(['completed_at' => now()]);
+            ->oldest('task_date')
+            ->oldest('created_at')
+            ->oldest('id')
+            ->first();
+
+        if ($task === null) {
+            return;
+        }
+
+        $task->delete();
+
+        $newTask = RepairTaskItem::query()->updateOrCreate(
+            [
+                'repair_order_registro_id' => $order->registro_id,
+                'task_date' => now()->toDateString(),
+            ],
+            [
+                'completed_at' => null,
+            ],
+        );
+        $newTask->forceFill(['created_at' => now(), 'updated_at' => now()])->save();
     }
 
     public function addOriginalImages(RepairOrder $order, array $images): RepairOrder
@@ -1267,30 +1323,7 @@ class RepairService
             $query->whereIn(Schema::hasColumn('ordenes', 'registro_id') ? 'registro_id' : 'id', $registroIds !== [] ? $registroIds : [-1]);
         }
 
-        if (($filters['q'] ?? '') !== '') {
-            $term = trim((string) $filters['q']);
-            $search = '%' . $term . '%';
-            $numericTerm = ctype_digit($term) ? (int) $term : null;
-
-            $query->where(function ($subQuery) use ($search, $numericTerm): void {
-                $subQuery
-                    ->where('nombre_cliente', 'like', $search)
-                    ->orWhere('modelo', 'like', $search)
-                    ->orWhere('descripcion', 'like', $search)
-                    ->orWhere('contacto', 'like', $search)
-                    ->orWhere('dni', 'like', $search);
-
-                if ($numericTerm !== null) {
-                    $subQuery
-                        ->orWhere('id', $numericTerm)
-                        ->orWhere('reparacion', $numericTerm);
-
-                    if (Schema::hasColumn('ordenes', 'registro_id')) {
-                        $subQuery->orWhere('registro_id', $numericTerm);
-                    }
-                }
-            });
-        }
+        $this->applyGlobalSearch($query, $filters);
 
         return $query;
     }
@@ -1302,30 +1335,7 @@ class RepairService
 
         $this->applyDeliveredOrderFilters($query, $filters, 'archivado_at');
 
-        if (($filters['q'] ?? '') !== '') {
-            $term = trim((string) $filters['q']);
-            $search = '%' . $term . '%';
-            $numericTerm = ctype_digit($term) ? (int) $term : null;
-
-            $query->where(function ($subQuery) use ($search, $numericTerm): void {
-                $subQuery
-                    ->where('nombre_cliente', 'like', $search)
-                    ->orWhere('modelo', 'like', $search)
-                    ->orWhere('descripcion', 'like', $search)
-                    ->orWhere('contacto', 'like', $search)
-                    ->orWhere('dni', 'like', $search);
-
-                if ($numericTerm !== null) {
-                    $subQuery
-                        ->orWhere('id', $numericTerm)
-                        ->orWhere('reparacion', $numericTerm);
-
-                    if (Schema::hasColumn('ordenes', 'registro_id')) {
-                        $subQuery->orWhere('registro_id', $numericTerm);
-                    }
-                }
-            });
-        }
+        $this->applyGlobalSearch($query, $filters);
 
         if (($filters['estado'] ?? '') !== '') {
             $query->where('estado', (string) $filters['estado']);
@@ -1382,6 +1392,8 @@ class RepairService
             $query->where('senia', '>', 0);
         } elseif ($balance === 'sin_senia') {
             $query->where('senia', '<=', 0);
+        } elseif ($balance === 'pagado') {
+            $query->where('monto', '>', 0)->whereColumn('senia', '>=', 'monto');
         } elseif ($balance !== '' && is_numeric($balance)) {
             $query->whereRaw('(monto - senia) = ?', [(float) $balance]);
         }
@@ -1395,6 +1407,132 @@ class RepairService
                 $query->where('estado', $state);
             }
         }
+    }
+
+    private function applyGlobalSearch(\Illuminate\Database\Eloquent\Builder $query, array $filters): void
+    {
+        $term = trim((string) ($filters['q'] ?? ''));
+
+        if ($term === '') {
+            return;
+        }
+
+        $activeFields = $this->activeGlobalSearchFields($filters);
+
+        if ($activeFields === []) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $search = '%' . $term . '%';
+        $numericTerm = ctype_digit($term) ? (int) $term : null;
+
+        $query->where(function ($subQuery) use ($activeFields, $search, $numericTerm): void {
+            foreach ($activeFields as $field) {
+                switch ($field) {
+                    case 'id':
+                        $this->applyIdGlobalSearch($subQuery, $search, $numericTerm);
+                        break;
+                    case 'cliente':
+                        $subQuery->orWhere('nombre_cliente', 'like', $search);
+                        break;
+                    case 'dni':
+                        $subQuery->orWhere('dni', 'like', $search);
+                        break;
+                    case 'contacto':
+                        $subQuery->orWhere('contacto', 'like', $search);
+                        break;
+                    case 'modelo':
+                        $subQuery->orWhere('modelo', 'like', $search);
+                        break;
+                    case 'ingreso':
+                        $this->applyDateGlobalSearch($subQuery, 'fecha', $search);
+                        break;
+                    case 'estimada':
+                        $this->applyDateGlobalSearch($subQuery, 'fecha_estimada', $search);
+                        break;
+                    case 'saldo':
+                        $subQuery->orWhereRaw('CAST((monto - senia) AS CHAR) LIKE ?', [$search]);
+                        break;
+                    case 'estado':
+                        $subQuery->orWhere('estado', 'like', $search);
+                        break;
+                }
+            }
+        });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function activeGlobalSearchFields(array $filters): array
+    {
+        $fields = $filters['q_fields'] ?? self::GLOBAL_SEARCH_FIELDS;
+
+        if (! is_array($fields)) {
+            return self::GLOBAL_SEARCH_FIELDS;
+        }
+
+        return array_values(array_intersect(self::GLOBAL_SEARCH_FIELDS, array_map('strval', $fields)));
+    }
+
+    private function applyIdGlobalSearch(\Illuminate\Database\Eloquent\Builder $query, string $search, ?int $numericTerm): void
+    {
+        if ($numericTerm !== null) {
+            $query
+                ->orWhere('id', $numericTerm)
+                ->orWhere('reparacion', $numericTerm);
+
+            if (Schema::hasColumn('ordenes', 'registro_id')) {
+                $query->orWhere('registro_id', $numericTerm);
+            }
+
+            return;
+        }
+
+        $query
+            ->orWhereRaw('CAST(id AS CHAR) LIKE ?', [$search])
+            ->orWhereRaw('CAST(reparacion AS CHAR) LIKE ?', [$search]);
+
+        if (Schema::hasColumn('ordenes', 'registro_id')) {
+            $query->orWhereRaw('CAST(registro_id AS CHAR) LIKE ?', [$search]);
+        }
+    }
+
+    private function applyDateGlobalSearch(\Illuminate\Database\Eloquent\Builder $query, string $column, string $search): void
+    {
+        foreach ($this->dateGlobalSearchPatterns($search) as $pattern) {
+            $query->orWhere($column, 'like', $pattern);
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function dateGlobalSearchPatterns(string $search): array
+    {
+        $term = trim($search, '% ');
+        $patterns = ['%' . $term . '%'];
+
+        if (preg_match('/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2}|\d{4}))?$/', $term, $matches) === 1) {
+            $day = (int) $matches[1];
+            $month = (int) $matches[2];
+            $year = $matches[3] ?? null;
+
+            if ($day >= 1 && $day <= 31 && $month >= 1 && $month <= 12) {
+                $dayToken = str_pad((string) $day, 2, '0', STR_PAD_LEFT);
+                $monthToken = str_pad((string) $month, 2, '0', STR_PAD_LEFT);
+
+                if ($year !== null) {
+                    $yearToken = strlen($year) === 2 ? '20' . $year : $year;
+                    $patterns[] = '%' . $yearToken . '-' . $monthToken . '-' . $dayToken . '%';
+                } else {
+                    $patterns[] = '%-' . $monthToken . '-' . $dayToken . '%';
+                }
+            }
+        }
+
+        return array_values(array_unique($patterns));
     }
 
     private function applyDeliveredOrderFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters, string $dateColumn = 'fecha_entregado'): void
@@ -1437,8 +1575,14 @@ class RepairService
      */
     private function taskQueueRegistroIds(): array
     {
+        $this->completePreviousTerminalTaskItems();
+
         return RepairTaskItem::query()
             ->whereNull('completed_at')
+            ->whereHas('repairOrder', fn ($query) => $query
+                ->whereNull('archivado_at')
+                ->where('entregado', 'no')
+                ->whereNotIn('estado', ['LISTA', 'CANCELADA']))
             ->oldest('task_date')
             ->oldest('created_at')
             ->oldest('id')
@@ -1446,6 +1590,17 @@ class RepairService
             ->map(fn ($id): int => (int) $id)
             ->values()
             ->all();
+    }
+
+    public function completePreviousTerminalTaskItems(): void
+    {
+        $today = now()->toDateString();
+
+        RepairTaskItem::query()
+            ->whereNull('completed_at')
+            ->whereDate('task_date', '<', $today)
+            ->whereHas('repairOrder', fn ($query) => $query->whereIn('estado', ['LISTA', 'CANCELADA']))
+            ->update(['completed_at' => now()]);
     }
 
     private function summaryQuery(array $filters): \Illuminate\Database\Eloquent\Builder
@@ -1458,10 +1613,10 @@ class RepairService
 
     private function applySummaryFilters(\Illuminate\Database\Eloquent\Builder $query, array $filters, bool $includeCategory): void
     {
-        $range = (string) ($filters['summary_range'] ?? 'month');
+        $range = (string) ($filters['summary_range'] ?? 'quarter');
 
         if (! array_key_exists($range, self::SUMMARY_RANGE_DAYS)) {
-            $range = 'month';
+            $range = 'quarter';
         }
 
         if ($range === 'custom') {
@@ -1503,9 +1658,13 @@ class RepairService
         return str_pad((string) random_int(0, 99999), 5, '0', STR_PAD_LEFT);
     }
 
-    private function addInitialPayment(RepairOrder $order, mixed $amount): void
+    private function addInitialPayment(RepairOrder $order, mixed $amount, ?string $method = null): void
     {
-        $amount = min((float) $amount, (float) $order->monto);
+        $normalizedMethod = in_array($method, ['efectivo', 'transferencia'], true) ? $method : 'efectivo';
+        $maxAmount = $normalizedMethod === 'transferencia' && (float) $order->monto > 30000
+            ? round((float) $order->monto * 1.1, 2)
+            : (float) $order->monto;
+        $amount = min((float) $amount, $maxAmount);
 
         if ($amount <= 0) {
             return;
@@ -1516,7 +1675,7 @@ class RepairService
             'reparacion' => $order->reparacion,
             'amount' => $amount,
             'payment_type' => 'senia',
-            'method' => null,
+            'method' => $normalizedMethod,
             'notes' => 'Sena inicial',
             'paid_at' => now()->toDateString(),
         ]);
@@ -1529,6 +1688,7 @@ class RepairService
         return (float) RepairPayment::query()
             ->where('orden_id', $order->id)
             ->where('reparacion', $order->reparacion)
+            ->where('payment_type', 'senia')
             ->sum('amount');
     }
 
@@ -1863,32 +2023,40 @@ class RepairService
      * @return array<int, array{
      *     modelo:?string,
      *     marca:?string,
+     *     color:?string,
      *     descripcion:string,
      *     observaciones:string,
      *     monto:float|int,
      *     senia:float|int,
+     *     senia_method:?string,
      *     fecha_estimada:?string,
      *     estado:string,
      *     repuesto:?string,
      *     pedir_repuesto:bool,
      *     inventory_part_id:int,
-     *     categorias_reparacion:int
+     *     categorias_reparacion:int,
+     *     unlock_type:?string,
+     *     unlock_value:?string
      * }>
      */
     private function normalizeJobs(array $payload): array
     {
         $jobs = collect($payload['jobs'] ?? [Arr::only($payload, [
             'modelo',
+            'color',
             'tipo_servicio',
             'descripcion',
             'observaciones',
             'monto',
             'senia',
+            'senia_method',
             'fecha_estimada',
             'estado',
             'repuesto',
             'inventory_part_id',
             'categorias_reparacion',
+            'unlock_type',
+            'unlock_value',
         ])])
             ->filter(fn ($job): bool => is_array($job))
             ->map(function (array $job): array {
@@ -1901,6 +2069,8 @@ class RepairService
                 $shouldRequestPart = filter_var($job['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
                 $part = trim((string) ($job['repuesto'] ?? ''));
                 $inventoryPartId = max(0, (int) ($job['inventory_part_id'] ?? 0));
+                $categoryId = max(1, (int) ($job['categorias_reparacion'] ?? 4));
+                $unlock = $this->normalizeUnlockData($job, $categoryId);
 
                 if ($description === '' && $fallbackDescription !== '') {
                     $description = $fallbackDescription;
@@ -1914,16 +2084,20 @@ class RepairService
                 return [
                     'modelo' => $model !== '' ? $model : null,
                     'marca' => $brand !== '' ? $brand : null,
+                    'color' => trim((string) ($job['color'] ?? '')) !== '' ? trim((string) $job['color']) : null,
                     'descripcion' => $this->uppercaseFailure($description),
                     'observaciones' => trim((string) ($job['observaciones'] ?? '')) !== '' ? trim((string) ($job['observaciones'] ?? '')) : 'sin observaciones',
                     'monto' => $job['monto'] ?? 0,
                     'senia' => $job['senia'] ?? 0,
+                    'senia_method' => $job['senia_method'] ?? null,
                     'fecha_estimada' => $job['fecha_estimada'] ?? null,
                     'estado' => $state,
                     'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                     'pedir_repuesto' => $shouldRequestPart,
                     'inventory_part_id' => $inventoryPartId,
-                    'categorias_reparacion' => max(1, (int) ($job['categorias_reparacion'] ?? 4)),
+                    'categorias_reparacion' => $categoryId,
+                    'unlock_type' => $unlock['type'],
+                    'unlock_value' => $unlock['value'],
                 ];
             })
             ->filter(fn (array $job): bool => trim((string) $job['descripcion']) !== '')
@@ -1940,23 +2114,61 @@ class RepairService
             $shouldRequestPart = filter_var($payload['pedir_repuesto'] ?? false, FILTER_VALIDATE_BOOL);
             $part = trim((string) ($payload['repuesto'] ?? ''));
             $inventoryPartId = max(0, (int) ($payload['inventory_part_id'] ?? 0));
+            $categoryId = max(1, (int) ($payload['categorias_reparacion'] ?? 4));
+            $unlock = $this->normalizeUnlockData($payload, $categoryId);
 
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
                 'marca' => $this->normalizeDeviceModel((string) ($payload['marca'] ?? '')) ?: null,
+                'color' => trim((string) ($payload['color'] ?? '')) !== '' ? trim((string) $payload['color']) : null,
                 'descripcion' => $this->uppercaseFailure($description),
                 'observaciones' => trim((string) ($payload['observaciones'] ?? '')) !== '' ? trim((string) $payload['observaciones']) : 'sin observaciones',
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => $payload['senia'] ?? 0,
+                'senia_method' => $payload['senia_method'] ?? null,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => ! $shouldRequestPart && ($payload['estado'] ?? null) === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : ($payload['estado'] ?? 'PENDIENTE'),
                 'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                 'pedir_repuesto' => $shouldRequestPart,
                 'inventory_part_id' => $inventoryPartId,
-                'categorias_reparacion' => max(1, (int) ($payload['categorias_reparacion'] ?? 4)),
+                'categorias_reparacion' => $categoryId,
+                'unlock_type' => $unlock['type'],
+                'unlock_value' => $unlock['value'],
             ]];
         }
 
         return $jobs;
+    }
+
+    /**
+     * @return array{type:?string,value:?string}
+     */
+    private function normalizeUnlockData(array $payload, int $categoryId): array
+    {
+        if ($categoryId !== 1) {
+            return ['type' => null, 'value' => null];
+        }
+
+        $type = trim((string) ($payload['unlock_type'] ?? ''));
+        if (! in_array($type, ['pin', 'pattern'], true)) {
+            return ['type' => null, 'value' => null];
+        }
+
+        $value = trim((string) ($payload['unlock_value'] ?? ''));
+        if ($type === 'pattern') {
+            $points = collect(preg_split('/[^1-9]+/', $value) ?: [])
+                ->filter(fn (string $point): bool => $point !== '')
+                ->unique()
+                ->values()
+                ->all();
+
+            $value = implode('-', $points);
+        }
+
+        if ($value === '') {
+            return ['type' => null, 'value' => null];
+        }
+
+        return ['type' => $type, 'value' => Str::limit($value, 80, '')];
     }
 }

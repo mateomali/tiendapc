@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Category;
 use App\Models\SiteContactConfig;
 use App\Models\SiteGlobalConfig;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 
 class SiteViewDataService
@@ -16,6 +18,21 @@ class SiteViewDataService
      *   navItems: array<int, array{label: string, href: string, isActive: bool}>,
      *   cartUrl: string,
      *   repairUrl: string,
+     *   startupNotice: array{
+     *     enabled: bool,
+     *     title: string,
+     *     body: string,
+     *     imageUrl: string,
+     *     mobileImageUrl: string,
+     *     backgroundImageUrl: string,
+     *     backgroundColor: string,
+     *     textColor: string,
+     *     titleSize: int,
+     *     bodySize: int,
+     *     buttonLabel: string,
+     *     buttonUrl: string,
+     *     version: string
+     *   },
      *   footer: array{
      *     address: string,
      *     hours: string,
@@ -67,6 +84,7 @@ class SiteViewDataService
             ],
             'cartUrl' => route('store.cart'),
             'repairUrl' => $repairUrl,
+            'startupNotice' => $this->startupNotice(),
             'footer' => [
                 'address' => $this->value('footer_address', 'Av. Jose de San Martin 2658, Parque San Martin, Merlo'),
                 'hours' => $this->value('footer_hours', 'Lunes a viernes de 10:30 a 13:30 y 17:00 a 20:30 | Sábados 17:00 a 20:30'),
@@ -78,6 +96,127 @@ class SiteViewDataService
                 'copyrightYear' => (int) date('Y'),
             ],
         ];
+    }
+
+    /**
+     * @return array{enabled: bool, title: string, body: string, imageUrl: string, mobileImageUrl: string, backgroundImageUrl: string, backgroundColor: string, textColor: string, titleSize: int, bodySize: int, buttonLabel: string, buttonUrl: string, version: string}
+     */
+    private function startupNotice(): array
+    {
+        $enabled = $this->isTruthy(SiteGlobalConfig::value('startup_notice_enabled', '0'));
+        $title = $this->value('startup_notice_title', '');
+        $body = $this->value('startup_notice_body', '');
+        $imageUrl = $this->normalizeMediaUrl($this->value('startup_notice_image_url', ''));
+        $mobileImageUrl = $this->normalizeMediaUrl($this->value('startup_notice_mobile_image_url', ''));
+        $backgroundImageUrl = $this->normalizeMediaUrl($this->value('startup_notice_background_image_url', ''));
+        $backgroundColor = $this->sanitizeCssColor($this->value('startup_notice_background_color', '#edf4ff'), '#edf4ff');
+        $textColor = $this->sanitizeCssColor($this->value('startup_notice_text_color', '#143a7c'), '#143a7c');
+        $titleSize = max(24, min(120, (int) $this->value('startup_notice_title_size', '64')));
+        $bodySize = max(14, min(48, (int) $this->value('startup_notice_body_size', '24')));
+        $buttonLabel = $this->value('startup_notice_button_label', '');
+        $categorySlugs = $this->startupNoticeCategorySlugs();
+        $startsAt = $this->parseConfiguredDate($this->value('startup_notice_starts_at', ''));
+        $endsAt = $this->parseConfiguredDate($this->value('startup_notice_ends_at', ''));
+        $buttonUrl = '';
+
+        if ($categorySlugs !== []) {
+            $categories = Category::query()
+                ->whereIn('slug', $categorySlugs)
+                ->where('is_hidden', false)
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'slug', 'group_key']);
+
+            if ($categories->count() === 1) {
+                $category = $categories->first();
+                $buttonUrl = route('store.catalog', array_filter([
+                    'categoria' => $category->slug,
+                    'grupo' => (string) $category->group_key,
+                ], static fn ($value) => $value !== ''));
+            } elseif ($categories->count() > 1) {
+                $buttonUrl = route('store.catalog', [
+                    'categorias' => $categories->pluck('slug')->values()->all(),
+                ]);
+            }
+        }
+
+        $isScheduled = ($startsAt === null || $startsAt->lte(now())) && ($endsAt === null || $endsAt->gte(now()));
+        $versionSource = implode('|', [$enabled ? '1' : '0', $title, $body, $imageUrl, $mobileImageUrl, $backgroundImageUrl, $backgroundColor, $textColor, $titleSize, $bodySize, $buttonLabel, $buttonUrl, (string) $startsAt, (string) $endsAt]);
+
+        return [
+            'enabled' => $enabled && $isScheduled && trim($title . $body . $imageUrl) !== '',
+            'title' => $title,
+            'body' => $body,
+            'imageUrl' => $imageUrl,
+            'mobileImageUrl' => $mobileImageUrl,
+            'backgroundImageUrl' => $backgroundImageUrl,
+            'backgroundColor' => $backgroundColor,
+            'textColor' => $textColor,
+            'titleSize' => $titleSize,
+            'bodySize' => $bodySize,
+            'buttonLabel' => $buttonLabel,
+            'buttonUrl' => $buttonUrl,
+            'version' => substr(sha1($versionSource), 0, 12),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function startupNoticeCategorySlugs(): array
+    {
+        $stored = $this->value('startup_notice_category_slugs', '');
+        $decoded = $stored !== '' ? json_decode($stored, true) : null;
+        $slugs = is_array($decoded) ? $decoded : [];
+        $legacySlug = trim($this->value('startup_notice_category_slug', ''));
+
+        if ($slugs === [] && $legacySlug !== '') {
+            $slugs[] = $legacySlug;
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn ($slug): string => trim((string) $slug), $slugs),
+            static fn (string $slug): bool => $slug !== '',
+        )));
+    }
+
+    private function normalizeMediaUrl(string $value): string
+    {
+        $path = trim($value);
+        if ($path === '') {
+            return '';
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '/')) {
+            return $path;
+        }
+
+        return '/' . ltrim($path, '/');
+    }
+
+    private function parseConfiguredDate(string $value): ?Carbon
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function sanitizeCssColor(string $value, string $default): string
+    {
+        $color = trim($value);
+
+        if (preg_match('/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/', $color) === 1) {
+            return $color;
+        }
+
+        return $default;
     }
 
     private function contactWhatsapp(): string

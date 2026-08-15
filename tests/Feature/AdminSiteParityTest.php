@@ -78,7 +78,9 @@ it('renders rich admin site pages with legacy-oriented props', function (): void
         ->assertInertia(fn (Assert $page) => $page
             ->component('Admin/SettingsPage')
             ->where('settings.whatsapp_number', '5491122334455')
-            ->where('settings.catalog_empty_text', 'Sin resultados'));
+            ->where('settings.catalog_empty_text', 'Sin resultados')
+            ->where('settings.repair_cash_discount_threshold', '30000')
+            ->where('settings.repair_cash_discount_percentage', '10'));
 
     $this->actingAs($user)
         ->get(route('admin.services.index'))
@@ -106,12 +108,20 @@ it('persists curated settings and syncs whatsapp contact', function (): void {
                 'catalog_new_days' => '7',
                 'catalog_product_image_rotation_ms' => '9000',
                 'product_detail_description_word_limit' => '140',
+                'repair_cash_discount_enabled' => '1',
+                'repair_cash_discount_threshold' => '45000',
+                'repair_cash_discount_percentage' => '12.5',
+                'repair_cash_discount_note' => 'Precio efectivo disponible segun condicion de pago.',
             ],
         ])
         ->assertRedirect();
 
     expect(SiteGlobalConfig::value('whatsapp_number'))->toBe('5491177788899');
     expect(SiteGlobalConfig::value('catalog_product_image_rotation_ms'))->toBe('9000');
+    expect(SiteGlobalConfig::value('repair_cash_discount_enabled'))->toBe('1');
+    expect(SiteGlobalConfig::value('repair_cash_discount_threshold'))->toBe('45000');
+    expect(SiteGlobalConfig::value('repair_cash_discount_percentage'))->toBe('12.5');
+    expect(SiteGlobalConfig::value('repair_cash_discount_note'))->toBe('Precio efectivo disponible segun condicion de pago.');
     expect(SiteContactConfig::query()->find(1)?->whatsapp_number)->toBe('5491177788899');
 });
 
