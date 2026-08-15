@@ -238,9 +238,9 @@ Copy-DirectorySafe -Source (Join-Path $repoRoot 'public') -Destination $bundlePa
 
 $publicTarget = Join-Path $bundlePath 'public'
 Get-ChildItem -LiteralPath $publicTarget -Force | ForEach-Object {
-    Move-Item -LiteralPath $_.FullName -Destination $publicHtmlPath -Force
+    Copy-Item -LiteralPath $_.FullName -Destination $publicHtmlPath -Recurse -Force
 }
-Remove-Item -LiteralPath $publicTarget -Force
+Remove-Item -LiteralPath $publicTarget -Recurse -Force
 
 Remove-IfExists -Path (Join-Path $publicHtmlPath 'hot')
 Remove-IfExists -Path (Join-Path $publicHtmlPath 'backups')
