@@ -98,6 +98,14 @@ const labels: Record<string, { label: string; hint: string; multiline?: boolean 
         hint: 'Mensaje que se imprime cuando aplica el precio efectivo.',
         multiline: true,
     },
+    repair_quote_monthly_increment_percentage: {
+        label: 'Aumento mensual presupuestos',
+        hint: 'Porcentaje mensual aplicado cuando el precio encontrado para reparar un telefono es antiguo.',
+    },
+    repair_intake_mode: {
+        label: 'Carga de nueva orden',
+        hint: 'Define si el alta de reparaciones se completa en una sola pantalla o por pasos.',
+    },
 };
 
 export default function SettingsPage({ settings, whatsappDisplay }: SettingsPageProps): JSX.Element {
@@ -124,6 +132,8 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
         'repair_cash_discount_threshold',
         'repair_cash_discount_percentage',
         'repair_cash_discount_note',
+        'repair_quote_monthly_increment_percentage',
+        'repair_intake_mode',
     ];
     const productCashKeys = [
         'product_sku_enabled',
@@ -146,7 +156,21 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
         return (
             <label key={key} className={ui.field}>
                 <span className={ui.fieldLabel}>{meta.label}</span>
-                {key === 'repair_cash_discount_enabled' || key === 'product_cash_discount_enabled' || key === 'product_sku_enabled' ? (
+                {key === 'repair_intake_mode' ? (
+                    <select
+                        className={ui.input}
+                        value={value || 'continuous'}
+                        onChange={(event) =>
+                            form.setData('settings', {
+                                ...form.data.settings,
+                                [key]: event.target.value,
+                            })
+                        }
+                    >
+                        <option value="continuous">Formulario continuo</option>
+                        <option value="wizard">Paso a paso</option>
+                    </select>
+                ) : key === 'repair_cash_discount_enabled' || key === 'product_cash_discount_enabled' || key === 'product_sku_enabled' ? (
                     <select
                         className={ui.input}
                         value={value}
@@ -174,9 +198,9 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
                 ) : (
                     <input
                         className={ui.input}
-                        type={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' || key === 'catalog_new_days' || key === 'catalog_product_image_rotation_ms' || key === 'product_detail_description_word_limit' ? 'number' : 'text'}
-                        min={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' ? '0' : undefined}
-                        step={key === 'repair_cash_discount_percentage' || key === 'product_cash_discount_percentage' ? '0.1' : undefined}
+                        type={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' || key === 'catalog_new_days' || key === 'catalog_product_image_rotation_ms' || key === 'product_detail_description_word_limit' ? 'number' : 'text'}
+                        min={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' ? '0' : undefined}
+                        step={key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'product_cash_discount_percentage' ? '0.1' : undefined}
                         value={value}
                         onChange={(event) =>
                             form.setData('settings', {

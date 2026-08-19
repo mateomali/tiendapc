@@ -24,6 +24,7 @@ Route::get('/productos', [StoreController::class, 'catalog'])->name('store.catal
 Route::get('/productos-preview', [StoreController::class, 'catalog'])->name('store.catalog.preview');
 Route::get('/producto/{slug}', [StoreController::class, 'show'])->name('store.product.show');
 Route::get('/servicios', [StoreController::class, 'services'])->name('store.services');
+Route::get('/quiero-reparar-mi-telefono', [StoreController::class, 'repairQuote'])->name('store.repair_quote');
 Route::get('/carrito', [StoreController::class, 'cart'])->name('store.cart');
 
 Route::post('/carrito/agregar', [CartController::class, 'add'])->name('cart.add');

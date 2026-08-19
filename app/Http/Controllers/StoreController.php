@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\RepairDeviceModel;
+use App\Models\RepairOrder;
 use App\Models\SiteAnnouncement;
 use App\Models\SiteAnnouncementConfig;
 use App\Models\SiteContactConfig;
@@ -11,9 +13,11 @@ use App\Models\SiteGlobalConfig;
 use App\Models\SiteService;
 use App\Models\SiteServicesConfig;
 use App\Services\CartService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -264,6 +268,39 @@ class StoreController extends Controller
                 'whatsappUrl' => $this->buildWhatsappUrl('Hola Sudoku, quiero hacer una consulta por servicios tecnicos.'),
                 'repairUrl' => $this->safeRouteConfigValue('reparaciones_url', url('/reparaciones.php')),
             ],
+        ]);
+    }
+
+    public function repairQuote(Request $request): Response
+    {
+        $selectedModelId = (int) $request->query('modelo', 0);
+        $selectedFailure = trim((string) $request->query('falla', ''));
+        $models = RepairDeviceModel::query()
+            ->where('category_id', 1)
+            ->orderByRaw("CASE WHEN brand IS NULL OR brand = '' THEN 1 ELSE 0 END")
+            ->orderBy('brand')
+            ->orderBy('model')
+            ->get();
+        $selectedModel = $selectedModelId > 0 ? $models->firstWhere('id', $selectedModelId) : null;
+        $failuresByModel = $this->repairQuoteFailuresByModel($models);
+        $selectedFailureIsKnown = $selectedModel instanceof RepairDeviceModel
+            && in_array($selectedFailure, array_column($failuresByModel[$selectedModel->id] ?? [], 'value'), true);
+
+        $result = $selectedModel instanceof RepairDeviceModel && $selectedFailureIsKnown
+            ? $this->repairQuoteResult($selectedModel, $selectedFailure)
+            : null;
+
+        return Inertia::render('Store/RepairQuotePage', [
+            'brands' => $this->serializeRepairQuoteModels($models),
+            'failuresByModel' => $failuresByModel,
+            'selected' => [
+                'modelId' => $selectedModel?->id,
+                'failure' => $selectedFailureIsKnown ? $selectedFailure : '',
+            ],
+            'searched' => $selectedModel instanceof RepairDeviceModel && $selectedFailureIsKnown,
+            'result' => $result,
+            'whatsappUrl' => $this->buildWhatsappUrl($this->repairQuoteWhatsappMessage($selectedModel, $selectedFailure, $result)),
+            'whatsappBaseUrl' => 'https://wa.me/' . $this->whatsappNumber() . '?text=',
         ]);
     }
 
@@ -604,10 +641,193 @@ class StoreController extends Controller
 
     private function buildWhatsappUrl(string $message): string
     {
-        $contact = SiteContactConfig::query()->find(1);
-        $number = preg_replace('/\D+/', '', (string) ($contact?->whatsapp_number ?: SiteGlobalConfig::value('whatsapp_number', config('tienda.whatsapp_number'))));
+        return 'https://wa.me/' . $this->whatsappNumber() . '?text=' . rawurlencode($message);
+    }
 
-        return 'https://wa.me/' . $number . '?text=' . rawurlencode($message);
+    private function whatsappNumber(): string
+    {
+        $contact = SiteContactConfig::query()->find(1);
+
+        return preg_replace('/\D+/', '', (string) ($contact?->whatsapp_number ?: SiteGlobalConfig::value('whatsapp_number', config('tienda.whatsapp_number'))));
+    }
+
+    /**
+     * @param Collection<int, RepairDeviceModel> $models
+     * @return array<int, array{brand: string, models: array<int, array{id: int, label: string}>}>
+     */
+    private function serializeRepairQuoteModels(Collection $models): array
+    {
+        return $models
+            ->groupBy(fn (RepairDeviceModel $model): string => trim((string) $model->brand) !== '' ? trim((string) $model->brand) : 'OTROS')
+            ->sortKeys()
+            ->map(fn (Collection $brandModels, string $brand): array => [
+                'brand' => $brand,
+                'models' => $brandModels
+                    ->sortBy('model')
+                    ->map(fn (RepairDeviceModel $model): array => [
+                        'id' => $model->id,
+                        'label' => $model->model,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param Collection<int, RepairDeviceModel> $models
+     * @return array<int, array<int, array{value: string, label: string}>>
+     */
+    private function repairQuoteFailuresByModel(Collection $models): array
+    {
+        $orders = RepairOrder::query()
+            ->where('categorias_reparacion', 1)
+            ->where('monto', '>', 0)
+            ->where('estado', '<>', 'CANCELADA')
+            ->whereNotNull('descripcion')
+            ->orderByDesc('fecha')
+            ->orderByDesc('registro_id')
+            ->limit(1200)
+            ->get();
+
+        return $models
+            ->mapWithKeys(function (RepairDeviceModel $model) use ($orders): array {
+                $seen = [];
+                $failures = [];
+
+                foreach ($orders as $order) {
+                    if (! $this->repairQuoteModelMatches((string) $order->modelo, $model)) {
+                        continue;
+                    }
+
+                    $label = trim((string) $order->descripcion);
+                    $lookup = $this->repairLookupText($label);
+                    if ($label === '' || $lookup === '' || isset($seen[$lookup])) {
+                        continue;
+                    }
+
+                    $seen[$lookup] = true;
+                    $failures[] = [
+                        'value' => $label,
+                        'label' => $label,
+                    ];
+                }
+
+                return [$model->id => $failures];
+            })
+            ->all();
+    }
+
+    private function repairQuoteResult(RepairDeviceModel $model, string $failure): ?array
+    {
+        $failureLookup = $this->repairLookupText($failure);
+        if ($failureLookup === '') {
+            return null;
+        }
+
+        $order = RepairOrder::query()
+            ->where('categorias_reparacion', 1)
+            ->where('monto', '>', 0)
+            ->where('estado', '<>', 'CANCELADA')
+            ->orderByDesc('fecha')
+            ->orderByDesc('registro_id')
+            ->limit(800)
+            ->get()
+            ->first(fn (RepairOrder $order): bool => $this->repairQuoteOrderMatches($order, $model, $failureLookup));
+
+        if (! $order instanceof RepairOrder) {
+            return null;
+        }
+
+        $basePrice = (int) round((float) $order->monto);
+        $sourceDate = CarbonImmutable::parse($order->fecha ?? $order->created_at ?? now());
+        $monthsOld = max(0, $sourceDate->startOfMonth()->diffInMonths(CarbonImmutable::now()->startOfMonth()));
+        $monthlyIncrement = max(0, min(100, (float) SiteGlobalConfig::value('repair_quote_monthly_increment_percentage', '5')));
+        $estimatedPrice = $monthsOld > 0 && $monthlyIncrement > 0
+            ? (int) round(($basePrice * ((1 + ($monthlyIncrement / 100)) ** $monthsOld)) / 100) * 100
+            : $basePrice;
+
+        return [
+            'found' => true,
+            'basePrice' => $basePrice,
+            'basePriceLabel' => '$ ' . $this->money($basePrice),
+            'estimatedPrice' => $estimatedPrice,
+            'estimatedPriceLabel' => '$ ' . $this->money($estimatedPrice),
+            'sourceDate' => $sourceDate->format('d/m/Y'),
+            'monthsOld' => $monthsOld,
+            'monthlyIncrementPercentage' => $monthlyIncrement,
+            'orderId' => (int) ($order->id ?? $order->registro_id),
+        ];
+    }
+
+    private function repairQuoteOrderMatches(RepairOrder $order, RepairDeviceModel $model, string $failureLookup): bool
+    {
+        if (! $this->repairQuoteModelMatches((string) $order->modelo, $model)) {
+            return false;
+        }
+
+        $descriptionLookup = $this->repairLookupText((string) $order->descripcion);
+        if ($descriptionLookup === '') {
+            return false;
+        }
+
+        return $descriptionLookup === $failureLookup
+            || str_contains($descriptionLookup, $failureLookup)
+            || str_contains($failureLookup, $descriptionLookup);
+    }
+
+    private function repairQuoteModelMatches(string $orderModel, RepairDeviceModel $model): bool
+    {
+        $orderLookup = $this->repairLookupText($orderModel);
+        $modelLookup = $this->repairLookupText($model->model);
+        $storedLookup = $this->repairLookupText($model->normalized_model);
+        $brandLookup = $this->repairLookupText((string) $model->brand);
+
+        $accepted = array_values(array_unique(array_filter([
+            $modelLookup,
+            $storedLookup,
+            trim($brandLookup . ' ' . $modelLookup),
+            trim($brandLookup . ' ' . $storedLookup),
+        ])));
+
+        if (in_array($orderLookup, $accepted, true)) {
+            return true;
+        }
+
+        if ($brandLookup !== '' && str_starts_with($orderLookup, $brandLookup . ' ')) {
+            return in_array(trim(Str::after($orderLookup, $brandLookup . ' ')), [$modelLookup, $storedLookup], true);
+        }
+
+        return false;
+    }
+
+    private function repairLookupText(?string $value): string
+    {
+        $normalized = Str::ascii(Str::upper((string) $value));
+        $normalized = preg_replace('/[^A-Z0-9]+/', ' ', $normalized) ?? '';
+
+        return trim(preg_replace('/\s+/', ' ', $normalized) ?? '');
+    }
+
+    private function repairQuoteWhatsappMessage(?RepairDeviceModel $model, string $failure, ?array $result): string
+    {
+        $lines = ['Hola Sudoku, quiero consultar por reparar mi telefono.'];
+
+        if ($model instanceof RepairDeviceModel) {
+            $brand = trim((string) $model->brand);
+            $lines[] = 'Modelo: ' . trim(($brand !== '' ? $brand . ' ' : '') . $model->model);
+        }
+
+        if (trim($failure) !== '') {
+            $lines[] = 'Falla: ' . trim($failure);
+        }
+
+        if (is_array($result) && isset($result['estimatedPriceLabel'])) {
+            $lines[] = 'Precio estimado visto en la web: ' . $result['estimatedPriceLabel'];
+        }
+
+        return implode("\n", $lines);
     }
 
     private function normalizeMediaUrl(?string $value): ?string

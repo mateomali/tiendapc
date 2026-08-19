@@ -92,6 +92,7 @@ interface WorkbenchPageProps {
     deviceModels: DeviceModelOption[];
     nextOrderId: number;
     pageMode?: 'consultas' | 'ingreso';
+    intakeMode?: 'continuous' | 'wizard';
     initialCreateClient?: {
         nombre_cliente: string;
         dni: number | string;
@@ -100,6 +101,7 @@ interface WorkbenchPageProps {
 }
 
 interface RepairJobFormData {
+    same_device: boolean;
     marca: string;
     modelo: string;
     color: string;
@@ -129,11 +131,13 @@ interface WorkbenchCreateFormData {
 }
 
 type CreateFlowField = 'order-id' | 'customer-name' | `job-${number}-brand` | `job-${number}-model` | `job-${number}-description` | `job-${number}-amount` | `job-${number}-date`;
+type IntakeStep = 'client' | 'device' | 'extras' | 'summary';
 
 function createEmptyJob(defaultState: string): RepairJobFormData {
     const today = new Date().toISOString().slice(0, 10);
 
     return {
+        same_device: false,
         marca: '',
         modelo: '',
         color: '',
@@ -672,11 +676,13 @@ export default function WorkbenchPage({
     deviceModels,
     nextOrderId,
     pageMode = 'consultas',
+    intakeMode = 'continuous',
     archivedSearchMatches,
     initialCreateClient = null,
 }: WorkbenchPageProps): JSX.Element {
     const isConsultas = pageMode === 'consultas';
     const isIngreso = pageMode === 'ingreso';
+    const isWizardIntake = intakeMode === 'wizard';
     const highlightTerm = (filters.q ?? '').trim();
     const filtersForm = useForm({
         q: filters.q ?? '',
@@ -711,6 +717,8 @@ export default function WorkbenchPage({
     const [lookupBusy, setLookupBusy] = useState(false);
     const [imagePreviews, setImagePreviews] = useState<Record<number, string[]>>({});
     const [duplicateNotice, setDuplicateNotice] = useState('');
+    const [pendingFailureOptions, setPendingFailureOptions] = useState<Record<number, string>>({});
+    const [activeIntakeStep, setActiveIntakeStep] = useState<IntakeStep>('client');
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
@@ -874,6 +882,50 @@ export default function WorkbenchPage({
         );
     };
 
+    const normalizedJobsForSubmit = (): RepairJobFormData[] => createForm.data.jobs.reduce<RepairJobFormData[]>((jobs, job) => {
+        const previous = jobs[jobs.length - 1];
+
+        if (job.same_device && previous) {
+            jobs.push({
+                ...job,
+                marca: previous.marca,
+                modelo: previous.modelo,
+                color: previous.color,
+                categorias_reparacion: previous.categorias_reparacion,
+                unlock_type: previous.unlock_type,
+                unlock_value: previous.unlock_value,
+            });
+
+            return jobs;
+        }
+
+        jobs.push(job);
+        return jobs;
+    }, []);
+
+    const submitCreateForm = (): void => {
+        createForm.transform((data) => ({
+            ...data,
+            jobs: normalizedJobsForSubmit(),
+        }));
+
+        createForm.post(route('repairs.orders.store'), {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                createForm.reset();
+                createForm.setData('id_orden', String(nextOrderId + 1));
+                createForm.setData('contacto', '');
+                createForm.setData('jobs', [createEmptyJob(states[0] ?? 'PENDIENTE')]);
+                setImagePreviews({});
+                setLookupFeedback('');
+                setPartSearches({});
+                setActiveIntakeStep('client');
+            },
+            onFinish: () => createForm.transform((data) => data),
+        });
+    };
+
     const isPhoneCategory = (value: string): boolean => {
         const category = serviceCategories.find((item) => String(item.value) === String(value));
 
@@ -1014,8 +1066,34 @@ export default function WorkbenchPage({
         );
     };
 
+    const blankJobFromSameDevice = (source?: RepairJobFormData): RepairJobFormData => {
+        const base = createEmptyJob(states[0] ?? 'PENDIENTE');
+
+        if (!source) {
+            return base;
+        }
+
+        return {
+            ...base,
+            same_device: true,
+            marca: source.marca,
+            modelo: source.modelo,
+            color: source.color,
+            categorias_reparacion: source.categorias_reparacion,
+            unlock_type: source.unlock_type,
+            unlock_value: source.unlock_value,
+            fecha_estimada: source.fecha_estimada,
+            observaciones: source.observaciones,
+        };
+    };
+
     const addJob = (job?: RepairJobFormData): void => {
         createForm.setData('jobs', [...createForm.data.jobs, job ? { ...job, images: null } : createEmptyJob(states[0] ?? 'PENDIENTE')]);
+    };
+
+    const addJobForSameDevice = (): void => {
+        const source = createForm.data.jobs[createForm.data.jobs.length - 1];
+        createForm.setData('jobs', [...createForm.data.jobs, blankJobFromSameDevice(source)]);
     };
 
     const removeJob = (index: number): void => {
@@ -1103,6 +1181,31 @@ export default function WorkbenchPage({
         },
         { monto: 0, senia: 0 },
     );
+    const jobSubtotalRows = createForm.data.jobs.map((job, index) => {
+        const amount = Number.parseFloat(job.monto || '0');
+        const deposit = Number.parseFloat(job.senia || '0');
+        const description = job.descripcion.split('\n').map((line) => line.trim()).filter(Boolean)[0] ?? '';
+        const model = [job.marca, job.modelo].map((value) => value.trim()).filter(Boolean).join(' ');
+
+        return {
+            index,
+            model: model !== '' ? model : 'Sin modelo',
+            description: description !== '' ? description : 'Sin falla cargada',
+            amount: Number.isFinite(amount) ? amount : 0,
+            deposit: Number.isFinite(deposit) ? deposit : 0,
+        };
+    });
+    const groupedJobIndexes = (index: number): number[] => {
+        const indexes = [index];
+        let nextIndex = index + 1;
+
+        while (createForm.data.jobs[nextIndex]?.same_device) {
+            indexes.push(nextIndex);
+            nextIndex += 1;
+        }
+
+        return indexes;
+    };
 
     const formatMoney = (value: number): string => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
     const transferPriceLabel = (value: string): string => {
@@ -1166,6 +1269,59 @@ export default function WorkbenchPage({
     const guidedPanelClass = (baseClass: string, field: CreateFlowField): string => cn(baseClass, isGuidedField(field) && guidedFieldClass);
     const guidedInputClass = (field: CreateFlowField, baseClass = compactInputClass): string => cn(baseClass, isGuidedField(field) && 'border-[#2563eb] bg-[#eff6ff] ring-2 ring-[#2563eb24]');
     const guidedInlineLabelClass = (field: CreateFlowField): string => cn(repairLabelClass, isGuidedField(field) && guidedLabelClass);
+    const intakeSteps: { key: IntakeStep; label: string }[] = [
+        { key: 'client', label: 'Cliente' },
+        { key: 'device', label: 'Equipo y fallas' },
+        { key: 'extras', label: 'Fotos y repuesto' },
+        { key: 'summary', label: 'Resumen' },
+    ];
+    const activeIntakeStepIndex = Math.max(0, intakeSteps.findIndex((step) => step.key === activeIntakeStep));
+    const showIntakeStep = (step: IntakeStep): boolean => !isWizardIntake || activeIntakeStep === step;
+    const hasValidAmount = (value: string): boolean => {
+        const amount = Number(value || 0);
+
+        return Number.isFinite(amount) && amount > 0;
+    };
+    const isIntakeStepComplete = (step: IntakeStep): boolean => {
+        if (step === 'client') {
+            return createForm.data.id_orden.trim() !== '' && createForm.data.nombre_cliente.trim() !== '';
+        }
+
+        if (step === 'device') {
+            return createForm.data.jobs.every((job) => {
+                const hasDeviceData = job.same_device || (
+                    job.modelo.trim() !== ''
+                    && (!isPhoneCategory(job.categorias_reparacion) || job.marca.trim() !== '')
+                );
+
+                return hasDeviceData && job.descripcion.trim() !== '' && hasValidAmount(job.monto);
+            });
+        }
+
+        if (step === 'extras') {
+            return createForm.data.jobs.every((job) => job.fecha_estimada.trim() !== '');
+        }
+
+        return true;
+    };
+    const canGoToNextIntakeStep = isIntakeStepComplete(activeIntakeStep);
+    const canSelectIntakeStep = (targetIndex: number): boolean => {
+        if (targetIndex <= activeIntakeStepIndex) {
+            return true;
+        }
+
+        return intakeSteps.slice(0, targetIndex).every((step) => isIntakeStepComplete(step.key));
+    };
+    const goToPreviousIntakeStep = (): void => {
+        setActiveIntakeStep(intakeSteps[Math.max(0, activeIntakeStepIndex - 1)].key);
+    };
+    const goToNextIntakeStep = (): void => {
+        if (!canGoToNextIntakeStep) {
+            return;
+        }
+
+        setActiveIntakeStep(intakeSteps[Math.min(intakeSteps.length - 1, activeIntakeStepIndex + 1)].key);
+    };
 
     const descriptionOptions = [
         ...serviceTemplates.map((template) => ({
@@ -1197,6 +1353,47 @@ export default function WorkbenchPage({
         }
 
         applyFailureTemplate(index, option.value);
+    };
+
+    const addFailureFromSelectedOption = (index: number): void => {
+        const optionKey = pendingFailureOptions[index] ?? '';
+        const option = descriptionOptions.find((item) => item.key === optionKey);
+
+        if (!option) {
+            return;
+        }
+
+        const source = createForm.data.jobs[index];
+        const nextJob = blankJobFromSameDevice(source);
+        const description = option.type === 'service'
+            ? (serviceTemplates.find((item) => item.value === option.value)?.description ?? '')
+            : option.value;
+        const repuesto = option.type === 'service'
+            ? (serviceTemplates.find((item) => item.value === option.value)?.repuesto ?? '')
+            : '';
+
+        if (source.descripcion.trim() === '') {
+            updateJob(index, (job) => ({
+                ...job,
+                tipo_servicio: option.type === 'service' ? option.value : job.tipo_servicio,
+                descripcion: description,
+                repuesto: job.repuesto.trim() === '' ? repuesto : job.repuesto,
+            }));
+            setPendingFailureOptions((current) => ({ ...current, [index]: '' }));
+            return;
+        }
+
+        createForm.setData('jobs', [
+            ...createForm.data.jobs.slice(0, index + 1),
+            {
+                ...nextJob,
+                tipo_servicio: option.type === 'service' ? option.value : '',
+                descripcion: description,
+                repuesto,
+            },
+            ...createForm.data.jobs.slice(index + 1),
+        ]);
+        setPendingFailureOptions((current) => ({ ...current, [index]: '' }));
     };
 
     const applyTemplate = (index: number, serviceType: string): void => {
@@ -1850,32 +2047,46 @@ export default function WorkbenchPage({
 
                     <form
                         className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 rounded-lg border border-[#cbd5e1] bg-white p-4 shadow-sm md:p-5 xl:p-6"
+                        noValidate={isWizardIntake}
                         onSubmit={(event) => {
                             event.preventDefault();
-                            createForm.post(route('repairs.orders.store'), {
-                                preserveScroll: true,
-                                forceFormData: true,
-                                onSuccess: () => {
-                                    createForm.reset();
-                                    createForm.setData('id_orden', String(nextOrderId + 1));
-                                    createForm.setData('contacto', '');
-                                    createForm.setData('jobs', [createEmptyJob(states[0] ?? 'PENDIENTE')]);
-                                    setImagePreviews({});
-                                    setLookupFeedback('');
-                                    setPartSearches({});
-                                },
-                            });
+                            submitCreateForm();
                         }}
                     >
                         <div className={ui.repairCardHeading}>
                             <div className={ui.cardTitleWrap}>
                                 <p className={ui.eyebrow}>Datos del cliente</p>
-                                <h2 className={ui.cardTitle}>Informacion general</h2>
-                                <p className={ui.inlineCaption}>Estos datos se comparten entre todos los trabajos de la orden.</p>
+                                <h2 className={ui.cardTitle}>Nueva orden guiada</h2>
+                                <p className={ui.inlineCaption}>Cargá el cliente una vez y agregá cada falla como un trabajo separado con su precio.</p>
                             </div>
                         </div>
 
-                        <div className="grid items-start gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3 md:grid-cols-2 md:p-4 xl:grid-cols-[10rem_minmax(18rem,1fr)_12rem_14rem]">
+                        {isWizardIntake ? (
+                            <div className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3">
+                                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                                    {intakeSteps.map((step, stepIndex) => (
+                                        <button
+                                            key={step.key}
+                                            type="button"
+                                            className={cn(
+                                                'min-h-10 rounded-md border px-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45',
+                                                activeIntakeStep === step.key
+                                                    ? 'border-[#0f172a] bg-[#0f172a] text-white'
+                                                    : stepIndex < activeIntakeStepIndex
+                                                        ? 'border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]'
+                                                        : 'border-[#cbd5e1] bg-white text-[#334155]',
+                                            )}
+                                            onClick={() => canSelectIntakeStep(stepIndex) ? setActiveIntakeStep(step.key) : undefined}
+                                            disabled={!canSelectIntakeStep(stepIndex)}
+                                        >
+                                            {stepIndex + 1}. {step.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
+
+                        <div className={cn('grid items-start gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3 md:grid-cols-2 md:p-4 xl:grid-cols-[10rem_minmax(18rem,1fr)_12rem_14rem]', !showIntakeStep('client') && 'hidden')}>
                             <label className={guidedInlineLabelClass('order-id')}>ID de orden *<input className={guidedInputClass('order-id')} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required /><span className="text-xs font-semibold text-[#64748b]">Editable si esta libre.</span></label>
                             <label className={guidedInlineLabelClass('customer-name')}>Nombre del cliente *<input className={guidedInputClass('customer-name')} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required /></label>
                             <label className={repairLabelClass}>DNI<div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => createForm.setData('dni', event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
@@ -1883,14 +2094,22 @@ export default function WorkbenchPage({
                             {lookupFeedback !== '' ? <p className="md:col-span-4 rounded-md bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
                         </div>
 
-                        <div className="grid gap-4">
-                            {createForm.data.jobs.map((job, index) => (
+                        <div className={cn('grid gap-4', !showIntakeStep('device') && !showIntakeStep('extras') && 'hidden')}>
+                            {createForm.data.jobs.map((job, index) => {
+                                if (job.same_device && index > 0) {
+                                    return null;
+                                }
+
+                                const groupedIndexes = groupedJobIndexes(index);
+                                const hasGroupedFailures = groupedIndexes.length > 1;
+
+                                return (
                                 <article key={`job-v2-${index}`} className={cn('rounded-lg border bg-white p-3 shadow-sm md:p-4', Number(job.monto || 0) <= 0 ? 'border-[#fed7aa]' : Number(job.senia || 0) > 0 ? 'border-[#bbf7d0]' : 'border-[#cbd5e1]')}>
                                     <div className="mb-3 flex flex-wrap items-start justify-between gap-2 md:mb-4 md:gap-3">
                                         <div className={ui.cardTitleWrap}>
-                                            <p className={ui.eyebrow}>Reparacion activa</p>
-                                            <h3 className="text-base font-black tracking-tight text-ink-950 md:text-xl">Orden #{createForm.data.id_orden || nextOrderId} - Reparacion #{index + 1}</h3>
-                                            <p className="text-xs font-semibold text-slate-500 md:text-sm">Completa equipo, falla, presupuesto, repuesto y fotos.</p>
+                                            <p className={ui.eyebrow}>Trabajo de la orden</p>
+                                            <h3 className="text-base font-black tracking-tight text-ink-950 md:text-xl">Trabajo #{index + 1}</h3>
+                                            <p className="text-xs font-semibold text-slate-500 md:text-sm">Cada falla se carga por separado y suma al total del ticket.</p>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className={ui.repairMiniChip}>{Number(job.monto || 0) <= 0 ? 'A presupuestar' : Number(job.senia || 0) > 0 ? 'Con seña' : 'Presupuestado'}</span>
@@ -1901,11 +2120,17 @@ export default function WorkbenchPage({
                                     </div>
 
                                     <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
-                                        <div className={fieldPanelPurple}>
+                                        {job.same_device && index > 0 ? (
+                                            <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-semibold text-[#334155] md:col-span-2">
+                                                Misma unidad que el trabajo anterior: {[createForm.data.jobs[index - 1]?.marca, createForm.data.jobs[index - 1]?.modelo].map((value) => value?.trim()).filter(Boolean).join(' ') || 'equipo compartido'}.
+                                            </div>
+                                        ) : (
+                                            <>
+                                        <div className={cn(fieldPanelPurple, !showIntakeStep('device') && 'hidden')}>
                                             <label className={repairLabelClass}>Categoría<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
                                         </div>
                                         {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <div className={guidedPanelClass(fieldPanelPurple, `job-${index}-brand`)}>
+                                            <div className={cn(guidedPanelClass(fieldPanelPurple, `job-${index}-brand`), !showIntakeStep('device') && 'hidden')}>
                                                 <label className={repairLabelClass}>
                                                     Marca
                                                     <select className={guidedInputClass(`job-${index}-brand`)} value={job.marca} onChange={(event) => changeJobBrand(index, event.target.value)}>
@@ -1919,8 +2144,18 @@ export default function WorkbenchPage({
                                                 </label>
                                             </div>
                                         ) : null}
+                                        <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-model`), !showIntakeStep('device') && 'hidden')}>
+                                            <label className={repairLabelClass}>Modelo / equipo<input className={guidedInputClass(`job-${index}-model`)} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} /></label>
+                                            {renderDeviceModelSuggestions(index)}
+                                        </div>
+                                        <div className={cn(fieldPanelBlue, !showIntakeStep('device') && 'hidden')}>
+                                            <label className={repairLabelClass}>
+                                                Color
+                                                <RepairColorCombobox className={compactInputClass} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
+                                            </label>
+                                        </div>
                                         {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <div className={fieldPanelPurple}>
+                                            <div className={cn(fieldPanelPurple, !showIntakeStep('device') && 'hidden')}>
                                                 <label className={repairLabelClass}>
                                                     Desbloqueo
                                                     <PhoneUnlockFields
@@ -1933,29 +2168,103 @@ export default function WorkbenchPage({
                                                 </label>
                                             </div>
                                         ) : null}
-                                        <div className={guidedPanelClass(fieldPanelBlue, `job-${index}-model`)}>
-                                            <label className={repairLabelClass}>Modelo / equipo<input className={guidedInputClass(`job-${index}-model`)} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} /></label>
-                                            {renderDeviceModelSuggestions(index)}
+                                            </>
+                                        )}
+                                        <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'md:col-span-2', !showIntakeStep('device') && 'hidden')}>
+                                            <label className={repairLabelClass}>Falla / trabajo a realizar *</label>
+                                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                                                <select
+                                                    className={guidedInputClass(`job-${index}-description`)}
+                                                    value={pendingFailureOptions[index] ?? ''}
+                                                    onChange={(event) => setPendingFailureOptions((current) => ({ ...current, [index]: event.target.value }))}
+                                                >
+                                                    <option value="">Elegir falla...</option>
+                                                    {descriptionOptions.map((option) => (
+                                                        <option key={option.key} value={option.key}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    className={buttonClass('soft', 'sm')}
+                                                    type="button"
+                                                    onClick={() => addFailureFromSelectedOption(index)}
+                                                    disabled={(pendingFailureOptions[index] ?? '') === ''}
+                                                >
+                                                    <FaPlusCircle aria-hidden="true" /> Agregar falla
+                                                </button>
+                                            </div>
+                                            <div className="grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-2">
+                                                {groupedIndexes.map((jobIndex, rowIndex) => {
+                                                    const rowJob = createForm.data.jobs[jobIndex];
+
+                                                    return (
+                                                        <div
+                                                            key={`failure-row-${jobIndex}`}
+                                                            className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 sm:grid-cols-[2rem_minmax(0,1fr)_7.5rem_7.5rem] lg:grid-cols-[2rem_minmax(0,1fr)_8rem_8rem_10rem_auto] lg:items-start"
+                                                        >
+                                                            <span className="pt-2 text-sm font-black text-[#475569]">#{rowIndex + 1}</span>
+                                                            <textarea
+                                                                className={guidedInputClass(`job-${jobIndex}-description`, cn(compactTextareaClass, 'min-h-[4.25rem]'))}
+                                                                rows={2}
+                                                                value={rowJob.descripcion}
+                                                                onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, descripcion: event.target.value }))}
+                                                                required
+                                                                placeholder="Detalle de la falla"
+                                                            />
+                                                            <label className="col-start-2 grid gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
+                                                                Monto
+                                                                <input
+                                                                    className={guidedInputClass(`job-${jobIndex}-amount`)}
+                                                                    inputMode="decimal"
+                                                                    value={rowJob.monto}
+                                                                    onFocus={() => clearAmountForTyping(jobIndex, 'monto')}
+                                                                    onKeyDown={preventAmountArrowStep}
+                                                                    onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value }))}
+                                                                />
+                                                            </label>
+                                                            <label className="col-start-2 grid gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
+                                                                Seña
+                                                                <input
+                                                                    className={compactInputClass}
+                                                                    inputMode="decimal"
+                                                                    value={rowJob.senia}
+                                                                    onFocus={() => clearAmountForTyping(jobIndex, 'senia')}
+                                                                    onKeyDown={preventAmountArrowStep}
+                                                                    onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia: event.target.value }))}
+                                                                />
+                                                            </label>
+                                                            <label className="col-start-2 grid gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
+                                                                Medio
+                                                                <select
+                                                                    className={compactInputClass}
+                                                                    value={rowJob.senia_method}
+                                                                    onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia_method: event.target.value }))}
+                                                                >
+                                                                    <option value="efectivo">Efectivo</option>
+                                                                    <option value="transferencia">Transferencia</option>
+                                                                </select>
+                                                            </label>
+                                                            {rowIndex > 0 ? (
+                                                                <button
+                                                                    type="button"
+                                                                    className={cn(buttonClass('danger', 'sm'), 'col-start-2 w-full sm:col-start-auto lg:w-auto')}
+                                                                    onClick={() => removeJob(jobIndex)}
+                                                                    aria-label="Quitar falla"
+                                                                >
+                                                                    <FaTimes aria-hidden="true" />
+                                                                </button>
+                                                            ) : (
+                                                                <span className="hidden lg:block" />
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <span className="text-xs font-semibold text-[#64748b]">Elegí una falla y usá Agregar falla. Si ya hay una cargada, se apila como otro trabajo del mismo equipo.</span>
                                         </div>
-                                        <div className={fieldPanelBlue}>
-                                            <label className={repairLabelClass}>
-                                                Color
-                                                <RepairColorCombobox className={compactInputClass} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
-                                            </label>
-                                        </div>
-                                        <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'md:col-span-2')}>
-                                            <label className={repairLabelClass}>Tipo de servicio / descripcion de la falla *</label>
-                                            <select className={guidedInputClass(`job-${index}-description`)} value="" onChange={(event) => applyDescriptionOption(index, event.target.value)}>
-                                                <option value="">Agregar tipo o falla...</option>
-                                                {descriptionOptions.map((option) => (
-                                                    <option key={option.key} value={option.key}>
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <textarea className={guidedInputClass(`job-${index}-description`, compactTextareaClass)} rows={4} value={job.descripcion} onChange={(event) => updateJob(index, (current) => ({ ...current, descripcion: event.target.value }))} required />
-                                            <span className="text-xs font-semibold text-[#64748b]">El menu esta ordenado alfabeticamente y agrega cada seleccion en la descripcion.</span>
-                                        </div>
+                                        {false ? (
+                                            <>
                                         <div className={guidedPanelClass(fieldPanelGreen, `job-${index}-amount`)}>
                                             <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(job.monto)}</span></label>
                                         </div>
@@ -1965,13 +2274,15 @@ export default function WorkbenchPage({
                                         <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
                                             <label className={repairLabelClass}>Medio de seña<select className={compactInputClass} value={job.senia_method} onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
                                         </div>
-                                        <div className={guidedPanelClass(fieldPanelAmber, `job-${index}-date`)}>
+                                            </>
+                                        ) : null}
+                                        <div className={cn(guidedPanelClass(fieldPanelAmber, `job-${index}-date`), !showIntakeStep('extras') && 'hidden')}>
                                             <label className={repairLabelClass}>Fecha estimada<input className={guidedInputClass(`job-${index}-date`)} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
                                         </div>
-                                        <div className={fieldPanelPurple}>
+                                        <div className={cn(fieldPanelPurple, !showIntakeStep('extras') && 'hidden')}>
                                             <label className={repairLabelClass}>Observaciones<textarea className={compactTextareaClass} rows={4} value={job.observaciones} onFocus={() => { if (job.observaciones.trim().toLowerCase() === 'sin observaciones') updateJob(index, (current) => ({ ...current, observaciones: '' })); }} onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))} /></label>
                                         </div>
-                                        <div className="grid min-w-0 gap-3 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] p-3">
+                                        <div className={cn('grid min-w-0 gap-3 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] p-3', !showIntakeStep('extras') && 'hidden')}>
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <strong className="text-sm text-[#0f172a]">Imagenes ({imagePreviews[index]?.length ?? 0}/2)</strong>
                                                 <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{imagePreviews[index]?.length ?? 0}/2</span>
@@ -1998,7 +2309,7 @@ export default function WorkbenchPage({
                                                 <span className="rounded-lg border border-dashed border-[#bfdbfe] bg-white px-3 py-4 text-center text-sm font-semibold text-slate-500">No hay imagenes seleccionadas.</span>
                                             )}
                                         </div>
-                                        <div className={cn(fieldPanelAmber, 'md:col-span-2')}>
+                                        <div className={cn(fieldPanelAmber, 'md:col-span-2', !showIntakeStep('extras') && 'hidden')}>
                                             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                                                 <span className="text-sm font-black text-[#334155]">Repuesto a pedir</span>
                                                 <label className="inline-flex items-center gap-2 rounded-md border border-[#f59e0b33] bg-white px-3 py-1 text-xs font-bold text-[#92400e]">
@@ -2065,22 +2376,58 @@ export default function WorkbenchPage({
                                         </div>
                                     </div>
                                 </article>
-                            ))}
+                                );
+                            })}
                         </div>
 
-                        <section className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                        <section className={cn('grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4', !showIntakeStep('summary') && 'hidden')}>
+                            <div className="grid gap-2">
+                                <strong className="text-sm font-black text-[#0f172a]">Resumen de trabajos</strong>
+                                <div className="overflow-hidden rounded-lg border border-[#cbd5e1] bg-white">
+                                    {jobSubtotalRows.map((row) => (
+                                        <div key={`subtotal-${row.index}`} className="grid gap-1 border-b border-[#e2e8f0] px-3 py-2 text-sm last:border-b-0 md:grid-cols-[3rem_minmax(0,1fr)_8rem_8rem] md:items-center">
+                                            <span className="font-black text-[#475569]">#{row.index + 1}</span>
+                                            <span className="min-w-0">
+                                                <strong className="block truncate text-[#0f172a]">{row.description}</strong>
+                                                <span className="block truncate text-xs font-semibold text-[#64748b]">{row.model}</span>
+                                            </span>
+                                            <span className="font-bold text-[#334155]">Seña {formatMoney(row.deposit)}</span>
+                                            <strong className="text-[#0f172a] md:text-right">{row.amount > 0 ? formatMoney(row.amount) : 'A presupuestar'}</strong>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
-                            <div className="hidden gap-2 border-t border-[#dbeafe] pt-3 md:col-span-4 lg:grid lg:grid-cols-[auto_auto] lg:justify-end">
-                                <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Agregar reparacion</button>
+                            </div>
+                            <div className={cn('hidden gap-2 border-t border-[#dbeafe] pt-3 lg:grid lg:grid-cols-[auto_auto] lg:justify-end', isWizardIntake && 'lg:hidden')}>
+                                <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Otro equipo</button>
                                 <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}><FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
                             </div>
                         </section>
 
-                        <div className="grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between lg:hidden">
-                            <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Agregar reparacion</button>
+                        {isWizardIntake ? (
+                            <div className="grid gap-2 border-t border-[#e2e8f0] pt-3 sm:flex sm:items-center sm:justify-between">
+                                <button className={buttonClass('soft')} type="button" onClick={goToPreviousIntakeStep} disabled={activeIntakeStepIndex === 0}>
+                                    Anterior
+                                </button>
+                                {activeIntakeStep === 'summary' ? (
+                                    <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}>
+                                        <FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}
+                                    </button>
+                                ) : (
+                                    <button className={buttonClass('primary')} type="button" onClick={goToNextIntakeStep} disabled={!canGoToNextIntakeStep}>
+                                        Siguiente
+                                    </button>
+                                )}
+                            </div>
+                        ) : null}
+
+                        <div className={cn('grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between lg:hidden', isWizardIntake && 'hidden')}>
+                            <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Otro equipo</button>
                             <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}><FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
                         </div>
                         {duplicateNotice !== '' ? <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-[#111827] px-4 py-2 text-sm font-bold text-white shadow-lg">{duplicateNotice}</div> : null}
@@ -2097,15 +2444,7 @@ export default function WorkbenchPage({
                         className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            createForm.post(route('repairs.orders.store'), {
-                                preserveScroll: true,
-                                forceFormData: true,
-                                onSuccess: () => {
-                                    createForm.reset();
-                                    createForm.setData('jobs', [createEmptyJob(states[0] ?? 'PENDIENTE')]);
-                                    setLookupFeedback('');
-                                },
-                            });
+                            submitCreateForm();
                         }}
                     >
                         <div className={ui.repairCardHeading}>
@@ -2196,6 +2535,13 @@ export default function WorkbenchPage({
                                                 ))}
                                             </select>
                                         ) : null}
+                                        <input
+                                            className={ui.input}
+                                            placeholder="Modelo"
+                                            value={job.modelo}
+                                            onChange={(event) => changeJobModel(index, event.target.value)}
+                                        />
+                                        <RepairColorCombobox className={ui.input} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
                                         {isPhoneCategory(job.categorias_reparacion) ? (
                                             <PhoneUnlockFields
                                                 unlockType={job.unlock_type}
@@ -2205,13 +2551,6 @@ export default function WorkbenchPage({
                                                 inputClassName={ui.input}
                                             />
                                         ) : null}
-                                        <input
-                                            className={ui.input}
-                                            placeholder="Modelo"
-                                            value={job.modelo}
-                                            onChange={(event) => changeJobModel(index, event.target.value)}
-                                        />
-                                        <RepairColorCombobox className={ui.input} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
                                         {renderDeviceModelSuggestions(index)}
                                         <textarea
                                             className={`${ui.textarea} ${ui.repairFull}`}

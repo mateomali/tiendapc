@@ -177,7 +177,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
 
                             return (
                                 <div key={`${repair.registro_id}-${repair.reparacion}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
-                                    <div className="mb-[3px] text-[12px]">{ticket.repairs.length === 1 ? 'REPARACION' : `REPARACION ${index + 1}`}</div>
+                                    <div className="mb-[3px] text-[12px]">{ticket.repairs.length === 1 ? 'TRABAJO' : `TRABAJO ${index + 1}`}</div>
                                     <TicketLine label="MODELO:" value={modelLabel} />
                                     <div className="mb-px block">
                                         <span className="block">FALLA:</span>
@@ -205,6 +205,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                     ))}
                                     {hasDeposits ? <TicketLine label="SALDO:" value={monto > 0 ? listDueLabel(financial) : 'A DEFINIR'} /> : null}
                                     {hasDeposits && financial.discountApplies ? <TicketLine label="SALDO EFECTIVO HOY:" value={monto > 0 ? cashDueLabel : 'A DEFINIR'} /> : null}
+                                    {ticket.repairs.length > 1 ? <TicketLine label="SUBTOTAL TRABAJO:" value={monto > 0 ? formatCurrency(financial.cashTotal) : 'A PRESUPUESTAR'} /> : null}
                                     {deliveredLabel !== null ? (
                                         <TicketLine label="ENTREGA:" value={deliveredLabel} />
                                     ) : null}

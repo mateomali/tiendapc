@@ -1122,6 +1122,12 @@ function AddRepairModal({
                                 </select>
                             </EditField>
                         ) : null}
+                        <EditField label="Modelo">
+                            <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
+                        </EditField>
+                        <EditField label="Color">
+                            <RepairColorCombobox className={ui.input} value={form.data.color} onChange={(value) => form.setData('color', value)} />
+                        </EditField>
                         {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
                             <EditField label="Desbloqueo">
                                 <PhoneUnlockFields
@@ -1133,12 +1139,6 @@ function AddRepairModal({
                                 />
                             </EditField>
                         ) : null}
-                        <EditField label="Modelo">
-                            <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
-                        </EditField>
-                        <EditField label="Color">
-                            <RepairColorCombobox className={ui.input} value={form.data.color} onChange={(value) => form.setData('color', value)} />
-                        </EditField>
                         <EditField label="Tipo de servicio">
                             <select className={ui.input} value="" onChange={(event) => applyDescriptionOption(event.target.value)}>
                                 <option value="">Agregar tipo o falla...</option>
@@ -1706,8 +1706,8 @@ function RepairEditCard({
     const InlineEditor = ({ mobile = false }: { mobile?: boolean }): JSX.Element => (
         <form
             className={cn(
-                'grid gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3',
-                mobile ? 'grid-cols-2' : 'grid-cols-[76px_minmax(150px,1fr)_96px_128px_126px_124px_124px_minmax(150px,1fr)_106px_138px_112px_142px]',
+                'grid gap-3 rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-sm',
+                mobile ? 'grid-cols-1 sm:grid-cols-2' : 'lg:grid-cols-6 xl:grid-cols-[76px_minmax(150px,1fr)_96px_128px_126px_124px_124px_minmax(150px,1fr)_106px_138px_112px_142px]',
             )}
             onSubmit={submitEdit}
         >
@@ -1741,7 +1741,7 @@ function RepairEditCard({
             <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
                 {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
             </select>
-            <div className={cn('grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2', mobile ? 'col-span-2 grid-cols-1' : 'col-span-full grid-cols-[minmax(180px,1fr)_120px_140px_auto] items-end')}>
+            <div className={cn('grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2', mobile ? 'sm:col-span-2 grid-cols-1' : 'col-span-full grid-cols-[minmax(180px,1fr)_120px_140px_auto] items-end')}>
                 <input
                     className={ui.repairDenseInput}
                     placeholder="Concepto de incremento"
@@ -1771,14 +1771,22 @@ function RepairEditCard({
                     Registrar incremento
                 </button>
             </div>
-            <div className={cn('flex gap-2', mobile ? 'col-span-2' : 'col-span-full justify-end')}>
+            <div className={cn('flex gap-2', mobile ? 'sm:col-span-2' : 'col-span-full justify-end')}>
                 <button type="button" className={buttonClass('soft', 'sm')} onClick={cancelInlineEdit}>Cancelar</button>
                 <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing || incrementForm.processing}>
                     <FaSave aria-hidden="true" /> Guardar
                 </button>
             </div>
-            <textarea className={cn(ui.repairDenseTextarea, mobile ? 'col-span-2' : 'col-span-full')} value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} placeholder="Descripcion" />
-            <textarea className={cn(ui.repairDenseTextarea, mobile ? 'col-span-2' : 'col-span-full')} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} placeholder="Observaciones" />
+            <div className={cn('grid gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] p-2', mobile ? 'sm:col-span-2' : 'col-span-full md:grid-cols-[2rem_minmax(0,1fr)_12rem] md:items-start')}>
+                <span className="pt-2 text-sm font-black text-[#475569]">#1</span>
+                <textarea className={cn(ui.repairDenseTextarea, 'min-h-[4.25rem]')} value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} placeholder="Descripcion de la falla" />
+                <div className="grid gap-1 rounded-md border border-[#e2e8f0] bg-white p-2 text-xs font-semibold text-[#475569]">
+                    <span>Monto actual</span>
+                    <strong className="text-base text-[#0f172a]">{formatCurrency(Number(form.data.monto || 0))}</strong>
+                    <span>{transferPriceLabel(form.data.monto)}</span>
+                </div>
+            </div>
+            <textarea className={cn(ui.repairDenseTextarea, mobile ? 'sm:col-span-2' : 'col-span-full')} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} placeholder="Observaciones" />
         </form>
     );
 

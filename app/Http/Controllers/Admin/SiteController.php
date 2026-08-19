@@ -225,6 +225,8 @@ class SiteController extends Controller
             'settings.repair_cash_discount_threshold' => ['nullable', 'integer', 'min:0', 'max:999999999'],
             'settings.repair_cash_discount_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'settings.repair_cash_discount_note' => ['nullable', 'string', 'max:255'],
+            'settings.repair_quote_monthly_increment_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'settings.repair_intake_mode' => ['nullable', 'string', 'in:continuous,wizard'],
         ]);
 
         $settings = $validated['settings'];
@@ -449,6 +451,8 @@ class SiteController extends Controller
             'repair_cash_discount_threshold' => SiteGlobalConfig::value('repair_cash_discount_threshold', '30000'),
             'repair_cash_discount_percentage' => SiteGlobalConfig::value('repair_cash_discount_percentage', '10'),
             'repair_cash_discount_note' => SiteGlobalConfig::value('repair_cash_discount_note', 'Abonando en efectivo tenes 10% de descuento.'),
+            'repair_quote_monthly_increment_percentage' => SiteGlobalConfig::value('repair_quote_monthly_increment_percentage', '5'),
+            'repair_intake_mode' => SiteGlobalConfig::value('repair_intake_mode', 'continuous'),
         ];
     }
 

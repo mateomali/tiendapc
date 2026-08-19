@@ -161,6 +161,7 @@ class WorkbenchController extends Controller
             'deviceModels' => $repairService->deviceModelOptions(),
             'nextOrderId' => $repairService->nextOrderId(),
             'pageMode' => $pageMode,
+            'intakeMode' => SiteGlobalConfig::value('repair_intake_mode', 'continuous') === 'wizard' ? 'wizard' : 'continuous',
             'initialCreateClient' => $prefillOrder instanceof RepairOrder ? [
                 'nombre_cliente' => $prefillOrder->nombre_cliente,
                 'dni' => $prefillOrder->dni,
