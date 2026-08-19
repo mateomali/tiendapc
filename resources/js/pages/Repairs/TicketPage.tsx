@@ -190,18 +190,21 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                             value={`${ticketIncrementLabel(payment.notes)} + ${formatCurrency(payment.amount)}`}
                                         />
                                     ))}
-                                    <TicketLine label={hasDeposits ? 'PRESUPUESTO:' : 'PRECIO:'} value={monto > 0 ? formatCurrency(financial.listTotal) : 'A PRESUPUESTAR'} />
                                     {financial.discountApplies ? (
-                                        <>
-                                            <TicketNote>{ticketPricing.cashDiscountNote}</TicketNote>
-                                            <TicketLine label={hasDeposits ? 'PRESUP. EFECTIVO:' : 'PRECIO EFECTIVO:'} value={formatCurrency(financial.cashTotal)} />
-                                        </>
-                                    ) : null}
+                                        <CashOfferBlock
+                                            regularLabel={hasDeposits ? 'PRESUP. REGULAR:' : 'PRECIO REGULAR:'}
+                                            cashLabel={`DESCUENTO ${ticketDiscountPercentageLabel(ticketPricing.cashDiscountPercentage)} EN EFECTIVO:`}
+                                            regularAmount={financial.listTotal}
+                                            cashAmount={financial.cashTotal}
+                                        />
+                                    ) : (
+                                        <TicketLine label={hasDeposits ? 'PRESUPUESTO:' : 'PRECIO:'} value={monto > 0 ? formatCurrency(financial.listTotal) : 'A PRESUPUESTAR'} />
+                                    )}
                                     {deposits.map((payment) => (
                                         <TicketLine key={payment.id} label={`SEÑA ${paymentMethodLabel(payment)}:`} value={formatCurrency(payment.amount)} />
                                     ))}
                                     {hasDeposits ? <TicketLine label="SALDO:" value={monto > 0 ? listDueLabel(financial) : 'A DEFINIR'} /> : null}
-                                    {hasDeposits && financial.discountApplies ? <TicketLine label="SALDO EFECTIVO:" value={monto > 0 ? cashDueLabel : 'A DEFINIR'} /> : null}
+                                    {hasDeposits && financial.discountApplies ? <TicketLine label="SALDO EFECTIVO HOY:" value={monto > 0 ? cashDueLabel : 'A DEFINIR'} /> : null}
                                     {deliveredLabel !== null ? (
                                         <TicketLine label="ENTREGA:" value={deliveredLabel} />
                                     ) : null}
@@ -213,19 +216,20 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     {ticket.repairs.length > 1 ? (
                         <>
                             <div className="my-[5px] border-t border-dashed border-black" />
-                            <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
-                                <span>{generalFinancial.paidActual > 0 ? 'SALDO GENERAL:' : 'TOTAL GENERAL:'}</span>
-                                <strong>{formatCurrency(generalFinancial.listDue)}</strong>
-                            </div>
                             {generalFinancial.discountApplies ? (
-                                <>
-                                    <TicketNote>{ticketPricing.cashDiscountNote}</TicketNote>
-                                    <div className="mt-[2px] flex justify-between gap-[5px] text-[13px]">
-                                        <span>{generalFinancial.paidActual > 0 ? 'SALDO GRAL. EFECTIVO:' : 'TOTAL GRAL. EFECTIVO:'}</span>
-                                        <strong>{formatCurrency(generalFinancial.cashDue)}</strong>
-                                    </div>
-                                </>
-                            ) : null}
+                                <CashOfferBlock
+                                    regularLabel={generalFinancial.paidActual > 0 ? 'SALDO GRAL. REGULAR:' : 'TOTAL GRAL. REGULAR:'}
+                                    cashLabel={`DESCUENTO ${ticketDiscountPercentageLabel(ticketPricing.cashDiscountPercentage)} EN EFECTIVO:`}
+                                    regularAmount={generalFinancial.listDue}
+                                    cashAmount={generalFinancial.cashDue}
+                                    className="mt-[4px] text-[13px]"
+                                />
+                            ) : (
+                                <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
+                                    <span>{generalFinancial.paidActual > 0 ? 'SALDO GENERAL:' : 'TOTAL GENERAL:'}</span>
+                                    <strong>{formatCurrency(generalFinancial.listDue)}</strong>
+                                </div>
+                            )}
                         </>
                     ) : null}
 
@@ -374,6 +378,12 @@ function formatDeliveredTicketDate(value?: string | null): string {
     return `Entregado el ${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year.slice(-2)}`;
 }
 
+function ticketDiscountPercentageLabel(value: number): string {
+    const normalized = Math.max(0, Number(value ?? 0));
+
+    return Number.isInteger(normalized) ? `${normalized}%` : `${normalized.toFixed(1).replace('.', ',')}%`;
+}
+
 function TicketLine({ label, value, strongClassName = '', variant = 'default' }: { label: string; value: string; strongClassName?: string; variant?: 'default' | 'highlight' }): JSX.Element {
     if (variant === 'highlight') {
         return (
@@ -392,10 +402,23 @@ function TicketLine({ label, value, strongClassName = '', variant = 'default' }:
     );
 }
 
-function TicketNote({ children }: { children: string }): JSX.Element {
+function CashOfferBlock({
+    regularLabel,
+    cashLabel,
+    regularAmount,
+    cashAmount,
+    className = '',
+}: {
+    regularLabel: string;
+    cashLabel: string;
+    regularAmount: number;
+    cashAmount: number;
+    className?: string;
+}): JSX.Element {
     return (
-        <div className="my-[3px] border-y border-dashed border-black py-[3px] text-center text-[9.5px] leading-[1.1]">
-            {children}
+        <div className={`my-[3px] border-y border-dashed border-black py-[3px] ${className}`}>
+            <TicketLine label={regularLabel} value={formatCurrency(regularAmount)} />
+            <TicketLine label={cashLabel} value={formatCurrency(cashAmount)} strongClassName="text-[13px]" />
         </div>
     );
 }

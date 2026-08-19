@@ -33,6 +33,7 @@ class RepairOrderRequest extends FormRequest
             'senia_method' => ['nullable', 'string', 'in:efectivo,transferencia'],
             'fecha_estimada' => ['nullable', 'date'],
             'estado' => ['nullable', 'string', 'max:80'],
+            'cancelado_motivo' => ['nullable', 'required_if:estado,CANCELADA', 'string', 'max:1000'],
             'fecha_entregado' => ['nullable', 'date'],
             'repuesto' => ['nullable', 'string', 'max:255'],
             'repuesto_pedido' => ['nullable', 'boolean'],

@@ -1067,9 +1067,10 @@ class WorkbenchController extends Controller
     {
         $validated = $request->validate([
             'estado' => ['required', 'string', 'in:PENDIENTE,EN REPARACION,EN REPARACION / ESPERA REPUESTO,LISTA,CANCELADA,ENTREGADA'],
+            'cancelado_motivo' => ['nullable', 'required_if:estado,CANCELADA', 'string', 'max:1000'],
         ]);
 
-        $repairService->updateState($repairOrder, $validated['estado']);
+        $repairService->updateState($repairOrder, $validated['estado'], $validated['cancelado_motivo'] ?? null);
 
         return back()->with('success', 'Estado actualizado.');
     }
@@ -1174,11 +1175,15 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Orden marcada como lista.');
     }
 
-    public function cancel(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    public function cancel(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
-        $repairService->cancel($repairOrder);
+        $validated = $request->validate([
+            'cancelado_motivo' => ['required', 'string', 'max:1000'],
+        ]);
 
-        return back()->with('success', 'Orden cancelada y enviada a archivados.');
+        $repairService->cancel($repairOrder, $validated['cancelado_motivo']);
+
+        return back()->with('success', 'Orden cancelada. Queda pendiente de retiro.');
     }
 
     public function moveBack(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
@@ -1285,6 +1290,7 @@ class WorkbenchController extends Controller
             'fecha_entregado' => optional($order->fecha_entregado)->format('Y-m-d'),
             'archivado_at' => optional($order->archivado_at)->format('Y-m-d H:i'),
             'archivado_motivo' => $order->archivado_motivo,
+            'cancelado_motivo' => $order->cancelado_motivo,
             'repuesto' => $order->repuesto,
             'repuesto_pedido' => (bool) $order->repuesto_pedido,
             'repuesto_pedido_at' => optional($order->repuesto_pedido_at)->format('Y-m-d H:i'),

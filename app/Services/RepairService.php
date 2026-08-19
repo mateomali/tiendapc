@@ -561,6 +561,11 @@ class RepairService
             $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4), $payload['marca'] ?? null);
             $brand = $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? ''));
 
+            $nextState = (string) ($payload['estado'] ?? $order->estado);
+            $nextCancellationReason = Str::upper($nextState) === 'CANCELADA'
+                ? $this->normalizeCancellationReason((string) ($payload['cancelado_motivo'] ?? $order->cancelado_motivo ?? ''))
+                : null;
+
             $order->fill([
                 'id' => $newOrderId,
                 'nombre_cliente' => $payload['nombre_cliente'],
@@ -579,7 +584,8 @@ class RepairService
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => $this->paymentTotal($order),
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
-                'estado' => $payload['estado'] ?? $order->estado,
+                'estado' => $nextState,
+                'cancelado_motivo' => $nextCancellationReason,
                 'fecha_entregado' => $payload['fecha_entregado'] ?? $order->fecha_entregado,
                 'repuesto' => ($activePartRequest || $allocation !== null) && $part !== '' ? $part : null,
                 'repuesto_pedido' => $activePartRequest,
@@ -618,16 +624,29 @@ class RepairService
         return $this->setState($order, 'LISTA', 'LISTA');
     }
 
-    public function updateState(RepairOrder $order, string $state): RepairOrder
+    public function updateState(RepairOrder $order, string $state, ?string $cancellationReason = null): RepairOrder
     {
-        return $this->setState($order, $state, 'CAMBIO_ESTADO_DIRECTO');
+        return $this->setState($order, $state, 'CAMBIO_ESTADO_DIRECTO', $cancellationReason);
     }
 
-    public function cancel(RepairOrder $order): RepairOrder
+    public function cancel(RepairOrder $order, string $reason): RepairOrder
     {
-        $cancelled = $this->setState($order, 'CANCELADA', 'CANCELADA');
+        $reason = $this->normalizeCancellationReason($reason);
+        $previousState = $order->estado;
 
-        return $this->archive($cancelled, 'cancelada');
+        $order->update([
+            'estado' => 'CANCELADA',
+            'entregado' => 'no',
+            'fecha_entregado' => null,
+            'archivado_at' => null,
+            'archivado_motivo' => null,
+            'cancelado_motivo' => $reason,
+        ]);
+
+        $this->syncTaskQueueForState($order, 'CANCELADA');
+        $this->recordEvent($order, 'CANCELADA', $previousState, 'CANCELADA');
+
+        return $order->refresh();
     }
 
     public function deliver(RepairOrder $order, ?string $date = null, ?string $via = null, ?string $detail = null, bool $archive = false): RepairOrder
@@ -701,13 +720,14 @@ class RepairService
     public function moveBackToConsultas(RepairOrder $order): RepairOrder
     {
         $previousState = $order->estado;
-        $order->update([
-            'entregado' => 'no',
-            'fecha_entregado' => null,
-            'archivado_at' => null,
-            'archivado_motivo' => null,
-            'estado' => 'PENDIENTE',
-        ]);
+            $order->update([
+                'entregado' => 'no',
+                'fecha_entregado' => null,
+                'archivado_at' => null,
+                'archivado_motivo' => null,
+                'cancelado_motivo' => null,
+                'estado' => 'PENDIENTE',
+            ]);
 
         $this->recordEvent($order, 'MOVER_A_CONSULTAS', $previousState, 'PENDIENTE');
 
@@ -958,13 +978,20 @@ class RepairService
         return max($paymentsTotal, (float) $order->senia, 0);
     }
 
-    private function setState(RepairOrder $order, string $state, string $event): RepairOrder
+    private function setState(RepairOrder $order, string $state, string $event, ?string $cancellationReason = null): RepairOrder
     {
         $previousState = $order->estado;
-
-        $order->update([
+        $updates = [
             'estado' => $state,
-        ]);
+        ];
+
+        if (Str::upper($state) === 'CANCELADA') {
+            $updates['cancelado_motivo'] = $this->normalizeCancellationReason((string) $cancellationReason);
+        } else {
+            $updates['cancelado_motivo'] = null;
+        }
+
+        $order->update($updates);
 
         if (Str::upper($state) === 'LISTA') {
             $this->consumeInventoryReservation($order->refresh());
@@ -976,6 +1003,17 @@ class RepairService
         }
 
         return $order->refresh();
+    }
+
+    private function normalizeCancellationReason(string $reason): string
+    {
+        $reason = trim(preg_replace('/\s+/', ' ', $reason) ?? '');
+
+        if ($reason === '') {
+            throw new \RuntimeException('Indica el motivo de cancelacion.');
+        }
+
+        return Str::limit($reason, 1000, '');
     }
 
     private function syncTaskQueueForState(RepairOrder $order, string $state): void

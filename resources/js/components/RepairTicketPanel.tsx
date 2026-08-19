@@ -79,6 +79,7 @@ interface RepairUpdateFormData {
     senia: string;
     fecha_estimada: string;
     estado: string;
+    cancelado_motivo: string;
     fecha_entregado: string;
     repuesto: string;
     repuesto_pedido: boolean;
@@ -1316,6 +1317,7 @@ function RepairEditCard({
         senia: formatAmountInput(repair.senia),
         fecha_estimada: repair.fecha_estimada ?? '',
         estado: repair.estado,
+        cancelado_motivo: repair.cancelado_motivo ?? '',
         fecha_entregado: repair.fecha_entregado ?? '',
         repuesto: repair.repuesto ?? '',
         repuesto_pedido: Boolean(repair.repuesto_pedido),
@@ -1347,6 +1349,8 @@ function RepairEditCard({
     const [deliveryVia, setDeliveryVia] = useState<DeliveryVia>('dni');
     const [deliveryDetail, setDeliveryDetail] = useState('');
     const [deliveryArchive, setDeliveryArchive] = useState(false);
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelReason, setCancelReason] = useState(repair.cancelado_motivo ?? '');
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [finalImagePreviews, setFinalImagePreviews] = useState<string[]>([]);
@@ -1364,7 +1368,7 @@ function RepairEditCard({
     const nextStatus = nextQuickStatus(repair.estado);
     const displayStatus = statusLabel?.(repair) ?? compactStatus(repair.estado);
     const unlockLabel = phoneUnlockLabel(repair.unlock_type, repair.unlock_value);
-    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.contacto || repair.dni || unlockLabel);
+    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.cancelado_motivo || repair.contacto || repair.dni || unlockLabel);
     const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
@@ -1630,9 +1634,35 @@ function RepairEditCard({
 
     const cancelRepair = (): void => {
         if (!repair.actions?.cancel) return;
-        if (window.confirm(`Cancelar orden #${repair.id} trabajo #${repair.reparacion}?`)) {
-            router.post(repair.actions.cancel, {}, { preserveScroll: true });
+        setCancelReason(repair.cancelado_motivo ?? '');
+        setCancelOpen(true);
+    };
+
+    const submitCancelRepair = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        if (!repair.actions?.cancel) return;
+
+        const reason = cancelReason.trim();
+        if (reason === '') {
+            window.alert('Indica el motivo de cancelacion.');
+            return;
         }
+
+        router.post(
+            repair.actions.cancel,
+            { cancelado_motivo: reason },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    form.setData((current) => ({
+                        ...current,
+                        estado: 'CANCELADA',
+                        cancelado_motivo: reason,
+                    }));
+                    setCancelOpen(false);
+                },
+            },
+        );
     };
 
     const deleteRepair = (): void => {
@@ -2240,10 +2270,35 @@ function RepairEditCard({
                                     </EditField>
                                 </div>
                                 <EditField label="Estado">
-                                    <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado), hasChangedValue(form.data.estado, repair.estado) && 'ring-2 ring-[#2563eb]')} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)} disabled={readOnly}>
+                                    <select
+                                        className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado), hasChangedValue(form.data.estado, repair.estado) && 'ring-2 ring-[#2563eb]')}
+                                        value={form.data.estado}
+                                        onChange={(event) => {
+                                            const nextState = event.target.value;
+                                            form.setData((current) => ({
+                                                ...current,
+                                                estado: nextState,
+                                                cancelado_motivo: nextState === 'CANCELADA' ? current.cancelado_motivo : '',
+                                            }));
+                                        }}
+                                        disabled={readOnly}
+                                    >
                                         {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
                                     </select>
                                 </EditField>
+                                {form.data.estado === 'CANCELADA' ? (
+                                    <EditField label="Motivo de cancelacion">
+                                        <textarea
+                                            className={changedTextareaClass(form.data.cancelado_motivo, repair.cancelado_motivo ?? '')}
+                                            value={form.data.cancelado_motivo}
+                                            onChange={(event) => form.setData('cancelado_motivo', event.target.value)}
+                                            rows={3}
+                                            disabled={readOnly}
+                                            required
+                                            placeholder="Ej: el cliente no autoriza el presupuesto, no se consigue repuesto, equipo sin solucion..."
+                                        />
+                                    </EditField>
+                                ) : null}
                             </EditSection>
 
                             <EditSection title="Descripción y Contexto">
@@ -2351,6 +2406,31 @@ function RepairEditCard({
                             <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing || incrementForm.processing}>
                                 <FaSave aria-hidden="true" /> Guardar Cambios
                             </button>
+                        </div>
+                    </form>
+                </ModalShell>
+            ) : null}
+            {cancelOpen ? (
+                <ModalShell title={`Cancelar orden #${repair.id} trabajo #${repair.reparacion}`} onClose={() => setCancelOpen(false)}>
+                    <form className="grid gap-3" onSubmit={submitCancelRepair}>
+                        <p className="rounded-lg border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold text-[#92400e]">
+                            La reparacion queda cancelada, pero sigue en consultas hasta que el cliente retire el equipo.
+                        </p>
+                        <label className="grid gap-1.5 text-sm font-black text-[#334155]">
+                            Motivo de cancelacion
+                            <textarea
+                                className={ui.textarea}
+                                value={cancelReason}
+                                onChange={(event) => setCancelReason(event.target.value)}
+                                rows={4}
+                                required
+                                autoFocus
+                                placeholder="Ej: el cliente no autoriza el presupuesto, no se consigue repuesto, equipo sin solucion..."
+                            />
+                        </label>
+                        <div className="flex flex-wrap justify-end gap-2">
+                            <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setCancelOpen(false)}>Volver</button>
+                            <button type="submit" className={buttonClass('danger', 'sm')}>Confirmar cancelacion</button>
                         </div>
                     </form>
                 </ModalShell>
@@ -2568,6 +2648,7 @@ function RepairEditCard({
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
                         <FieldSummary label="F. estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black text-[#92400e]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black text-[#be123c]">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
                         <FieldSummary label="Estado" value={<HighlightText value={displayStatus} term={highlightTerm} />} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
+                        {repair.estado === 'CANCELADA' && repair.cancelado_motivo ? <FieldSummary label="Motivo" value={<HighlightText value={repair.cancelado_motivo} term={highlightTerm} />} className="col-span-2 border border-slate-200 bg-white" onClick={openInlineEditor} /> : null}
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                         {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
@@ -2598,6 +2679,7 @@ function RepairEditCard({
                             <div className="grid gap-2 p-3 text-sm">
                                 <FieldSummary label="F. ingreso" value={<HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} />} onClick={openInlineEditor} />
                                 {repair.descripcion ? <FieldSummary label="Descripcion" value={<HighlightText value={repair.descripcion} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
+                                {repair.cancelado_motivo ? <FieldSummary label="Motivo cancelacion" value={<HighlightText value={repair.cancelado_motivo} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.repuesto ? <FieldSummary label="Repuesto" value={repair.repuesto} onClick={openInlineEditor} /> : null}
                                 {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                                 {repair.observaciones ? <FieldSummary label="Observaciones" value={repair.observaciones} onClick={openInlineEditor} /> : null}

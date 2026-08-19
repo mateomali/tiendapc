@@ -129,6 +129,7 @@ class PublicTrackingController extends Controller
             'senia' => $order->senia,
             'fecha_estimada' => $this->rawOrderDate($order, 'fecha_estimada'),
             'estado' => $order->estado,
+            'cancelado_motivo' => $order->cancelado_motivo,
             'entregado' => $order->entregado,
             'fecha_entregado' => $this->rawOrderDate($order, 'fecha_entregado'),
             'imagenes' => $this->serializePublicImageFiles($this->parseImageList((string) ($order->getRawOriginal('imagen') ?? '')), false),
@@ -140,7 +141,12 @@ class PublicTrackingController extends Controller
                 'position' => $queuePosition,
                 'total' => $queuePositions['total'],
             ] : null,
-            'events' => [],
+            'events' => $order->events()->get()->map(fn ($event): array => [
+                'evento' => $event->evento,
+                'estado_anterior' => $event->estado_anterior,
+                'estado_nuevo' => $event->estado_nuevo,
+                'created_at' => optional($event->created_at)->format('Y-m-d H:i'),
+            ])->all(),
         ];
     }
 
@@ -482,6 +488,23 @@ class PublicTrackingController extends Controller
                 'variant' => 'warning',
                 'message' => 'Todavía no pudimos revisar tu equipo. Por favor, intentá más tarde.',
                 'announcedAt' => $this->stateAnnouncementDate($repair),
+            ];
+        }
+
+        if ($state === 'CANCELADA') {
+            $reason = trim((string) ($repair['cancelado_motivo'] ?? ''));
+
+            return [
+                'variant' => 'danger',
+                'message' => $reason !== ''
+                    ? 'Este trabajo fue cancelado. Motivo: ' . $reason
+                    : 'Este trabajo fue cancelado. Podés pasar a retirar el equipo por el local.',
+                'announcedAt' => $this->stateAnnouncementDate($repair),
+                'pickup' => [
+                    'title' => 'Retiro del equipo',
+                    'address' => 'SUDOKU - ' . $this->businessAddress(),
+                    'hours' => $this->businessHours(),
+                ],
             ];
         }
 

@@ -679,6 +679,42 @@ it('allows moving cancelled repairs to delivered while preserving cancelled stat
             ->where('tickets.0.repairs.0.estado', 'CANCELADA'));
 });
 
+it('cancels repairs with a reason without archiving them', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 780,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Cancela',
+        'dni' => 33444558,
+        'modelo' => 'Moto E',
+        'descripcion' => 'Cambio de modulo',
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.cancel', $order), [
+            'cancelado_motivo' => 'Cliente no autoriza el presupuesto.',
+        ])
+        ->assertRedirect();
+
+    $updated = $order->fresh();
+
+    expect($updated?->estado)->toBe('CANCELADA');
+    expect($updated?->entregado)->toBe('no');
+    expect($updated?->archivado_at)->toBeNull();
+    expect($updated?->cancelado_motivo)->toBe('Cliente no autoriza el presupuesto.');
+    expect(RepairEvent::query()->where('orden_id', 780)->where('evento', 'CANCELADA')->exists())->toBeTrue();
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['estado' => 'CANCELADA']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('tickets.0.repairs.0.estado', 'CANCELADA')
+            ->where('tickets.0.repairs.0.cancelado_motivo', 'Cliente no autoriza el presupuesto.'));
+});
+
 it('marks only the selected job as ready in a multi-job ticket', function (): void {
     $first = RepairOrder::query()->create([
         'id' => 913,
