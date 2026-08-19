@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
+import { WebcamCaptureButton } from '../../components/WebcamCaptureButton';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import type { RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
@@ -1234,9 +1235,9 @@ export default function WorkbenchPage({
         }));
     };
 
-    const setJobImages = (index: number, files: FileList | null): void => {
+    const setJobImageFiles = (index: number, files: File[]): void => {
         const currentFiles = createForm.data.jobs[index]?.images ?? [];
-        const selected = [...currentFiles, ...Array.from(files ?? [])].slice(0, 2);
+        const selected = [...currentFiles, ...files].slice(0, 2);
 
         updateJob(index, (job) => ({
             ...job,
@@ -1246,6 +1247,10 @@ export default function WorkbenchPage({
             ...current,
             [index]: selected.map((file) => URL.createObjectURL(file)),
         }));
+    };
+
+    const setJobImages = (index: number, files: FileList | null): void => {
+        setJobImageFiles(index, Array.from(files ?? []));
     };
 
     const removeJobImage = (jobIndex: number, imageIndex: number): void => {
@@ -1971,8 +1976,9 @@ export default function WorkbenchPage({
                                                 <strong className="text-sm text-[#0f172a]">Imagenes ({imagePreviews[index]?.length ?? 0}/2)</strong>
                                                 <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{imagePreviews[index]?.length ?? 0}/2</span>
                                             </div>
-                                            <div className="grid gap-2 sm:grid-cols-2">
+                                            <div className="grid gap-2 sm:grid-cols-3">
                                                 <label className={buttonClass('primary', 'sm')}><FaCamera aria-hidden="true" /> Sacar foto<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => setJobImages(index, event.target.files)} /></label>
+                                                <WebcamCaptureButton className={buttonClass('soft', 'sm')} onCapture={(file) => setJobImageFiles(index, [file])} />
                                                 <label className={buttonClass('soft', 'sm')}><FaImages aria-hidden="true" /> Elegir de galeria<input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => setJobImages(index, event.target.files)} /></label>
                                             </div>
                                             <span className="text-[0.75rem] font-semibold text-slate-500">Estas imagenes se guardan como fotos iniciales del trabajo. Maximo 2.</span>

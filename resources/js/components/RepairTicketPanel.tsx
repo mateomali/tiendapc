@@ -23,6 +23,7 @@ import {
 } from 'react-icons/fa';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { PhoneUnlockFields, phoneUnlockLabel } from './PhoneUnlockFields';
+import { WebcamCaptureButton } from './WebcamCaptureButton';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
 import { cn, formatAmountInput, formatCurrency } from '../utils';
@@ -830,6 +831,7 @@ function ImageUploadPicker({
     disabled,
     previews,
     onSelect,
+    onCapture,
     onRemove,
 }: {
     title: string;
@@ -837,6 +839,7 @@ function ImageUploadPicker({
     disabled?: boolean;
     previews: string[];
     onSelect: (event: ChangeEvent<HTMLInputElement>) => void;
+    onCapture?: (file: File) => void;
     onRemove?: (index: number) => void;
 }): JSX.Element {
     return (
@@ -845,12 +848,19 @@ function ImageUploadPicker({
                 <strong className="text-sm text-[#0f172a]">{title}</strong>
                 <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{previews.length}/2</span>
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
                 <label className={cn(buttonClass('primary', 'sm'), disabled && 'pointer-events-none')}>
                     <FaCamera aria-hidden="true" />
                     Sacar foto
                     <input className="sr-only" type="file" accept="image/*" capture="environment" disabled={disabled} onChange={onSelect} />
                 </label>
+                {onCapture ? (
+                    <WebcamCaptureButton
+                        className={buttonClass('soft', 'sm')}
+                        disabled={disabled}
+                        onCapture={onCapture}
+                    />
+                ) : null}
                 <label className={cn(buttonClass('soft', 'sm'), disabled && 'pointer-events-none')}>
                     <FaImages aria-hidden="true" />
                     Elegir de galería
@@ -961,12 +971,16 @@ function AddRepairModal({
     const baseUpdateAction = ticket.repairs[0]?.actions?.update ?? '';
     const action = ticket.addRepairAction ?? (baseUpdateAction !== '' ? `${baseUpdateAction.replace(/\/$/, '')}/add-repair` : '');
 
-    const selectImages = (event: ChangeEvent<HTMLInputElement>): void => {
+    const selectImageFiles = (files: File[]): void => {
         const currentFiles = form.data.images ?? [];
-        const selected = [...currentFiles, ...Array.from(event.target.files ?? [])].slice(0, 2);
+        const selected = [...currentFiles, ...files].slice(0, 2);
 
         form.setData('images', selected.length > 0 ? selected : null);
         setImagePreviews(selected.map((file) => URL.createObjectURL(file)));
+    };
+
+    const selectImages = (event: ChangeEvent<HTMLInputElement>): void => {
+        selectImageFiles(Array.from(event.target.files ?? []));
         event.target.value = '';
     };
 
@@ -1241,6 +1255,7 @@ function AddRepairModal({
                         help="Podes sacar foto o elegir de galeria. Se guardan hasta 2 imagenes iniciales."
                         previews={imagePreviews}
                         onSelect={selectImages}
+                        onCapture={(file) => selectImageFiles([file])}
                         onRemove={removeImage}
                     />
                 </EditSection>
@@ -1517,9 +1532,9 @@ function RepairEditCard({
         );
     };
 
-    const selectImages = (key: 'images' | 'final_images', event: ChangeEvent<HTMLInputElement>): void => {
+    const selectImageFiles = (key: 'images' | 'final_images', incomingFiles: File[]): void => {
         const currentFiles = form.data[key] ?? [];
-        const files = [...currentFiles, ...Array.from(event.target.files ?? [])].slice(0, 2);
+        const files = [...currentFiles, ...incomingFiles].slice(0, 2);
         form.setData(key, files.length > 0 ? files : null);
         const previews = files.map((file) => URL.createObjectURL(file));
 
@@ -1528,7 +1543,10 @@ function RepairEditCard({
         } else {
             setFinalImagePreviews(previews);
         }
+    };
 
+    const selectImages = (key: 'images' | 'final_images', event: ChangeEvent<HTMLInputElement>): void => {
+        selectImageFiles(key, Array.from(event.target.files ?? []));
         event.target.value = '';
     };
 
@@ -2298,6 +2316,7 @@ function RepairEditCard({
                                         help="Podés sacar foto o elegir de galería. Se guardan hasta 2 imágenes iniciales."
                                         previews={imagePreviews}
                                         onSelect={(event) => selectImages('images', event)}
+                                        onCapture={(file) => selectImageFiles('images', [file])}
                                         onRemove={(index) => removeSelectedImage('images', index)}
                                     />
                                 ) : null}
@@ -2310,6 +2329,7 @@ function RepairEditCard({
                                         disabled={repair.estado !== 'LISTA' && repair.entregado !== 'si'}
                                         previews={finalImagePreviews}
                                         onSelect={(event) => selectImages('final_images', event)}
+                                        onCapture={(file) => selectImageFiles('final_images', [file])}
                                         onRemove={(index) => removeSelectedImage('final_images', index)}
                                     />
                                 ) : null}
