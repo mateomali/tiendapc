@@ -1703,7 +1703,158 @@ function RepairEditCard({
         );
     };
 
-    const InlineEditor = ({ mobile = false }: { mobile?: boolean }): JSX.Element => (
+    const InlineEditor = ({ mobile = false }: { mobile?: boolean }): JSX.Element => {
+        if (mobile) {
+            return (
+                <form className="grid gap-3 rounded-md border border-[#cbd5e1] bg-white p-3 shadow-sm" onSubmit={submitEdit}>
+                    <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <EditField label="Cliente">
+                                <input className={ui.repairDenseInput} value={form.data.nombre_cliente} onChange={(event) => form.setData('nombre_cliente', event.target.value)} />
+                            </EditField>
+                            <EditField label="Contacto">
+                                <input className={ui.repairDenseInput} value={form.data.contacto} onChange={(event) => form.setData('contacto', event.target.value)} />
+                            </EditField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <EditField label="Orden">
+                                <input className={ui.repairDenseInput} type="number" min="1" value={form.data.id_nuevo} onChange={(event) => form.setData('id_nuevo', event.target.value)} />
+                            </EditField>
+                            <EditField label="Ingreso">
+                                <input className={ui.repairDenseInput} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} />
+                            </EditField>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                            <EditField label="DNI">
+                                <input className={ui.repairDenseInput} value={form.data.dni} onChange={(event) => form.setData('dni', event.target.value)} />
+                            </EditField>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <EditField label="Categoría">
+                                <select className={ui.repairDenseInput} value={form.data.categorias_reparacion} onChange={(event) => changeInlineCategory(event.target.value)}>
+                                    {serviceCategories.map((category) => (
+                                        <option key={category.value} value={category.value}>{category.label}</option>
+                                    ))}
+                                </select>
+                            </EditField>
+                            <EditField label="Color">
+                                <RepairColorCombobox className={ui.repairDenseInput} value={form.data.color} onChange={(value) => form.setData('color', value)} />
+                            </EditField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <EditField label="Marca">
+                                {inlinePhoneCategory ? (
+                                    <select className={ui.repairDenseInput} value={form.data.marca} onChange={(event) => changeInlineBrand(event.target.value)}>
+                                        <option value="">Marca...</option>
+                                        {phoneBrandOptions.map((brand) => (
+                                            <option key={brand} value={brand}>{brand}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input className={ui.repairDenseInput} value={form.data.marca} onChange={(event) => form.setData('marca', event.target.value.toUpperCase())} />
+                                )}
+                            </EditField>
+                            <EditField label="Modelo">
+                                <input className={ui.repairDenseInput} value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
+                            </EditField>
+                        </div>
+                        {inlinePhoneCategory ? (
+                            <EditField label="Desbloqueo">
+                                <PhoneUnlockFields
+                                    unlockType={form.data.unlock_type}
+                                    unlockValue={form.data.unlock_value}
+                                    onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                    selectClassName={ui.repairDenseInput}
+                                    inputClassName={ui.repairDenseInput}
+                                />
+                            </EditField>
+                        ) : null}
+                    </div>
+
+                    <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                        <EditField label="Falla / trabajo">
+                            <textarea className={cn(ui.repairDenseTextarea, 'min-h-[5.5rem]')} value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} />
+                        </EditField>
+                        <EditField label="Observaciones">
+                            <textarea className={cn(ui.repairDenseTextarea, 'min-h-[4.5rem]')} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} />
+                        </EditField>
+                    </div>
+
+                    <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <EditField label="Monto">
+                                <input className={ui.repairDenseInput} value={form.data.monto} inputMode="decimal" onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                            </EditField>
+                            <EditField label="Pagado">
+                                <input className={ui.repairDenseInput} value={form.data.senia} inputMode="decimal" onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
+                            </EditField>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <EditField label="Fecha estimada">
+                                <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
+                            </EditField>
+                            <EditField label="Estado">
+                                <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
+                                    {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
+                                </select>
+                            </EditField>
+                        </div>
+                        <span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
+                    </div>
+
+                    <div className="grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2">
+                        <div className="grid grid-cols-2 gap-2">
+                            <EditField label="Incremento">
+                                <input
+                                    className={ui.repairDenseInput}
+                                    inputMode="decimal"
+                                    value={incrementForm.data.amount}
+                                    onFocus={() => incrementForm.data.amount.trim() === '0' ? incrementForm.setData('amount', '') : undefined}
+                                    onChange={(event) => incrementForm.setData('amount', event.target.value)}
+                                />
+                            </EditField>
+                            <EditField label="Fecha">
+                                <input className={ui.repairDenseInput} type="date" value={incrementForm.data.paid_at} onChange={(event) => incrementForm.setData('paid_at', event.target.value)} />
+                            </EditField>
+                        </div>
+                        <EditField label="Concepto">
+                            <input className={ui.repairDenseInput} value={incrementForm.data.notes} onChange={(event) => incrementForm.setData('notes', event.target.value)} />
+                        </EditField>
+                        <button
+                            type="button"
+                            className={buttonClass('soft', 'sm', 'w-full border-[#f59e0b] bg-[#f59e0b] text-white hover:bg-[#d97706]')}
+                            disabled={incrementForm.processing || incrementForm.data.amount.trim() === '' || incrementForm.data.notes.trim() === ''}
+                            onClick={submitIncrement}
+                        >
+                            Registrar incremento
+                        </button>
+                    </div>
+
+                    <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                        <EditField label="Repuesto">
+                            <textarea className={cn(ui.repairDenseTextarea, 'min-h-[4rem]')} value={form.data.repuesto} onChange={(event) => form.setData((current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))} />
+                        </EditField>
+                        <label className="flex items-center gap-2 text-sm font-bold text-[#334155]">
+                            <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} disabled={form.data.inventory_part_id !== ''} />
+                            Repuesto pedido
+                        </label>
+                        {assignedInventoryModel ? <span className="text-xs font-semibold text-[#64748b]">Caja: {assignedInventoryBox ?? '-'} · {assignedInventoryModel}</span> : null}
+                    </div>
+
+                    <div className="sticky bottom-2 z-10 grid grid-cols-2 gap-2 rounded-md border border-[#cbd5e1] bg-white p-2 shadow-sm">
+                        <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={cancelInlineEdit}>Cancelar</button>
+                        <button type="submit" className={buttonClass('primary', 'sm', 'w-full')} disabled={form.processing || incrementForm.processing}>
+                            <FaSave aria-hidden="true" /> Guardar
+                        </button>
+                    </div>
+                </form>
+            );
+        }
+
+        return (
         <form
             className={cn(
                 'grid gap-3 rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-sm',
@@ -1788,7 +1939,8 @@ function RepairEditCard({
             </div>
             <textarea className={cn(ui.repairDenseTextarea, mobile ? 'sm:col-span-2' : 'col-span-full')} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} placeholder="Observaciones" />
         </form>
-    );
+        );
+    };
 
     const Thumb = ({ large = false }: { large?: boolean }): JSX.Element => (
         <button
@@ -2655,7 +2807,14 @@ function RepairEditCard({
                         {repair.contacto ? <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                         <FieldSummary label="Saldo" value={<PaymentStatus monto={monto} senia={senia} />} strong onClick={openInlineEditor} />
                         <FieldSummary label="F. estimada" value={<><HighlightText value={formatLegacyDate(repair.fecha_estimada)} term={highlightTerm} />{isToday(repair.fecha_estimada) ? <span className="ml-1 rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 text-[0.65rem] font-black text-[#92400e]">Hoy</span> : null}{overdueText ? <span className="ml-1 rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 text-[0.65rem] font-black text-[#be123c]">{overdueText}</span> : null}</>} onClick={openInlineEditor} />
-                        <FieldSummary label="Estado" value={<HighlightText value={displayStatus} term={highlightTerm} />} labelClassName={repairStatusTextClass(repair.estado)} valueClassName={repairStatusTextClass(repair.estado)} className={repairStatusSelectClass(repair.estado)} onClick={openInlineEditor} />
+                        <FieldSummary
+                            label="Estado"
+                            value={<HighlightText value={displayStatus} term={highlightTerm} />}
+                            labelClassName={repairStatusTextClass(repair.estado)}
+                            valueClassName={repairStatusTextClass(repair.estado)}
+                            className={repairStatusSelectClass(repair.estado)}
+                            onClick={!readOnly && canCycleStatus && !form.processing ? cycleDesktopStatus : undefined}
+                        />
                         {repair.estado === 'CANCELADA' && repair.cancelado_motivo ? <FieldSummary label="Motivo" value={<HighlightText value={repair.cancelado_motivo} term={highlightTerm} />} className="col-span-2 border border-slate-200 bg-white" onClick={openInlineEditor} /> : null}
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}

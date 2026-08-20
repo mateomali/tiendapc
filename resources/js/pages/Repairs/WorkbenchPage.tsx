@@ -1355,8 +1355,8 @@ export default function WorkbenchPage({
         applyFailureTemplate(index, option.value);
     };
 
-    const addFailureFromSelectedOption = (index: number): void => {
-        const optionKey = pendingFailureOptions[index] ?? '';
+    const addFailureFromSelectedOption = (index: number, selectedOptionKey?: string): void => {
+        const optionKey = selectedOptionKey ?? pendingFailureOptions[index] ?? '';
         const option = descriptionOptions.find((item) => item.key === optionKey);
 
         if (!option) {
@@ -2172,11 +2172,17 @@ export default function WorkbenchPage({
                                         )}
                                         <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'md:col-span-2', !showIntakeStep('device') && 'hidden')}>
                                             <label className={repairLabelClass}>Falla / trabajo a realizar *</label>
-                                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                                            <div className="grid gap-2">
                                                 <select
                                                     className={guidedInputClass(`job-${index}-description`)}
                                                     value={pendingFailureOptions[index] ?? ''}
-                                                    onChange={(event) => setPendingFailureOptions((current) => ({ ...current, [index]: event.target.value }))}
+                                                    onChange={(event) => {
+                                                        const optionKey = event.target.value;
+                                                        setPendingFailureOptions((current) => ({ ...current, [index]: optionKey }));
+                                                        if (optionKey !== '') {
+                                                            addFailureFromSelectedOption(index, optionKey);
+                                                        }
+                                                    }}
                                                 >
                                                     <option value="">Elegir falla...</option>
                                                     {descriptionOptions.map((option) => (
@@ -2185,14 +2191,6 @@ export default function WorkbenchPage({
                                                         </option>
                                                     ))}
                                                 </select>
-                                                <button
-                                                    className={buttonClass('soft', 'sm')}
-                                                    type="button"
-                                                    onClick={() => addFailureFromSelectedOption(index)}
-                                                    disabled={(pendingFailureOptions[index] ?? '') === ''}
-                                                >
-                                                    <FaPlusCircle aria-hidden="true" /> Agregar falla
-                                                </button>
                                             </div>
                                             <div className="grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-2">
                                                 {groupedIndexes.map((jobIndex, rowIndex) => {
@@ -2261,7 +2259,7 @@ export default function WorkbenchPage({
                                                     );
                                                 })}
                                             </div>
-                                            <span className="text-xs font-semibold text-[#64748b]">Elegí una falla y usá Agregar falla. Si ya hay una cargada, se apila como otro trabajo del mismo equipo.</span>
+                                            <span className="text-xs font-semibold text-[#64748b]">Elegí una falla y se agrega automáticamente. Si ya hay una cargada, se apila como otro trabajo del mismo equipo.</span>
                                         </div>
                                         {false ? (
                                             <>
