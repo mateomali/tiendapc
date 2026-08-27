@@ -979,22 +979,25 @@ function RepairImagesBlock({
 
 function AddRepairModal({
     ticket,
+    baseRepair,
     serviceCategories,
     serviceTemplates,
     partInventory,
     onClose,
 }: {
     ticket: RepairTicketView;
+    baseRepair?: RepairOrderView | null;
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates: ServiceTemplateOption[];
     partInventory: RepairPartInventoryOption[];
     onClose: () => void;
 }): JSX.Element {
     const today = new Date().toISOString().slice(0, 10);
+    const baseBrand = baseRepair ? inferredRepairBrand(baseRepair) : '';
     const form = useForm<AddRepairFormData>({
-        marca: '',
-        modelo: '',
-        color: '',
+        marca: baseBrand,
+        modelo: baseRepair?.modelo ?? '',
+        color: baseRepair?.color ?? '',
         tipo_servicio: '',
         descripcion: '',
         observaciones: 'sin observaciones',
@@ -1005,9 +1008,9 @@ function AddRepairModal({
         repuesto: '',
         repuesto_pedido: false,
         inventory_part_id: '',
-        categorias_reparacion: '4',
-        unlock_type: '',
-        unlock_value: '',
+        categorias_reparacion: String(baseRepair?.categorias_reparacion ?? 4),
+        unlock_type: baseRepair?.unlock_type ?? '',
+        unlock_value: baseRepair?.unlock_value ?? '',
         images: null,
     });
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -1141,9 +1144,14 @@ function AddRepairModal({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="min-w-0">
                             <div className="text-sm font-black text-[#0f172a]">{ticket.nombre_cliente}</div>
-                            <div className="text-xs font-semibold text-[#475569]">Ticket #{ticket.id} - trabajo #{ticket.repairsCount + 1}</div>
+                            <div className="text-xs font-semibold text-[#475569]">
+                                Ticket #{ticket.id} - trabajo #{ticket.repairsCount + 1}
+                                {baseRepair ? ` - mismo modelo que trabajo #${baseRepair.reparacion}` : ''}
+                            </div>
                         </div>
-                        <span className="rounded-md border border-[#93c5fd] bg-white px-2.5 py-1 text-xs font-black text-[#1d4ed8]">Nueva reparacion</span>
+                        <span className="rounded-md border border-[#93c5fd] bg-white px-2.5 py-1 text-xs font-black text-[#1d4ed8]">
+                            {baseRepair ? 'Mismo equipo' : 'Nueva reparacion'}
+                        </span>
                     </div>
                 </div>
                 <EditSection title="Trabajo">
@@ -1336,7 +1344,7 @@ function RepairEditCard({
     variant?: 'mobile' | 'desktop';
     rowIndex?: number;
     rowTotal?: number;
-    onAddRepair: () => void;
+    onAddRepair: (baseRepair?: RepairOrderView) => void;
     desktopGroupExpanded?: boolean;
     onToggleDesktopGroup?: () => void;
     archived?: boolean;
@@ -1623,6 +1631,12 @@ function RepairEditCard({
 
     const openQuickView = (): void => {
         setQuickOpen(true);
+    };
+
+    const openAddRepairForSameModel = (): void => {
+        setEditOpen(false);
+        setQuickOpen(false);
+        onAddRepair(repair);
     };
 
     const openDeliveryModal = (): void => {
@@ -2080,7 +2094,7 @@ function RepairEditCard({
                         </button>
                         {showOrderActions ? (
                             <>
-                                <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparación">
+                                <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={() => onAddRepair(repair)} title="Agregar reparación">
                                     <FaPlus aria-hidden="true" />
                                 </button>
                                 <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
@@ -2179,7 +2193,7 @@ function RepairEditCard({
                         <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                     </button>
                     {showOrderActions ? (
-                        <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={onAddRepair} title="Agregar reparacion">
+                        <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={() => onAddRepair(repair)} title="Agregar reparacion">
                             <FaPlus aria-hidden="true" />{iconOnly ? null : 'Agregar reparacion'}
                         </button>
                     ) : null}
@@ -2301,7 +2315,7 @@ function RepairEditCard({
                                     {ticket.ticketUrl ? <Link href={ticket.ticketUrl} className={buttonClass('soft', 'sm')}>Ticket</Link> : null}
                                     {ticket.trackingUrl ? <a href={ticket.trackingUrl} className={buttonClass('soft', 'sm')}>Seguimiento</a> : null}
                                     {ticket.whatsappUrl ? <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={buttonClass('soft', 'sm')}>WhatsApp</a> : null}
-                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setQuickOpen(false); onAddRepair(); }}>Agregar reparación</button>
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={openAddRepairForSameModel}>Agregar reparación</button>
                                 </div>
                             ) : null}
                         </div>
@@ -2387,6 +2401,17 @@ function RepairEditCard({
                                         <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
                                     </EditField>
                                 </div>
+                                {!readOnly ? (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#ddd6fe] bg-[#faf5ff] p-3">
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-black text-[#0f172a]">Agregar trabajo al mismo modelo</div>
+                                            <div className="truncate text-xs font-semibold text-[#64748b]">{repairDisplayModel || 'Modelo sin cargar'}</div>
+                                        </div>
+                                        <button type="button" className={buttonClass('soft', 'sm', 'border-[#8b5cf6] bg-[#8b5cf6] text-white hover:bg-[#7c3aed]')} onClick={openAddRepairForSameModel}>
+                                            <FaPlus aria-hidden="true" /> Nuevo trabajo
+                                        </button>
+                                    </div>
+                                ) : null}
                                 {!readOnly ? (
                                     <div className="grid gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3">
                                         <div className="grid items-end gap-2 [grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr))]">
@@ -2953,6 +2978,17 @@ export function RepairDesktopRow({
     highlightTerm?: string;
 }): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
+    const [addBaseRepair, setAddBaseRepair] = useState<RepairOrderView | null>(null);
+
+    const openAddRepair = (baseRepair?: RepairOrderView): void => {
+        setAddBaseRepair(baseRepair ?? repair);
+        setAddOpen(true);
+    };
+
+    const closeAddRepair = (): void => {
+        setAddOpen(false);
+        setAddBaseRepair(null);
+    };
 
     return (
         <>
@@ -2970,9 +3006,9 @@ export function RepairDesktopRow({
                 archived={archived}
                 statusLabel={statusLabel}
                 highlightTerm={highlightTerm}
-                onAddRepair={() => setAddOpen(true)}
+                onAddRepair={openAddRepair}
             />
-            {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
+            {addOpen ? <AddRepairModal ticket={ticket} baseRepair={addBaseRepair} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={closeAddRepair} /> : null}
         </>
     );
 }
@@ -2990,8 +3026,19 @@ export function RepairTicketPanel({
     highlightTerm,
 }: RepairTicketPanelProps): JSX.Element {
     const [addOpen, setAddOpen] = useState(false);
+    const [addBaseRepair, setAddBaseRepair] = useState<RepairOrderView | null>(null);
     const [desktopGroupExpanded, setDesktopGroupExpanded] = useState(false);
     const desktopRepairs = desktopGroupExpanded ? ticket.repairs : ticket.repairs.slice(0, 1);
+
+    const openAddRepair = (baseRepair?: RepairOrderView): void => {
+        setAddBaseRepair(baseRepair ?? null);
+        setAddOpen(true);
+    };
+
+    const closeAddRepair = (): void => {
+        setAddOpen(false);
+        setAddBaseRepair(null);
+    };
 
     return (
         <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-lg max-xl:border max-xl:border-[#64748b] max-xl:bg-white max-xl:p-2 max-xl:shadow-[0_2px_6px_rgba(15,23,42,0.10)]')}>
@@ -3024,7 +3071,7 @@ export function RepairTicketPanel({
                         <span className="inline-flex min-h-[34px] items-center justify-center rounded-[10px] border border-slate-200 bg-white px-3 py-1.5 text-sm font-bold text-slate-600">Sin WhatsApp</span>
                     )}
                     {allowAddRepair && !readOnly ? (
-                        <button type="button" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[9px] border border-[#7c3aed] bg-[#7c3aed] px-2.5 py-1 text-[0.78rem] font-bold text-white transition hover:bg-[#6d28d9] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm xl:hidden" onClick={() => setAddOpen(true)}>
+                        <button type="button" className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-[9px] border border-[#7c3aed] bg-[#7c3aed] px-2.5 py-1 text-[0.78rem] font-bold text-white transition hover:bg-[#6d28d9] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm xl:hidden" onClick={() => openAddRepair()}>
                             <FaPlus aria-hidden="true" />Agregar reparacion
                         </button>
                     ) : null}
@@ -3063,7 +3110,7 @@ export function RepairTicketPanel({
                                 archived={archived}
                                 statusLabel={statusLabel}
                                 highlightTerm={highlightTerm}
-                                onAddRepair={() => setAddOpen(true)}
+                                onAddRepair={openAddRepair}
                             />
                         ))}
                     </div>
@@ -3085,7 +3132,7 @@ export function RepairTicketPanel({
                         archived={archived}
                         statusLabel={statusLabel}
                         highlightTerm={highlightTerm}
-                        onAddRepair={() => setAddOpen(true)}
+                        onAddRepair={openAddRepair}
                     />
                 ))}
             </div>
@@ -3103,13 +3150,13 @@ export function RepairTicketPanel({
                     </a>
                 ) : null}
                 {allowAddRepair && !readOnly ? (
-                    <button type="button" className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-[#8b5cf6] bg-[#8b5cf6] px-2.5 py-1.5 text-[0.78rem] font-bold text-white transition hover:bg-[#7c3aed]" onClick={() => setAddOpen(true)}>
+                    <button type="button" className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-[#8b5cf6] bg-[#8b5cf6] px-2.5 py-1.5 text-[0.78rem] font-bold text-white transition hover:bg-[#7c3aed]" onClick={() => openAddRepair()}>
                         <FaPlus aria-hidden="true" />Agregar reparacion
                     </button>
                 ) : null}
             </div>
 
-            {addOpen ? <AddRepairModal ticket={ticket} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={() => setAddOpen(false)} /> : null}
+            {addOpen ? <AddRepairModal ticket={ticket} baseRepair={addBaseRepair} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={closeAddRepair} /> : null}
             <span className="hidden">{states.length}</span>
         </section>
     );

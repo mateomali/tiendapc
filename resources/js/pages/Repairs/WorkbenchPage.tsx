@@ -91,6 +91,7 @@ interface WorkbenchPageProps {
     partInventory: RepairPartInventoryOption[];
     deviceModels: DeviceModelOption[];
     nextOrderId: number;
+    ticketPricing: TicketPricingSettings;
     pageMode?: 'consultas' | 'ingreso';
     intakeMode?: 'continuous' | 'wizard';
     initialCreateClient?: {
@@ -98,6 +99,13 @@ interface WorkbenchPageProps {
         dni: number | string;
         contacto?: string | null;
     } | null;
+}
+
+interface TicketPricingSettings {
+    cashDiscountEnabled: boolean;
+    cashDiscountThreshold: number;
+    cashDiscountPercentage: number;
+    cashDiscountNote: string;
 }
 
 interface RepairJobFormData {
@@ -674,6 +682,12 @@ export default function WorkbenchPage({
     partInventory,
     deviceModels,
     nextOrderId,
+    ticketPricing = {
+        cashDiscountEnabled: true,
+        cashDiscountThreshold: 30000,
+        cashDiscountPercentage: 10,
+        cashDiscountNote: 'Abonando en efectivo tenes 10% de descuento.',
+    },
     pageMode = 'consultas',
     intakeMode = 'continuous',
     archivedSearchMatches,
@@ -1207,17 +1221,42 @@ export default function WorkbenchPage({
     };
 
     const formatMoney = (value: number): string => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-    const transferPriceLabel = (value: string): string => {
+    const cashDiscountApplies = (cashAmount: number): boolean => {
+        return ticketPricing.cashDiscountEnabled
+            && ticketPricing.cashDiscountPercentage > 0
+            && cashAmount > ticketPricing.cashDiscountThreshold;
+    };
+    const regularPriceForCashAmount = (cashAmount: number): number => {
+        return cashDiscountApplies(cashAmount)
+            ? Math.round(Math.max(0, cashAmount) * (1 + ticketPricing.cashDiscountPercentage / 100))
+            : Math.max(0, cashAmount);
+    };
+    const regularPriceLabel = (value: string): string => {
         const amount = Number(value || 0);
 
         if (!Number.isFinite(amount) || amount <= 0) {
-            return 'Transferencia: sin monto';
+            return 'Regular sin descuento: sin monto';
         }
 
-        return amount > 30000
-            ? `Transferencia: ${formatMoney(Math.round(amount * 1.1))}`
-            : 'Transferencia: mismo importe';
+        return cashDiscountApplies(amount)
+            ? `Regular sin descuento: ${formatMoney(regularPriceForCashAmount(amount))}`
+            : 'Regular sin descuento: mismo importe';
     };
+    const regularPriceIndicator = (value: string, compact = false): JSX.Element => {
+        const amount = Number(value || 0);
+        const applies = Number.isFinite(amount) && amount > 0 && cashDiscountApplies(amount);
+
+        return (
+            <span className={cn(
+                'block text-xs font-semibold leading-5',
+                compact ? 'text-[#64748b]' : 'text-[#475569]',
+                applies && 'font-black text-[#92400e]',
+            )}>
+                {regularPriceLabel(value)}
+            </span>
+        );
+    };
+    const regularTotal = regularPriceForCashAmount(totals.monto);
     const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-semibold leading-tight text-[#334155]';
     const compactInputClass = ui.repairDenseInput;
     const guidedFieldClass = 'border-[#2563eb] bg-[#eff6ff] ring-1 ring-[#2563eb33]';
@@ -2219,6 +2258,7 @@ export default function WorkbenchPage({
                                                                     onKeyDown={preventAmountArrowStep}
                                                                     onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value }))}
                                                                 />
+                                                                {regularPriceIndicator(rowJob.monto, true)}
                                                             </label>
                                                             <label className="col-start-2 grid gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
                                                                 Seña
@@ -2263,7 +2303,7 @@ export default function WorkbenchPage({
                                         {false ? (
                                             <>
                                         <div className={guidedPanelClass(fieldPanelGreen, `job-${index}-amount`)}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} /><span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(job.monto)}</span></label>
+                                            <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} />{regularPriceIndicator(job.monto)}</label>
                                         </div>
                                         <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
                                             <label className={repairLabelClass}>Seña ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
@@ -2396,7 +2436,7 @@ export default function WorkbenchPage({
                             </div>
                             <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
-                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong></div>
+                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong><span className={cn('block text-xs font-semibold text-[#64748b]', regularTotal > totals.monto && 'font-black text-[#92400e]')}>Regular sin descuento: {regularTotal > 0 ? formatMoney(regularTotal) : 'sin monto'}</span></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
                             </div>
@@ -2569,8 +2609,8 @@ export default function WorkbenchPage({
                                             onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))}
                                         />
-                                        <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-xs font-bold text-[#475569]">
-                                            {transferPriceLabel(job.monto)}
+                                        <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2">
+                                            {regularPriceIndicator(job.monto)}
                                         </div>
                                         <input
                                             className={ui.input}
