@@ -182,6 +182,9 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/TicketPage')
             ->where('ticket.nombre_cliente', 'Lucia Gomez')
+            ->where('ticket.hasClientDni', true)
+            ->where('ticket.trackingVerifierLabel', 'DNI')
+            ->where('ticket.trackingVerifier', '30111222')
             ->has('ticket.repairs', 2));
 });
 
@@ -465,6 +468,15 @@ it('generates a verifier token for tickets without dni and uses it for public tr
 
     $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $order->id]));
     expect($token)->toMatch('/^\d{5}$/');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.tickets.show', ['orderId' => $order->id]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/TicketPage')
+            ->where('ticket.hasClientDni', false)
+            ->where('ticket.trackingVerifierLabel', 'PIN')
+            ->where('ticket.trackingVerifier', $token));
 
     $this->get(route('repairs.tracking', ['id_buscado' => $order->id, 'dni_buscado' => $token]))
         ->assertOk()

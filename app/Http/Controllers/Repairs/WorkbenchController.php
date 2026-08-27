@@ -1225,7 +1225,7 @@ class WorkbenchController extends Controller
                     'nombre_cliente' => $base->nombre_cliente,
                     'dni' => $base->dni,
                     'trackingVerifier' => $base->trackingVerifier(),
-                    'trackingVerifierLabel' => $base->hasClientDni() ? 'DNI' : 'Codigo',
+                    'trackingVerifierLabel' => $base->hasClientDni() ? 'DNI' : 'PIN',
                     'hasClientDni' => $base->hasClientDni(),
                     'contacto' => $base->contacto,
                     'info' => $ticketInfo,
