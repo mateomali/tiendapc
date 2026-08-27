@@ -74,6 +74,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
 
         return groups;
     }, []);
+    const shouldShowGeneralFinancial = repairPrintGroups.length > 1;
 
     useEffect(() => {
         let cancelled = false;
@@ -191,7 +192,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                         })}
                     </section>
 
-                    {ticket.repairs.length > 1 ? (
+                    {shouldShowGeneralFinancial ? (
                         <>
                             <div className="my-[5px] border-t border-dashed border-black" />
                             {generalFinancial.discountApplies ? (
