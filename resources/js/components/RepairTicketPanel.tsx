@@ -465,6 +465,32 @@ function repairSameModelPosition(ticket: RepairTicketView, repair: RepairOrderVi
     };
 }
 
+function repairSameModelAdjacency(ticket: RepairTicketView, repair: RepairOrderView): { previous: boolean; next: boolean } {
+    const modelKey = repairModelGroupKey(repair);
+    const currentIndex = ticket.repairs.findIndex((ticketRepair) => ticketRepair.registro_id === repair.registro_id);
+
+    if (modelKey === '' || modelKey === '-' || currentIndex < 0) {
+        return { previous: false, next: false };
+    }
+
+    return {
+        previous: currentIndex > 0 && repairModelGroupKey(ticket.repairs[currentIndex - 1]) === modelKey,
+        next: currentIndex < ticket.repairs.length - 1 && repairModelGroupKey(ticket.repairs[currentIndex + 1]) === modelKey,
+    };
+}
+
+function desktopSameModelAccentClass(modelKey: string): string {
+    const tones = [
+        'border-l-[#475569]',
+        'border-l-[#0f766e]',
+        'border-l-[#7c3aed]',
+        'border-l-[#b45309]',
+    ];
+    const hash = Array.from(modelKey).reduce((total, char) => total + char.charCodeAt(0), 0);
+
+    return tones[hash % tones.length];
+}
+
 function repairColorSwatchClass(color?: string | null): string {
     const normalized = normalizeRepairText(color);
     const option = repairColorOptions.find((item) => item.value === normalized);
@@ -1395,8 +1421,11 @@ function RepairEditCard({
     const desktopWorkLabel = rowTotal > 1 ? `Trabajo ${rowIndex + 1} de ${rowTotal}` : `Trabajo ${repair.reparacion}`;
     const repairBrand = inferredRepairBrand(repair);
     const repairDisplayModel = displayRepairModel(repair);
+    const repairDisplayModelKey = repairModelGroupKey(repair);
     const sameModelPosition = repairSameModelPosition(ticket, repair);
+    const sameModelAdjacency = repairSameModelAdjacency(ticket, repair);
     const hasRepeatedModelInTicket = sameModelPosition.total > 1;
+    const showSameModelContinuity = desktopGroupExpanded && hasRepeatedModelInTicket;
     const sameModelLabel = `Mismo modelo ${sameModelPosition.index}/${sameModelPosition.total}`;
     const cleanDescription = descriptionWithoutRepeatedModel(repair.descripcion, repair.modelo, repairBrand);
     const displayDescription = (cleanDescription || repair.descripcion || '-').toUpperCase();
@@ -2673,7 +2702,7 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('group/repair-row grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] focus-within:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
+                <div className={cn('group/repair-row grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] focus-within:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), hasRepeatedModelInTicket && desktopSameModelAccentClass(repairDisplayModelKey), showSameModelContinuity && sameModelAdjacency.next && 'border-b-transparent', showSameModelContinuity && sameModelAdjacency.previous && 'shadow-[inset_0_1px_0_#f8fafc]', isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
                     <div className="sticky left-0 z-[2] grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 bg-inherit text-center shadow-[1px_0_0_#cbd5e1]">
                         {showDesktopTicketData ? (
                             <button type="button" className="text-base font-black leading-none text-[#0f172a]" onClick={openQuickView}>#<HighlightText value={repair.id} term={highlightTerm} /></button>
@@ -2700,7 +2729,7 @@ function RepairEditCard({
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView} title={repair.contacto || '-'}>{showDesktopTicketData ? <HighlightText value={repair.contacto || '-'} term={highlightTerm} /> : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} /> : ''}</button>
                     <div className="flex items-center justify-center"><Thumb large /></div>
-                    <div className="grid content-center gap-1 text-left">
+                    <div className={cn('grid content-center gap-1 text-left', hasRepeatedModelInTicket && 'bg-[#f8fafc]')}>
                         {rowTotal > 1 ? (
                             <div className="flex min-w-0 items-center gap-2">
                                 <button type="button" className="min-w-0 text-left text-[0.62rem] font-black text-[#2563eb]" onClick={openQuickView} title={desktopWorkLabel}>
