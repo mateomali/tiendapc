@@ -2248,7 +2248,7 @@ export default function WorkbenchPage({
                                                                 required
                                                                 placeholder="Detalle de la falla"
                                                             />
-                                                            <label className="col-start-2 grid gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
+                                                            <label className="col-start-2 grid content-start gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
                                                                 Monto
                                                                 <input
                                                                     className={guidedInputClass(`job-${jobIndex}-amount`)}
@@ -2260,7 +2260,7 @@ export default function WorkbenchPage({
                                                                 />
                                                                 {regularPriceIndicator(rowJob.monto, true)}
                                                             </label>
-                                                            <label className="col-start-2 grid gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
+                                                            <label className="col-start-2 grid content-start gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
                                                                 Seña
                                                                 <input
                                                                     className={compactInputClass}
@@ -2270,8 +2270,9 @@ export default function WorkbenchPage({
                                                                     onKeyDown={preventAmountArrowStep}
                                                                     onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia: event.target.value }))}
                                                                 />
+                                                                <span className="block min-h-5 text-xs leading-5 text-transparent" aria-hidden="true">.</span>
                                                             </label>
-                                                            <label className="col-start-2 grid gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
+                                                            <label className="col-start-2 grid content-start gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
                                                                 Medio
                                                                 <select
                                                                     className={compactInputClass}
@@ -2281,6 +2282,7 @@ export default function WorkbenchPage({
                                                                     <option value="efectivo">Efectivo</option>
                                                                     <option value="transferencia">Transferencia</option>
                                                                 </select>
+                                                                <span className="block min-h-5 text-xs leading-5 text-transparent" aria-hidden="true">.</span>
                                                             </label>
                                                             {rowIndex > 0 ? (
                                                                 <button
