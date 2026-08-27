@@ -110,19 +110,48 @@ function trackingTitle(variant: string): string {
     return 'Estado de la reparacion';
 }
 
-function trackingColor(variant: string): string {
-    if (variant === 'warning') return '#d97706';
-    if (variant === 'waiting') return '#a21caf';
-    if (variant === 'success') return '#059669';
-    if (variant === 'info') return '#0284c7';
+function trackingToneClass(variant: string, target: 'bg' | 'border' | 'text'): string {
+    if (variant === 'warning') {
+        if (target === 'bg') return 'bg-[#d97706]';
+        if (target === 'border') return 'border-[#d97706]';
+        return 'text-[#d97706]';
+    }
 
-    return '#174ea6';
+    if (variant === 'waiting') {
+        if (target === 'bg') return 'bg-[#a21caf]';
+        if (target === 'border') return 'border-[#a21caf]';
+        return 'text-[#a21caf]';
+    }
+
+    if (variant === 'success') {
+        if (target === 'bg') return 'bg-[#059669]';
+        if (target === 'border') return 'border-[#059669]';
+        return 'text-[#059669]';
+    }
+
+    if (variant === 'info') {
+        if (target === 'bg') return 'bg-[#0284c7]';
+        if (target === 'border') return 'border-[#0284c7]';
+        return 'text-[#0284c7]';
+    }
+
+    if (target === 'bg') return 'bg-[#174ea6]';
+    if (target === 'border') return 'border-[#174ea6]';
+    return 'text-[#174ea6]';
+}
+
+function trackingLineWidthClass(index: number): string {
+    if (index <= 0) return 'w-0';
+    if (index === 1) return 'w-1/4';
+    if (index === 2) return 'w-1/2';
+
+    return 'w-3/4';
 }
 
 function StatusTracking({ status }: { status: PublicRepairStatusView }): JSX.Element {
     const currentIndex = trackingStepIndex(status.variant);
     const isSpecialState = currentIndex < 0;
-    const currentColor = trackingColor(status.variant);
+    const progressClass = cn(trackingLineWidthClass(currentIndex), trackingToneClass(status.variant, 'bg'));
 
     return (
         <div className={cn(sectionTintClass(status.variant), 'gap-4')}>
@@ -131,11 +160,7 @@ function StatusTracking({ status }: { status: PublicRepairStatusView }): JSX.Ele
                     <div className="relative grid grid-cols-4 gap-2">
                         <div className="absolute left-[12.5%] right-[12.5%] top-3 h-1 rounded-full bg-slate-200" aria-hidden="true" />
                         <div
-                            className="absolute left-[12.5%] top-3 h-1 rounded-full"
-                            style={{
-                                width: `${(currentIndex / (trackingSteps.length - 1)) * 75}%`,
-                                backgroundColor: currentColor,
-                            }}
+                            className={cn('absolute left-[12.5%] top-3 h-1 rounded-full', progressClass)}
                             aria-hidden="true"
                         />
                         {trackingSteps.map((step, index) => {
@@ -147,15 +172,13 @@ function StatusTracking({ status }: { status: PublicRepairStatusView }): JSX.Ele
                                     <span
                                         className={cn(
                                             'flex h-7 w-7 items-center justify-center rounded-full border-2 bg-white text-xs font-black',
+                                            complete && trackingToneClass(status.variant, 'border'),
+                                            complete && trackingToneClass(status.variant, 'bg'),
+                                            complete && 'text-white',
+                                            active && trackingToneClass(status.variant, 'border'),
+                                            active && trackingToneClass(status.variant, 'text'),
                                             !complete && !active && 'border-slate-300 text-slate-400',
                                         )}
-                                        style={
-                                            complete
-                                                ? { borderColor: currentColor, backgroundColor: currentColor, color: '#ffffff' }
-                                                : active
-                                                    ? { borderColor: currentColor, color: currentColor }
-                                                    : undefined
-                                        }
                                     >
                                         {complete ? '✓' : index + 1}
                                     </span>
@@ -163,9 +186,9 @@ function StatusTracking({ status }: { status: PublicRepairStatusView }): JSX.Ele
                                         className={cn(
                                             'text-[0.72rem] font-black leading-tight md:text-xs',
                                             active && 'text-[#102146]',
+                                            complete && trackingToneClass(status.variant, 'text'),
                                             !complete && !active && 'text-slate-500',
                                         )}
-                                        style={complete ? { color: currentColor } : undefined}
                                     >
                                         {step.label}
                                     </span>

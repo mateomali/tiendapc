@@ -1,9 +1,9 @@
 import { useForm } from '@inertiajs/react';
-import { type CSSProperties, type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useMemo, useState } from 'react';
 import { FaChartBar, FaPercent, FaSave } from 'react-icons/fa';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
-import { formatCurrency } from '../../utils';
+import { cn, formatCurrency } from '../../utils';
 
 interface RankedMetric {
     label: string;
@@ -184,7 +184,7 @@ function ChartPanel({
     }
 
     if (mode === 'models') {
-        return <PieChart title="Modelos mas pedidos" items={topModels} />;
+        return <HorizontalChart title="Modelos mas pedidos" items={topModels} valueType="count" />;
     }
 
     if (mode === 'workTypes') {
@@ -192,6 +192,44 @@ function ChartPanel({
     }
 
     return <HorizontalChart title="Estados" items={statusBreakdown} valueType="count" showTotal={false} />;
+}
+
+const progressWidthClasses = [
+    'w-[2%]',
+    'w-[5%]',
+    'w-[10%]',
+    'w-[15%]',
+    'w-[20%]',
+    'w-[25%]',
+    'w-[30%]',
+    'w-[35%]',
+    'w-[40%]',
+    'w-[45%]',
+    'w-[50%]',
+    'w-[55%]',
+    'w-[60%]',
+    'w-[65%]',
+    'w-[70%]',
+    'w-[75%]',
+    'w-[80%]',
+    'w-[85%]',
+    'w-[90%]',
+    'w-[95%]',
+    'w-full',
+] as const;
+
+function progressWidthClass(value: number): string {
+    if (!Number.isFinite(value) || value <= 0) {
+        return progressWidthClasses[0];
+    }
+
+    if (value >= 100) {
+        return 'w-full';
+    }
+
+    const bucket = Math.max(1, Math.min(19, Math.ceil(value / 5)));
+
+    return progressWidthClasses[bucket];
 }
 
 function MonthlyBillingChart({ items }: { items: MonthlyMetric[] }): JSX.Element {
@@ -205,7 +243,7 @@ function MonthlyBillingChart({ items }: { items: MonthlyMetric[] }): JSX.Element
                     <div key={item.label} className="grid grid-cols-[3rem_1fr_7rem] items-center gap-2 text-sm">
                         <span className="font-bold uppercase text-[#64748b]">{item.label}</span>
                         <span className="h-4 rounded-sm bg-[#e2e8f0]">
-                            <span className="block h-4 rounded-sm bg-[#2563eb]" style={{ width: `${Math.max(2, (item.total / maxTotal) * 100)}%` }} />
+                            <span className={cn('block h-4 rounded-sm bg-[#2563eb]', progressWidthClass((item.total / maxTotal) * 100))} />
                         </span>
                         <strong className="text-right text-[#0f172a]">{formatCurrency(item.total)}</strong>
                     </div>
@@ -229,10 +267,10 @@ function CollectionChart({ items }: { items: Array<{ label: string; billed: numb
                             <span className="font-bold text-[#64748b]">{formatCurrency(item.paid)} / {formatCurrency(item.billed)}</span>
                         </div>
                         <span className="h-4 rounded-sm bg-[#e2e8f0]">
-                            <span className="block h-4 rounded-sm bg-[#2563eb]" style={{ width: `${Math.max(2, (item.billed / maxTotal) * 100)}%` }} />
+                            <span className={cn('block h-4 rounded-sm bg-[#2563eb]', progressWidthClass((item.billed / maxTotal) * 100))} />
                         </span>
                         <span className="h-4 rounded-sm bg-[#ecfdf5]">
-                            <span className="block h-4 rounded-sm bg-[#059669]" style={{ width: `${Math.max(2, (item.paid / maxTotal) * 100)}%` }} />
+                            <span className={cn('block h-4 rounded-sm bg-[#059669]', progressWidthClass((item.paid / maxTotal) * 100))} />
                         </span>
                     </div>
                 ))}
@@ -241,60 +279,6 @@ function CollectionChart({ items }: { items: Array<{ label: string; billed: numb
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-[#2563eb]" />Ganancia</span>
                 <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-[#059669]" />Cobrado</span>
             </div>
-        </section>
-    );
-}
-
-const pieColors = ['#2563eb', '#059669', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#334155', '#db2777'];
-
-function PieChart({ title, items }: { title: string; items: RankedMetric[] }): JSX.Element {
-    const total = items.reduce((sum, item) => sum + item.count, 0);
-    let cursor = 0;
-    const slices = items.map((item, index) => {
-        const start = cursor;
-        const end = total > 0 ? cursor + (item.count / total) * 100 : cursor;
-        cursor = end;
-
-        return {
-            ...item,
-            color: pieColors[index % pieColors.length],
-            percent: total > 0 ? (item.count / total) * 100 : 0,
-            start,
-            end,
-        };
-    });
-    const background = slices.length > 0
-        ? `conic-gradient(${slices.map((slice) => `${slice.color} ${slice.start}% ${slice.end}%`).join(', ')})`
-        : '#e2e8f0';
-
-    return (
-        <section className="grid gap-4 rounded-lg border border-[#e2e8f0] p-3">
-            <h2 className="text-sm font-black text-[#0f172a]">{title}</h2>
-            {slices.length > 0 ? (
-                <div className="grid gap-4 lg:grid-cols-[18rem_1fr] lg:items-center">
-                    <div className="grid justify-items-center gap-2">
-                        <div
-                            className="h-56 w-56 rounded-full border border-[#cbd5e1]"
-                            style={{ background } as CSSProperties}
-                            role="img"
-                            aria-label={`Distribucion de ${title.toLowerCase()}`}
-                        />
-                        <strong className="text-sm text-[#0f172a]">{total} ordenes</strong>
-                    </div>
-                    <div className="grid gap-2">
-                        {slices.map((slice) => (
-                            <div key={slice.label} className="grid grid-cols-[1rem_minmax(0,1fr)_4rem_3rem] items-center gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-sm">
-                                <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: slice.color }} />
-                                <strong className="truncate text-[#0f172a]" title={slice.label}>{slice.label}</strong>
-                                <span className="text-right font-black text-[#334155]">{slice.count}</span>
-                                <span className="text-right font-bold text-[#64748b]">{slice.percent.toFixed(1)}%</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ) : (
-                <span className="rounded-md border border-dashed border-[#cbd5e1] px-3 py-4 text-center text-sm font-semibold text-[#64748b]">Sin datos.</span>
-            )}
         </section>
     );
 }
@@ -310,7 +294,7 @@ function HorizontalChart({ title, items, valueType, showTotal = true }: { title:
                     <div key={item.label} className="grid grid-cols-[minmax(5rem,12rem)_1fr_3rem] items-center gap-2 text-sm">
                         <span className="truncate font-bold text-[#334155]" title={item.label}>{item.label}</span>
                         <span className="h-4 rounded-sm bg-[#e2e8f0]">
-                            <span className="block h-4 rounded-sm bg-[#2563eb]" style={{ width: `${Math.max(2, (item.count / maxCount) * 100)}%` }} />
+                            <span className={cn('block h-4 rounded-sm bg-[#2563eb]', progressWidthClass((item.count / maxCount) * 100))} />
                         </span>
                         <strong className="text-right text-[#0f172a]">{valueType === 'count' ? item.count : showTotal ? formatCurrency(item.total ?? 0) : item.count}</strong>
                         {showTotal ? <span className="col-span-3 text-xs font-semibold text-[#64748b]">{formatCurrency(item.total ?? 0)}</span> : null}

@@ -130,22 +130,22 @@ type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
 
 const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
 const repairColorOptions = [
-    { value: '', label: 'Sin color', hex: '#f8fafc' },
-    { value: 'NEGRO', label: 'Negro', hex: '#111827' },
-    { value: 'BLANCO', label: 'Blanco', hex: '#ffffff' },
-    { value: 'GRIS', label: 'Gris', hex: '#6b7280' },
-    { value: 'PLATA', label: 'Plata', hex: '#c0c0c0' },
-    { value: 'AZUL', label: 'Azul', hex: '#2563eb' },
-    { value: 'CELESTE', label: 'Celeste', hex: '#38bdf8' },
-    { value: 'ROJO', label: 'Rojo', hex: '#dc2626' },
-    { value: 'VERDE', label: 'Verde', hex: '#16a34a' },
-    { value: 'AMARILLO', label: 'Amarillo', hex: '#facc15' },
-    { value: 'DORADO', label: 'Dorado', hex: '#d97706' },
-    { value: 'ROSA', label: 'Rosa', hex: '#f472b6' },
-    { value: 'VIOLETA', label: 'Violeta', hex: '#7c3aed' },
-    { value: 'NARANJA', label: 'Naranja', hex: '#f97316' },
-    { value: 'MARRON', label: 'Marron', hex: '#7c2d12' },
-    { value: 'BEIGE', label: 'Beige', hex: '#d6b48c' },
+    { value: '', label: 'Sin color', swatchClass: 'bg-[#f8fafc]' },
+    { value: 'NEGRO', label: 'Negro', swatchClass: 'bg-[#111827]' },
+    { value: 'BLANCO', label: 'Blanco', swatchClass: 'bg-white' },
+    { value: 'GRIS', label: 'Gris', swatchClass: 'bg-[#6b7280]' },
+    { value: 'PLATA', label: 'Plata', swatchClass: 'bg-[#c0c0c0]' },
+    { value: 'AZUL', label: 'Azul', swatchClass: 'bg-[#2563eb]' },
+    { value: 'CELESTE', label: 'Celeste', swatchClass: 'bg-[#38bdf8]' },
+    { value: 'ROJO', label: 'Rojo', swatchClass: 'bg-[#dc2626]' },
+    { value: 'VERDE', label: 'Verde', swatchClass: 'bg-[#16a34a]' },
+    { value: 'AMARILLO', label: 'Amarillo', swatchClass: 'bg-[#facc15]' },
+    { value: 'DORADO', label: 'Dorado', swatchClass: 'bg-[#d97706]' },
+    { value: 'ROSA', label: 'Rosa', swatchClass: 'bg-[#f472b6]' },
+    { value: 'VIOLETA', label: 'Violeta', swatchClass: 'bg-[#7c3aed]' },
+    { value: 'NARANJA', label: 'Naranja', swatchClass: 'bg-[#f97316]' },
+    { value: 'MARRON', label: 'Marron', swatchClass: 'bg-[#7c2d12]' },
+    { value: 'BEIGE', label: 'Beige', swatchClass: 'bg-[#d6b48c]' },
 ] as const;
 
 function isPhoneCategoryValue(serviceCategories: ServiceCategoryOption[], value: string | number | null | undefined): boolean {
@@ -445,11 +445,31 @@ function displayRepairModel(repair: RepairOrderView): string {
     return `${brand} ${model}`.trim();
 }
 
-function repairColorHex(color?: string | null): string {
+function repairModelGroupKey(repair: RepairOrderView): string {
+    return normalizeRepairText(displayRepairModel(repair));
+}
+
+function repairSameModelPosition(ticket: RepairTicketView, repair: RepairOrderView): { index: number; total: number } {
+    const modelKey = repairModelGroupKey(repair);
+
+    if (modelKey === '' || modelKey === '-') {
+        return { index: 1, total: 1 };
+    }
+
+    const sameModelRepairs = ticket.repairs.filter((ticketRepair) => repairModelGroupKey(ticketRepair) === modelKey);
+    const currentIndex = sameModelRepairs.findIndex((ticketRepair) => ticketRepair.registro_id === repair.registro_id);
+
+    return {
+        index: currentIndex >= 0 ? currentIndex + 1 : 1,
+        total: sameModelRepairs.length,
+    };
+}
+
+function repairColorSwatchClass(color?: string | null): string {
     const normalized = normalizeRepairText(color);
     const option = repairColorOptions.find((item) => item.value === normalized);
 
-    return option?.hex ?? '#94a3b8';
+    return option?.swatchClass ?? 'bg-[#94a3b8]';
 }
 
 function RepairColorSwatch({ color }: { color?: string | null }): JSX.Element | null {
@@ -461,8 +481,7 @@ function RepairColorSwatch({ color }: { color?: string | null }): JSX.Element | 
 
     return (
         <span
-            className="inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]"
-            style={{ backgroundColor: repairColorHex(label) }}
+            className={cn('inline-block h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]', repairColorSwatchClass(label))}
             title={label}
             aria-label={`Color ${label}`}
         />
@@ -503,7 +522,6 @@ function RepairColorCombobox({
     const [showAllColors, setShowAllColors] = useState(false);
     const [query, setQuery] = useState(repairColorLabel(value));
     const normalizedQuery = normalizeRepairText(query);
-    const selectedColor = repairColorHex(value);
     const filteredOptions = showAllColors || normalizedQuery === ''
         ? repairColorOptions
         : repairColorOptions.filter((option) => normalizeRepairText(option.label).includes(normalizedQuery) || option.value.includes(normalizedQuery));
@@ -518,8 +536,7 @@ function RepairColorCombobox({
     return (
         <div className="relative">
             <span
-                className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]"
-                style={{ backgroundColor: normalizeRepairText(value) === '' ? '#f8fafc' : selectedColor }}
+                className={cn('pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]', repairColorSwatchClass(value))}
                 aria-hidden="true"
             />
             <input
@@ -588,7 +605,7 @@ function RepairColorCombobox({
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => selectColor(option.value)}
                         >
-                            <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]" style={{ backgroundColor: option.hex }} aria-hidden="true" />
+                            <span className={cn('h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]', option.swatchClass)} aria-hidden="true" />
                             <span>{option.label}</span>
                         </button>
                     )) : (
@@ -1378,6 +1395,9 @@ function RepairEditCard({
     const desktopWorkLabel = rowTotal > 1 ? `Trabajo ${rowIndex + 1} de ${rowTotal}` : `Trabajo ${repair.reparacion}`;
     const repairBrand = inferredRepairBrand(repair);
     const repairDisplayModel = displayRepairModel(repair);
+    const sameModelPosition = repairSameModelPosition(ticket, repair);
+    const hasRepeatedModelInTicket = sameModelPosition.total > 1;
+    const sameModelLabel = `Mismo modelo ${sameModelPosition.index}/${sameModelPosition.total}`;
     const cleanDescription = descriptionWithoutRepeatedModel(repair.descripcion, repair.modelo, repairBrand);
     const displayDescription = (cleanDescription || repair.descripcion || '-').toUpperCase();
     const partMatches = partSearch.trim().length >= 2
@@ -2691,6 +2711,11 @@ function RepairEditCard({
                         <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openQuickView} title={repairDisplayModel || '-'}>
                             <RepairModelLabel repair={repair} term={highlightTerm} />
                         </button>
+                        {hasRepeatedModelInTicket ? (
+                            <span className="w-fit rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-1.5 py-0.5 text-[0.58rem] font-black uppercase text-[#1d4ed8]">
+                                {sameModelLabel}
+                            </span>
+                        ) : null}
                     </div>
                     <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openQuickView} title={displayDescription}>
                         <span className="line-clamp-2"><HighlightText value={displayDescription} term={highlightTerm} /></span>
@@ -2769,6 +2794,13 @@ function RepairEditCard({
                                 <span className={cn('rounded-full border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
                             <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
+                            {hasRepeatedModelInTicket ? (
+                                <div className="mt-1">
+                                    <span className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-1.5 py-0.5 text-[0.62rem] font-black uppercase text-[#1d4ed8]">
+                                        {sameModelLabel}
+                                    </span>
+                                </div>
+                            ) : null}
                             <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>

@@ -161,22 +161,22 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
 
 const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
 const repairColorOptions = [
-    { value: '', label: 'Sin color', hex: '#f8fafc' },
-    { value: 'NEGRO', label: 'Negro', hex: '#111827' },
-    { value: 'BLANCO', label: 'Blanco', hex: '#ffffff' },
-    { value: 'GRIS', label: 'Gris', hex: '#6b7280' },
-    { value: 'PLATA', label: 'Plata', hex: '#c0c0c0' },
-    { value: 'AZUL', label: 'Azul', hex: '#2563eb' },
-    { value: 'CELESTE', label: 'Celeste', hex: '#38bdf8' },
-    { value: 'ROJO', label: 'Rojo', hex: '#dc2626' },
-    { value: 'VERDE', label: 'Verde', hex: '#16a34a' },
-    { value: 'AMARILLO', label: 'Amarillo', hex: '#facc15' },
-    { value: 'DORADO', label: 'Dorado', hex: '#d97706' },
-    { value: 'ROSA', label: 'Rosa', hex: '#f472b6' },
-    { value: 'VIOLETA', label: 'Violeta', hex: '#7c3aed' },
-    { value: 'NARANJA', label: 'Naranja', hex: '#f97316' },
-    { value: 'MARRON', label: 'Marron', hex: '#7c2d12' },
-    { value: 'BEIGE', label: 'Beige', hex: '#d6b48c' },
+    { value: '', label: 'Sin color', swatchClass: 'bg-[#f8fafc]' },
+    { value: 'NEGRO', label: 'Negro', swatchClass: 'bg-[#111827]' },
+    { value: 'BLANCO', label: 'Blanco', swatchClass: 'bg-white' },
+    { value: 'GRIS', label: 'Gris', swatchClass: 'bg-[#6b7280]' },
+    { value: 'PLATA', label: 'Plata', swatchClass: 'bg-[#c0c0c0]' },
+    { value: 'AZUL', label: 'Azul', swatchClass: 'bg-[#2563eb]' },
+    { value: 'CELESTE', label: 'Celeste', swatchClass: 'bg-[#38bdf8]' },
+    { value: 'ROJO', label: 'Rojo', swatchClass: 'bg-[#dc2626]' },
+    { value: 'VERDE', label: 'Verde', swatchClass: 'bg-[#16a34a]' },
+    { value: 'AMARILLO', label: 'Amarillo', swatchClass: 'bg-[#facc15]' },
+    { value: 'DORADO', label: 'Dorado', swatchClass: 'bg-[#d97706]' },
+    { value: 'ROSA', label: 'Rosa', swatchClass: 'bg-[#f472b6]' },
+    { value: 'VIOLETA', label: 'Violeta', swatchClass: 'bg-[#7c3aed]' },
+    { value: 'NARANJA', label: 'Naranja', swatchClass: 'bg-[#f97316]' },
+    { value: 'MARRON', label: 'Marron', swatchClass: 'bg-[#7c2d12]' },
+    { value: 'BEIGE', label: 'Beige', swatchClass: 'bg-[#d6b48c]' },
 ] as const;
 
 function normalizeDeviceSearch(value: string): string {
@@ -209,11 +209,11 @@ function repairColorLabel(color?: string | null): string {
     return option?.label ?? (color ?? '');
 }
 
-function repairColorHex(color?: string | null): string {
+function repairColorSwatchClass(color?: string | null): string {
     const normalized = normalizeDeviceSearch(color ?? '');
     const option = repairColorOptions.find((item) => item.value === normalized);
 
-    return option?.hex ?? '#94a3b8';
+    return option?.swatchClass ?? 'bg-[#94a3b8]';
 }
 
 function RepairColorCombobox({
@@ -243,8 +243,7 @@ function RepairColorCombobox({
     return (
         <div className="relative">
             <span
-                className="pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]"
-                style={{ backgroundColor: normalizeDeviceSearch(value) === '' ? '#f8fafc' : repairColorHex(value) }}
+                className={cn('pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]', repairColorSwatchClass(value))}
                 aria-hidden="true"
             />
             <input
@@ -311,7 +310,7 @@ function RepairColorCombobox({
                             onMouseDown={(event) => event.preventDefault()}
                             onClick={() => selectColor(option.value)}
                         >
-                            <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]" style={{ backgroundColor: option.hex }} aria-hidden="true" />
+                            <span className={cn('h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]', option.swatchClass)} aria-hidden="true" />
                             <span>{option.label}</span>
                         </button>
                     )) : (

@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toDataURL } from 'qrcode';
 import type { RepairOrderView, RepairPaymentView, RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass } from '../../repairUi';
@@ -26,27 +26,53 @@ interface TicketPricingSettings {
 
 export default function TicketPage({ ticket, businessHours, ticketPricing, returnUrl }: TicketPageProps): JSX.Element {
     const [qrUrl, setQrUrl] = useState<string>('');
-    const [printPageHeightMm, setPrintPageHeightMm] = useState<number>(180);
-    const ticketRef = useRef<HTMLElement | null>(null);
     const now = new Date();
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, minute: '2-digit' });
-    const hasClientDni = ticket.hasClientDni ?? (Number(ticket.dni) > 0 && Number(ticket.dni) !== 12345678);
     const trackingVerifier = ticket.trackingVerifier || String(ticket.dni);
     const hasIncrements = ticket.repairs.some((repair) => (repair.payments ?? []).some((payment) => payment.payment_type === 'incremento'));
-    const generalFinancial = ticket.repairs.reduce(
-        (carry, repair) => {
-            const financial = repairFinancialSummary(repair, ticketPricing);
+    const generalFinancial = ticketFinancialSummary(ticket.repairs, ticketPricing);
+    const repairPrintItems = ticket.repairs.map((repair, index) => {
+        const monto = Number(repair.monto ?? 0);
+        const financial = repairFinancialSummary(repair, ticketPricing);
+        const modelLabel = ticketRepairModel(repair);
+        const failureLabel = ticketRepairFailure(repair, modelLabel);
+        const increments = (repair.payments ?? []).filter((payment) => payment.payment_type === 'incremento');
+        const deposits = (repair.payments ?? []).filter((payment) => payment.payment_type === 'senia' && Number(payment.amount ?? 0) > 0);
+        const hasDeposits = deposits.length > 0;
+        const canUseCompactPrice = increments.length === 0 && !hasDeposits && !financial.discountApplies;
 
-            return {
-                cashDue: carry.cashDue + financial.cashDue,
-                listDue: carry.listDue + financial.listDue,
-                paidActual: carry.paidActual + financial.paidActual,
-                discountApplies: carry.discountApplies || financial.discountApplies,
-            };
-        },
-        { cashDue: 0, listDue: 0, paidActual: 0, discountApplies: false },
-    );
+        return {
+            repair,
+            index,
+            number: index + 1,
+            key: `${repair.registro_id}-${repair.reparacion}`,
+            modelLabel,
+            modelKey: normalizeTicketText(modelLabel),
+            failureLabel,
+            monto,
+            financial,
+            deliveredLabel: repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null,
+            increments,
+            deposits,
+            hasDeposits,
+            canUseCompactPrice,
+            compactPriceLabel: monto > 0 ? formatCurrency(financial.cashTotal) : 'A PRESUPUESTAR',
+            cashDueLabel: financial.cashDue <= 0 ? 'PAGADO' : formatCurrency(financial.cashDue),
+        };
+    });
+    const repairPrintGroups = repairPrintItems.reduce<Array<{ key: string; modelLabel: string; items: typeof repairPrintItems }>>((groups, item) => {
+        const lastGroup = groups[groups.length - 1];
+
+        if (lastGroup && lastGroup.key === item.modelKey) {
+            lastGroup.items.push(item);
+            return groups;
+        }
+
+        groups.push({ key: item.modelKey, modelLabel: item.modelLabel, items: [item] });
+
+        return groups;
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -65,64 +91,14 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
         };
     }, [ticket.trackingUrl]);
 
-    const updatePrintPageHeight = useCallback((): void => {
-        const ticketElement = ticketRef.current;
-        if (!ticketElement) {
-            return;
-        }
-
-        const contentHeightPx = ticketElement.getBoundingClientRect().height;
-        const contentHeightMm = contentHeightPx * 25.4 / 96;
-        setPrintPageHeightMm(Math.max(80, Math.ceil(contentHeightMm + 4)));
-    }, []);
-
-    useEffect(() => {
-        updatePrintPageHeight();
-        const timeoutId = window.setTimeout(updatePrintPageHeight, 150);
-        window.addEventListener('beforeprint', updatePrintPageHeight);
-
-        return () => {
-            window.clearTimeout(timeoutId);
-            window.removeEventListener('beforeprint', updatePrintPageHeight);
-        };
-    }, [qrUrl, ticket.repairs.length, updatePrintPageHeight]);
-
     const printTicket = (): void => {
-        updatePrintPageHeight();
         window.requestAnimationFrame(() => window.print());
     };
 
     return (
         <>
             <Head title={`Ticket #${ticket.id}`} />
-            <style>{`
-                @media print {
-                    @page {
-                        size: 80mm ${printPageHeightMm}mm;
-                        margin: 0;
-                    }
-
-                    html,
-                    body,
-                    #app {
-                        width: 80mm;
-                        min-width: 80mm;
-                        height: auto !important;
-                        min-height: 0 !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        background: #fff !important;
-                    }
-
-                    .repair-ticket-print-page,
-                    .repair-ticket-print-sheet {
-                        height: auto !important;
-                        min-height: 0 !important;
-                    }
-                }
-            `}</style>
-
-            <div className="repair-ticket-print-page min-h-screen bg-[linear-gradient(180deg,#eef5ff,#f8fbff)] px-3 py-3 text-black print:w-[80mm] print:bg-white print:p-0">
+            <div className="min-h-screen bg-[linear-gradient(180deg,#eef5ff,#f8fbff)] px-3 py-3 text-black print:h-auto print:min-h-0 print:w-[80mm] print:bg-white print:p-0">
                 <div className="mx-auto mb-2 flex w-[80mm] flex-wrap justify-center gap-1.5 print:hidden">
                     <Link href={returnUrl} className={buttonClass('soft', 'sm')}>
                         Volver
@@ -137,7 +113,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     ) : null}
                 </div>
 
-                <main ref={ticketRef} className="repair-ticket-print-sheet mx-auto w-[80mm] rounded-[10px] border border-[#dbe7f6] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_16px_34px_rgba(15,23,42,0.16)] print:mx-auto print:w-[80mm] print:rounded-none print:border-0 print:px-[4mm] print:pt-[4mm] print:pb-[2mm] print:shadow-none">
+                <main className="mx-auto h-auto min-h-0 w-[80mm] rounded-[10px] border border-[#dbe7f6] bg-white px-[5px] py-[7px] font-[Arial,Helvetica,sans-serif] text-[12px] font-bold uppercase leading-[1.2] tracking-[0.01em] text-black shadow-[0_16px_34px_rgba(15,23,42,0.16)] print:mx-auto print:h-auto print:min-h-0 print:w-[80mm] print:rounded-none print:border-0 print:px-[4mm] print:pt-[4mm] print:pb-[2mm] print:shadow-none">
                     <div className="hidden print:block print:h-[4mm]" />
 
                     <header className="text-center">
@@ -156,7 +132,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                         <div className="mb-[3px] text-[12px]">{hasIncrements ? 'TICKET ACTUALIZADO' : 'COMPROBANTE DE INGRESO'}</div>
                         <TicketLine label="ORDEN N:" value={`#${ticket.id}`} variant="highlight" />
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
-                        {hasClientDni ? <TicketLine label="DNI:" value={String(ticket.dni)} /> : <TicketLine label="CODIGO:" value={trackingVerifier} />}
+                        <TicketLine label="CODIGO:" value={trackingVerifier} />
                         <TicketLine label="FECHA:" value={fecha} />
                         <TicketLine label="HORA:" value={hora} />
                     </section>
@@ -164,52 +140,52 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     <div className="my-[5px] border-t border-dashed border-black" />
 
                     <section>
-                        {ticket.repairs.map((repair, index) => {
-                            const monto = Number(repair.monto ?? 0);
-                            const financial = repairFinancialSummary(repair, ticketPricing);
-                            const deliveredLabel = repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null;
-                            const modelLabel = ticketRepairModel(repair);
-                            const failureLabel = ticketRepairFailure(repair, modelLabel);
-                            const increments = (repair.payments ?? []).filter((payment) => payment.payment_type === 'incremento');
-                            const deposits = (repair.payments ?? []).filter((payment) => payment.payment_type === 'senia' && Number(payment.amount ?? 0) > 0);
-                            const hasDeposits = deposits.length > 0;
-                            const cashDueLabel = financial.cashDue <= 0 ? 'PAGADO' : formatCurrency(financial.cashDue);
+                        {repairPrintGroups.map((group) => {
+                            const subtotal = ticketRepairGroupSubtotal(group.items, ticketPricing);
 
                             return (
-                                <div key={`${repair.registro_id}-${repair.reparacion}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
-                                    <div className="mb-[3px] text-[12px]">{ticket.repairs.length === 1 ? 'TRABAJO' : `TRABAJO ${index + 1}`}</div>
-                                    <TicketLine label="MODELO:" value={modelLabel} />
-                                    <div className="mb-px block">
-                                        <span className="block">FALLA:</span>
-                                        <strong className="mt-px block break-words text-left">{failureLabel}</strong>
+                            <div key={`${group.key}-${group.items[0]?.key ?? 'grupo'}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
+                                <TicketRepairGroupSummary
+                                    label={ticket.repairs.length === 1 ? 'TRABAJO' : group.items.length === 1 ? `TRABAJO ${group.items[0].number}` : `TRABAJOS ${group.items[0].number}-${group.items[group.items.length - 1].number}`}
+                                    model={group.modelLabel}
+                                    items={group.items.map((item) => ({
+                                        key: item.key,
+                                        failure: item.failureLabel,
+                                        price: ticketRepairLinePriceLabel(item, subtotal.discountApplies, ticketPricing),
+                                    }))}
+                                    subtotal={group.items.length > 1 || subtotal.discountApplies ? subtotal : null}
+                                    showRegularSubtotal={group.items.length > 1}
+                                    discountLabel={ticketCashDiscountLabel(ticketPricing.cashDiscountPercentage)}
+                                />
+                                {group.items.map((item) => !ticketRepairNeedsDetail(item, subtotal.discountApplies) ? null : (
+                                    <div key={`${item.key}-detalle`} className="mt-[3px]">
+                                        {item.increments.map((payment) => (
+                                            <TicketLine
+                                                key={payment.id}
+                                                label="INCREMENTO:"
+                                                value={`${ticketIncrementLabel(payment.notes)} + ${formatCurrency(payment.amount)}`}
+                                            />
+                                        ))}
+                                        {subtotal.discountApplies ? null : item.financial.discountApplies ? (
+                                            <CashOfferBlock
+                                                regularLabel={item.hasDeposits ? 'PRESUP. REGULAR:' : 'PRECIO REGULAR:'}
+                                                cashLabel={ticketCashDiscountLabel(ticketPricing.cashDiscountPercentage)}
+                                                regularAmount={item.financial.listTotal}
+                                                cashAmount={item.financial.cashTotal}
+                                            />
+                                        ) : (
+                                            item.canUseCompactPrice ? null : <TicketLine label={item.hasDeposits ? 'PRESUPUESTO:' : 'PRECIO:'} value={item.monto > 0 ? formatCurrency(item.financial.listTotal) : 'A PRESUPUESTAR'} />
+                                        )}
+                                        {item.deposits.map((payment) => (
+                                            <TicketLine key={payment.id} label={`SEÑA ${paymentMethodLabel(payment)}:`} value={formatCurrency(payment.amount)} />
+                                        ))}
+                                        {item.hasDeposits ? <TicketLine label="SALDO:" value={item.monto > 0 ? listDueLabel(item.financial) : 'A DEFINIR'} /> : null}
+                                        {item.hasDeposits && item.financial.discountApplies ? <TicketLine label="SALDO EFECTIVO HOY:" value={item.monto > 0 ? item.cashDueLabel : 'A DEFINIR'} /> : null}
+                                        {ticket.repairs.length > 1 && !item.canUseCompactPrice ? <TicketLine label="SUBTOTAL TRABAJO:" value={item.monto > 0 ? formatCurrency(item.financial.cashTotal) : 'A PRESUPUESTAR'} /> : null}
+                                        {item.deliveredLabel !== null ? <TicketLine label="ENTREGA:" value={item.deliveredLabel} /> : null}
                                     </div>
-                                    {increments.map((payment) => (
-                                        <TicketLine
-                                            key={payment.id}
-                                            label="INCREMENTO:"
-                                            value={`${ticketIncrementLabel(payment.notes)} + ${formatCurrency(payment.amount)}`}
-                                        />
-                                    ))}
-                                    {financial.discountApplies ? (
-                                        <CashOfferBlock
-                                            regularLabel={hasDeposits ? 'PRESUP. REGULAR:' : 'PRECIO REGULAR:'}
-                                            cashLabel={`DESCUENTO ${ticketDiscountPercentageLabel(ticketPricing.cashDiscountPercentage)} EN EFECTIVO:`}
-                                            regularAmount={financial.listTotal}
-                                            cashAmount={financial.cashTotal}
-                                        />
-                                    ) : (
-                                        <TicketLine label={hasDeposits ? 'PRESUPUESTO:' : 'PRECIO:'} value={monto > 0 ? formatCurrency(financial.listTotal) : 'A PRESUPUESTAR'} />
-                                    )}
-                                    {deposits.map((payment) => (
-                                        <TicketLine key={payment.id} label={`SEÑA ${paymentMethodLabel(payment)}:`} value={formatCurrency(payment.amount)} />
-                                    ))}
-                                    {hasDeposits ? <TicketLine label="SALDO:" value={monto > 0 ? listDueLabel(financial) : 'A DEFINIR'} /> : null}
-                                    {hasDeposits && financial.discountApplies ? <TicketLine label="SALDO EFECTIVO HOY:" value={monto > 0 ? cashDueLabel : 'A DEFINIR'} /> : null}
-                                    {ticket.repairs.length > 1 ? <TicketLine label="SUBTOTAL TRABAJO:" value={monto > 0 ? formatCurrency(financial.cashTotal) : 'A PRESUPUESTAR'} /> : null}
-                                    {deliveredLabel !== null ? (
-                                        <TicketLine label="ENTREGA:" value={deliveredLabel} />
-                                    ) : null}
-                                </div>
+                                ))}
+                            </div>
                             );
                         })}
                     </section>
@@ -220,7 +196,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                             {generalFinancial.discountApplies ? (
                                 <CashOfferBlock
                                     regularLabel={generalFinancial.paidActual > 0 ? 'SALDO GRAL. REGULAR:' : 'TOTAL GRAL. REGULAR:'}
-                                    cashLabel={`DESCUENTO ${ticketDiscountPercentageLabel(ticketPricing.cashDiscountPercentage)} EN EFECTIVO:`}
+                                    cashLabel={ticketCashDiscountLabel(ticketPricing.cashDiscountPercentage)}
                                     regularAmount={generalFinancial.listDue}
                                     cashAmount={generalFinancial.cashDue}
                                     className="mt-[4px] text-[13px]"
@@ -300,6 +276,22 @@ function repairFinancialSummary(repair: RepairOrderView, pricing: TicketPricingS
         paidActual,
         cashDue,
         listDue: listAmount(cashDue, discountApplies, pricing),
+        discountApplies,
+    };
+}
+
+function ticketFinancialSummary(repairs: RepairOrderView[], pricing: TicketPricingSettings): { cashDue: number; listDue: number; paidActual: number; discountApplies: boolean } {
+    const cashTotal = repairs.reduce((total, repair) => total + Math.max(0, Number(repair.monto ?? 0)), 0);
+    const discountApplies = cashDiscountApplies(cashTotal, pricing);
+    const deposits = repairs.flatMap((repair) => repair.payments ?? []).filter((payment) => payment.payment_type === 'senia');
+    const paidActual = deposits.reduce((total, payment) => total + Math.max(0, Number(payment.amount ?? 0)), 0);
+    const paidCashEquivalent = deposits.reduce((total, payment) => total + paymentCashEquivalent(payment, discountApplies, pricing), 0);
+    const cashDue = Math.max(0, cashTotal - paidCashEquivalent);
+
+    return {
+        cashDue,
+        listDue: listAmount(cashDue, discountApplies, pricing),
+        paidActual,
         discountApplies,
     };
 }
@@ -385,6 +377,61 @@ function ticketDiscountPercentageLabel(value: number): string {
     return Number.isInteger(normalized) ? `${normalized}%` : `${normalized.toFixed(1).replace('.', ',')}%`;
 }
 
+function ticketCashDiscountLabel(value: number): string {
+    return `EFECTIVO ${ticketDiscountPercentageLabel(value)} DESC.:`;
+}
+
+function ticketRepairGroupSubtotal(
+    items: Array<{ monto: number; financial: ReturnType<typeof repairFinancialSummary> }>,
+    pricing: TicketPricingSettings,
+): { cashLabel: string; listLabel: string; discountApplies: boolean } {
+    if (items.some((item) => item.monto <= 0)) {
+        return {
+            cashLabel: 'A PRESUPUESTAR',
+            listLabel: 'A PRESUPUESTAR',
+            discountApplies: false,
+        };
+    }
+
+    const cashSubtotal = items.reduce((total, item) => total + item.financial.cashTotal, 0);
+    const discountApplies = cashDiscountApplies(cashSubtotal, pricing);
+
+    return {
+        cashLabel: formatCurrency(cashSubtotal),
+        listLabel: formatCurrency(listAmount(cashSubtotal, discountApplies, pricing)),
+        discountApplies,
+    };
+}
+
+function ticketRepairLinePriceLabel(
+    item: { monto: number; financial: ReturnType<typeof repairFinancialSummary>; compactPriceLabel: string },
+    groupDiscountApplies: boolean,
+    pricing: TicketPricingSettings,
+): string {
+    if (item.monto <= 0) {
+        return item.compactPriceLabel;
+    }
+
+    return formatCurrency(listAmount(item.financial.cashTotal, groupDiscountApplies, pricing));
+}
+
+function ticketRepairNeedsDetail(
+    item: {
+        canUseCompactPrice: boolean;
+        deliveredLabel: string | null;
+        financial: ReturnType<typeof repairFinancialSummary>;
+        hasDeposits: boolean;
+        increments: RepairPaymentView[];
+    },
+    groupDiscountApplies: boolean,
+): boolean {
+    return item.increments.length > 0
+        || item.hasDeposits
+        || item.deliveredLabel !== null
+        || (!groupDiscountApplies && !item.canUseCompactPrice)
+        || (!groupDiscountApplies && item.financial.discountApplies);
+}
+
 function TicketLine({ label, value, strongClassName = '', variant = 'default' }: { label: string; value: string; strongClassName?: string; variant?: 'default' | 'highlight' }): JSX.Element {
     if (variant === 'highlight') {
         return (
@@ -399,6 +446,64 @@ function TicketLine({ label, value, strongClassName = '', variant = 'default' }:
         <div className="mb-px flex items-baseline justify-between gap-[5px]">
             <span className="shrink-0">{label}</span>
             <strong className={`break-words text-right ${strongClassName}`}>{value}</strong>
+        </div>
+    );
+}
+
+function TicketRepairGroupSummary({
+    label,
+    model,
+    items,
+    subtotal,
+    showRegularSubtotal,
+    discountLabel,
+}: {
+    label: string;
+    model: string;
+    items: Array<{ key: string; failure: string; price: string | null }>;
+    subtotal: { cashLabel: string; listLabel: string; discountApplies: boolean } | null;
+    showRegularSubtotal: boolean;
+    discountLabel: string;
+}): JSX.Element {
+    return (
+        <div className="mb-[3px] grid gap-px">
+            <div className="text-[12px] leading-[1.15]">{label}</div>
+            <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-[5px]">
+                <span className="text-[12px] leading-[1.15]">MODELO:</span>
+                <strong className="min-w-0 break-words text-right text-[12px] leading-[1.15]">{model}</strong>
+            </div>
+            <div className="text-[12px] leading-[1.15]">FALLAS:</div>
+            <div className="grid gap-px">
+                {items.map((item) => (
+                    <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
+                        <strong className="min-w-0 break-words text-[12px] leading-[1.15]">{item.failure}</strong>
+                        {item.price !== null ? <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{item.price}</strong> : null}
+                    </div>
+                ))}
+            </div>
+            {subtotal !== null ? (
+                <div className="mt-px grid gap-px border-t border-dashed border-black pt-[2px]">
+                    {subtotal.discountApplies ? (
+                        <>
+                            {showRegularSubtotal ? (
+                                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
+                                    <span className="text-[12px] leading-[1.15]">SUBTOTAL REGULAR:</span>
+                                    <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{subtotal.listLabel}</strong>
+                                </div>
+                            ) : null}
+                            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
+                                <span className="text-[12px] leading-[1.15]">{discountLabel}</span>
+                                <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{subtotal.cashLabel}</strong>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
+                            <span className="text-[12px] leading-[1.15]">SUBTOTAL MODELO:</span>
+                            <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{subtotal.cashLabel}</strong>
+                        </div>
+                    )}
+                </div>
+            ) : null}
         </div>
     );
 }
