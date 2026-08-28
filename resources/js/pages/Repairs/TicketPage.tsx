@@ -155,9 +155,8 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                         failure: item.failureLabel,
                                         price: ticketRepairLinePriceLabel(item, subtotal.discountApplies, ticketPricing),
                                     }))}
-                                    subtotal={group.items.length > 1 || subtotal.discountApplies ? subtotal : null}
+                                    subtotal={group.items.length > 1 ? subtotal : null}
                                     showRegularSubtotal={group.items.length > 1}
-                                    discountLabel={ticketCashDiscountLabel(ticketPricing.cashDiscountPercentage)}
                                 />
                                 {group.items.map((item) => !ticketRepairNeedsDetail(item, subtotal.discountApplies) ? null : (
                                     <div key={`${item.key}-detalle`} className="mt-[3px]">
@@ -169,11 +168,9 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                             />
                                         ))}
                                         {subtotal.discountApplies ? null : item.financial.discountApplies ? (
-                                            <CashOfferBlock
+                                            <RegularPriceBlock
                                                 regularLabel={item.hasDeposits ? 'PRESUP. REGULAR:' : 'PRECIO REGULAR:'}
-                                                cashLabel={ticketCashDiscountLabel(ticketPricing.cashDiscountPercentage)}
                                                 regularAmount={item.financial.listTotal}
-                                                cashAmount={item.financial.cashTotal}
                                             />
                                         ) : (
                                             item.canUseCompactPrice ? null : <TicketLine label={item.hasDeposits ? 'PRESUPUESTO:' : 'PRECIO:'} value={item.monto > 0 ? formatCurrency(item.financial.listTotal) : 'A PRESUPUESTAR'} />
@@ -182,7 +179,6 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                             <TicketLine key={payment.id} label={`SEÑA ${paymentMethodLabel(payment)}:`} value={formatCurrency(payment.amount)} />
                                         ))}
                                         {item.hasDeposits ? <TicketLine label="SALDO:" value={item.monto > 0 ? listDueLabel(item.financial) : 'A DEFINIR'} /> : null}
-                                        {item.hasDeposits && item.financial.discountApplies ? <TicketLine label="SALDO EFECTIVO HOY:" value={item.monto > 0 ? item.cashDueLabel : 'A DEFINIR'} /> : null}
                                         {ticket.repairs.length > 1 && !item.canUseCompactPrice ? <TicketLine label="SUBTOTAL TRABAJO:" value={item.monto > 0 ? formatCurrency(item.financial.cashTotal) : 'A PRESUPUESTAR'} /> : null}
                                         {item.deliveredLabel !== null ? <TicketLine label="ENTREGA:" value={item.deliveredLabel} /> : null}
                                     </div>
@@ -195,21 +191,19 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     {shouldShowGeneralFinancial ? (
                         <>
                             <div className="my-[5px] border-t border-dashed border-black" />
-                            {generalFinancial.discountApplies ? (
-                                <CashOfferBlock
-                                    regularLabel={generalFinancial.paidActual > 0 ? 'SALDO GRAL. REGULAR:' : 'TOTAL GRAL. REGULAR:'}
-                                    cashLabel={ticketCashDiscountLabel(ticketPricing.cashDiscountPercentage)}
-                                    regularAmount={generalFinancial.listDue}
-                                    cashAmount={generalFinancial.cashDue}
-                                    className="mt-[4px] text-[13px]"
-                                />
-                            ) : (
-                                <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
-                                    <span>{generalFinancial.paidActual > 0 ? 'SALDO GENERAL:' : 'TOTAL GENERAL:'}</span>
-                                    <strong>{formatCurrency(generalFinancial.listDue)}</strong>
-                                </div>
-                            )}
+                            <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
+                                <span>{generalFinancial.paidActual > 0 ? (generalFinancial.discountApplies ? 'SALDO GRAL. REGULAR:' : 'SALDO GENERAL:') : (generalFinancial.discountApplies ? 'TOTAL GRAL. REGULAR:' : 'TOTAL GENERAL:')}</span>
+                                <strong>{formatCurrency(generalFinancial.listDue)}</strong>
+                            </div>
                         </>
+                    ) : null}
+
+                    {generalFinancial.discountApplies ? (
+                        <CashPromoBanner
+                            note={ticketPricing.cashDiscountNote}
+                            percentage={ticketPricing.cashDiscountPercentage}
+                            cashDue={generalFinancial.cashDue}
+                        />
                     ) : null}
 
                     <footer className="mt-[6px] text-center text-[10.5px] leading-[1.15]">
@@ -379,10 +373,6 @@ function ticketDiscountPercentageLabel(value: number): string {
     return Number.isInteger(normalized) ? `${normalized}%` : `${normalized.toFixed(1).replace('.', ',')}%`;
 }
 
-function ticketCashDiscountLabel(value: number): string {
-    return `EFECTIVO ${ticketDiscountPercentageLabel(value)} DESC.:`;
-}
-
 function ticketRepairGroupSubtotal(
     items: Array<{ monto: number; financial: ReturnType<typeof repairFinancialSummary> }>,
     pricing: TicketPricingSettings,
@@ -452,20 +442,42 @@ function TicketLine({ label, value, strongClassName = '', variant = 'default' }:
     );
 }
 
+function CashPromoBanner({
+    note,
+    percentage,
+    cashDue,
+}: {
+    note: string;
+    percentage: number;
+    cashDue: number;
+}): JSX.Element {
+    const normalizedNote = note.trim() !== ''
+        ? note.trim().toUpperCase()
+        : `PROMO EN EFECTIVO ${ticketDiscountPercentageLabel(percentage)} DESCUENTO`;
+
+    return (
+        <div className="my-[5px] border-2 border-black bg-white px-[5px] py-[4px] text-center leading-[1.1]">
+            <div className="text-[12px] font-black">{normalizedNote}</div>
+            <div className="mt-[3px] border-t border-dashed border-black pt-[3px]">
+                <span className="block text-[10px]">EN EFECTIVO QUEDA</span>
+                <strong className="block text-[17px] leading-none">{cashDue <= 0 ? 'PAGADO' : formatCurrency(cashDue)}</strong>
+            </div>
+        </div>
+    );
+}
+
 function TicketRepairGroupSummary({
     label,
     model,
     items,
     subtotal,
     showRegularSubtotal,
-    discountLabel,
 }: {
     label: string;
     model: string;
     items: Array<{ key: string; failure: string; price: string | null }>;
     subtotal: { cashLabel: string; listLabel: string; discountApplies: boolean } | null;
     showRegularSubtotal: boolean;
-    discountLabel: string;
 }): JSX.Element {
     return (
         <div className="mb-[3px] grid gap-px">
@@ -486,18 +498,12 @@ function TicketRepairGroupSummary({
             {subtotal !== null ? (
                 <div className="mt-px grid gap-px border-t border-dashed border-black pt-[2px]">
                     {subtotal.discountApplies ? (
-                        <>
-                            {showRegularSubtotal ? (
-                                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
-                                    <span className="text-[12px] leading-[1.15]">SUBTOTAL REGULAR:</span>
-                                    <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{subtotal.listLabel}</strong>
-                                </div>
-                            ) : null}
+                        showRegularSubtotal ? (
                             <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
-                                <span className="text-[12px] leading-[1.15]">{discountLabel}</span>
-                                <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{subtotal.cashLabel}</strong>
+                                <span className="text-[12px] leading-[1.15]">SUBTOTAL REGULAR:</span>
+                                <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{subtotal.listLabel}</strong>
                             </div>
-                        </>
+                        ) : null
                     ) : (
                         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
                             <span className="text-[12px] leading-[1.15]">SUBTOTAL MODELO:</span>
@@ -510,23 +516,18 @@ function TicketRepairGroupSummary({
     );
 }
 
-function CashOfferBlock({
+function RegularPriceBlock({
     regularLabel,
-    cashLabel,
     regularAmount,
-    cashAmount,
     className = '',
 }: {
     regularLabel: string;
-    cashLabel: string;
     regularAmount: number;
-    cashAmount: number;
     className?: string;
 }): JSX.Element {
     return (
         <div className={`my-[3px] border-y border-dashed border-black py-[3px] ${className}`}>
             <TicketLine label={regularLabel} value={formatCurrency(regularAmount)} />
-            <TicketLine label={cashLabel} value={formatCurrency(cashAmount)} strongClassName="text-[13px]" />
         </div>
     );
 }

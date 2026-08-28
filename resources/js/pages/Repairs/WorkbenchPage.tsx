@@ -140,10 +140,27 @@ interface WorkbenchCreateFormData {
 
 type CreateFlowField = 'order-id' | 'customer-name' | `job-${number}-brand` | `job-${number}-model` | `job-${number}-description` | `job-${number}-amount` | `job-${number}-date`;
 type IntakeStep = 'client' | 'device' | 'extras' | 'summary';
+type DateShortcutValue = 'today' | 'tomorrow' | 'day-after' | 'custom';
+
+interface ClientLookupPreview {
+    nombre_cliente?: string;
+    dni?: number;
+    contacto?: string | null;
+    ultima_orden?: number;
+}
+
+function localDateWithOffset(days: number): string {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+}
 
 function createEmptyJob(defaultState: string): RepairJobFormData {
-    const today = new Date().toISOString().slice(0, 10);
-
     return {
         same_device: false,
         marca: '',
@@ -155,7 +172,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         monto: '0',
         senia: '0',
         senia_method: 'efectivo',
-        fecha_estimada: today,
+        fecha_estimada: localDateWithOffset(0),
         estado: defaultState,
         repuesto: '',
         pedir_repuesto: false,
@@ -728,9 +745,11 @@ export default function WorkbenchPage({
     });
     const [lookupFeedback, setLookupFeedback] = useState<string>('');
     const [lookupBusy, setLookupBusy] = useState(false);
+    const [clientPreview, setClientPreview] = useState<ClientLookupPreview | null>(null);
     const [imagePreviews, setImagePreviews] = useState<Record<number, string[]>>({});
     const [duplicateNotice, setDuplicateNotice] = useState('');
     const [pendingFailureOptions, setPendingFailureOptions] = useState<Record<number, string>>({});
+    const [customEstimatedDateJobs, setCustomEstimatedDateJobs] = useState<Record<number, boolean>>({});
     const [activeIntakeStep, setActiveIntakeStep] = useState<IntakeStep>('client');
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
@@ -741,6 +760,7 @@ export default function WorkbenchPage({
         return defaultSearchFields.filter((field) => incoming.includes(field));
     });
     const gridFilterSubmitTimeout = useRef<number | null>(null);
+    const dniLookupTimeout = useRef<number | null>(null);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const ticketDateGroups = groupTicketsByEntryDate(tickets);
     const isTaskQueueView = filters.prioridad === 'tareas';
@@ -749,6 +769,9 @@ export default function WorkbenchPage({
     useEffect(() => () => {
         if (gridFilterSubmitTimeout.current !== null) {
             window.clearTimeout(gridFilterSubmitTimeout.current);
+        }
+        if (dniLookupTimeout.current !== null) {
+            window.clearTimeout(dniLookupTimeout.current);
         }
     }, []);
 
@@ -932,6 +955,12 @@ export default function WorkbenchPage({
                 createForm.setData('jobs', [createEmptyJob(states[0] ?? 'PENDIENTE')]);
                 setImagePreviews({});
                 setLookupFeedback('');
+                setClientPreview(null);
+                setCustomEstimatedDateJobs({});
+                if (dniLookupTimeout.current !== null) {
+                    window.clearTimeout(dniLookupTimeout.current);
+                    dniLookupTimeout.current = null;
+                }
                 setPartSearches({});
                 setActiveIntakeStep('client');
             },
@@ -1502,47 +1531,148 @@ export default function WorkbenchPage({
         }));
     };
 
-    const lookupByDni = async (): Promise<void> => {
-        if (createForm.data.dni.trim() === '') {
+    const handleDniChange = (value: string): void => {
+        createForm.setData('dni', value);
+        setClientPreview(null);
+        setLookupFeedback('');
+
+        if (dniLookupTimeout.current !== null) {
+            window.clearTimeout(dniLookupTimeout.current);
+            dniLookupTimeout.current = null;
+        }
+
+        if (value.trim().length >= 7) {
+            dniLookupTimeout.current = window.setTimeout(() => {
+                void lookupByDni(value, true);
+            }, 650);
+        }
+    };
+
+    const lookupByDni = async (dniValue = createForm.data.dni, automatic = false): Promise<void> => {
+        const dni = dniValue.trim();
+
+        if (dni === '') {
+            setClientPreview(null);
+            if (automatic) {
+                return;
+            }
             setLookupFeedback('Ingresá un DNI para recuperar datos previos.');
             return;
         }
 
         setLookupBusy(true);
         setLookupFeedback('');
+        setClientPreview(null);
 
         try {
-            const response = await window.fetch(`${route('repairs.lookup')}?dni=${encodeURIComponent(createForm.data.dni.trim())}`, {
+            const response = await window.fetch(`${route('repairs.lookup')}?dni=${encodeURIComponent(dni)}`, {
                 headers: {
                     Accept: 'application/json',
                 },
             });
 
-            const payload = (await response.json()) as {
-                nombre_cliente?: string;
-                dni?: number;
-                contacto?: string | null;
-                ultima_orden?: number;
-            } | null;
+            const payload = (await response.json()) as ClientLookupPreview | null;
 
             if (!response.ok || !payload) {
+                if (automatic) {
+                    return;
+                }
                 setLookupFeedback('No encontramos un cliente previo con ese DNI.');
                 return;
             }
 
-            createForm.setData((current) => ({
-                ...current,
-                nombre_cliente: payload.nombre_cliente ?? current.nombre_cliente,
-                dni: payload.dni ? String(payload.dni) : current.dni,
-                contacto: payload.contacto ?? current.contacto,
-            }));
-            setLookupFeedback(`Cliente recuperado. Ultima orden: #${payload.ultima_orden ?? '-'}.`);
+            setClientPreview(payload);
         } catch {
+            if (automatic) {
+                return;
+            }
             setLookupFeedback('No se pudo consultar el DNI en este momento.');
         } finally {
             setLookupBusy(false);
         }
     };
+
+    const importClientPreview = (): void => {
+        if (!clientPreview) {
+            return;
+        }
+
+        createForm.setData((current) => ({
+            ...current,
+            nombre_cliente: clientPreview.nombre_cliente ?? current.nombre_cliente,
+            dni: clientPreview.dni ? String(clientPreview.dni) : current.dni,
+            contacto: clientPreview.contacto ?? current.contacto,
+        }));
+        setLookupFeedback(`Datos importados desde la orden #${clientPreview.ultima_orden ?? '-'}.`);
+        setClientPreview(null);
+    };
+
+    const dateShortcutFor = (value: string): DateShortcutValue => {
+        if (value === localDateWithOffset(0)) return 'today';
+        if (value === localDateWithOffset(1)) return 'tomorrow';
+        if (value === localDateWithOffset(2)) return 'day-after';
+
+        return 'custom';
+    };
+
+    const applyEstimatedDateShortcut = (index: number, value: DateShortcutValue): void => {
+        if (value === 'custom') {
+            setCustomEstimatedDateJobs((current) => ({ ...current, [index]: true }));
+            return;
+        }
+
+        const offset = value === 'today' ? 0 : value === 'tomorrow' ? 1 : 2;
+        setCustomEstimatedDateJobs((current) => ({ ...current, [index]: false }));
+        updateJob(index, (current) => ({ ...current, fecha_estimada: localDateWithOffset(offset) }));
+    };
+
+    const renderEstimatedDateField = (index: number, job: RepairJobFormData, inputClassName: string): JSX.Element => {
+        const shortcut = customEstimatedDateJobs[index] ? 'custom' : dateShortcutFor(job.fecha_estimada);
+
+        return (
+            <div className="grid gap-2">
+                <select
+                    className={inputClassName}
+                    value={shortcut}
+                    onChange={(event) => applyEstimatedDateShortcut(index, event.target.value as DateShortcutValue)}
+                >
+                    <option value="today">Hoy</option>
+                    <option value="tomorrow">Mañana</option>
+                    <option value="day-after">Pasado</option>
+                    <option value="custom">Otro</option>
+                </select>
+                {shortcut === 'custom' ? (
+                    <input
+                        className={inputClassName}
+                        type="date"
+                        value={job.fecha_estimada}
+                        onChange={(event) => {
+                            setCustomEstimatedDateJobs((current) => ({ ...current, [index]: true }));
+                            updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }));
+                        }}
+                    />
+                ) : null}
+            </div>
+        );
+    };
+
+    const renderClientPreview = (className = ''): JSX.Element | null => clientPreview ? (
+        <div className={cn('rounded-md border border-[#bbf7d0] bg-[#f0fdf4] p-3 text-sm text-[#14532d]', className)}>
+            <div className="grid gap-1 font-semibold">
+                <span>Cliente encontrado en orden #{clientPreview.ultima_orden ?? '-'}</span>
+                <span>{clientPreview.nombre_cliente ?? 'Sin nombre'} - DNI {clientPreview.dni ?? '-'}</span>
+                <span>Contacto: {clientPreview.contacto && clientPreview.contacto.trim() !== '' ? clientPreview.contacto : 'Sin contacto'}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+                <button className={buttonClass('success', 'sm')} type="button" onClick={importClientPreview}>
+                    <FaCheckCircle aria-hidden="true" /> Importar datos
+                </button>
+                <button className={buttonClass('soft', 'sm')} type="button" onClick={() => setClientPreview(null)}>
+                    Ignorar
+                </button>
+            </div>
+        </div>
+    ) : null;
 
     const renderDesktopDateGroups = (groups: TicketDateGroup[]): JSX.Element[] =>
         groups.flatMap((group) => [
@@ -2127,8 +2257,9 @@ export default function WorkbenchPage({
                         <div className={cn('grid items-start gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3 md:grid-cols-2 md:p-4 xl:grid-cols-[10rem_minmax(18rem,1fr)_12rem_14rem]', !showIntakeStep('client') && 'hidden')}>
                             <label className={guidedInlineLabelClass('order-id')}>ID de orden *<input className={guidedInputClass('order-id')} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required /><span className="text-xs font-semibold text-[#64748b]">Editable si esta libre.</span></label>
                             <label className={guidedInlineLabelClass('customer-name')}>Nombre del cliente *<input className={guidedInputClass('customer-name')} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required /></label>
-                            <label className={repairLabelClass}>DNI<div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => createForm.setData('dni', event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
+                            <label className={repairLabelClass}>DNI<div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => handleDniChange(event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
                             <label className={repairLabelClass}>Telefono / contacto<input className={compactInputClass} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Si queda vacio se guarda sin contacto.</span></label>
+                            {renderClientPreview('md:col-span-4')}
                             {lookupFeedback !== '' ? <p className="md:col-span-4 rounded-md bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
                         </div>
 
@@ -2316,7 +2447,7 @@ export default function WorkbenchPage({
                                             </>
                                         ) : null}
                                         <div className={cn(guidedPanelClass(fieldPanelAmber, `job-${index}-date`), !showIntakeStep('extras') && 'hidden')}>
-                                            <label className={repairLabelClass}>Fecha estimada<input className={guidedInputClass(`job-${index}-date`)} type="date" value={job.fecha_estimada} onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))} /></label>
+                                            <label className={repairLabelClass}>Fecha estimada{renderEstimatedDateField(index, job, guidedInputClass(`job-${index}-date`))}</label>
                                         </div>
                                         <div className={cn(fieldPanelPurple, !showIntakeStep('extras') && 'hidden')}>
                                             <label className={repairLabelClass}>Observaciones<textarea className={compactTextareaClass} rows={4} value={job.observaciones} onFocus={() => { if (job.observaciones.trim().toLowerCase() === 'sin observaciones') updateJob(index, (current) => ({ ...current, observaciones: '' })); }} onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))} /></label>
@@ -2508,7 +2639,8 @@ export default function WorkbenchPage({
                                     className={ui.input}
                                     placeholder="DNI"
                                     value={createForm.data.dni}
-                                    onChange={(event) => createForm.setData('dni', event.target.value)}
+                                    onChange={(event) => handleDniChange(event.target.value)}
+                                    onBlur={() => void lookupByDni()}
                                 />
                                 <button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>
                                     {lookupBusy ? 'Buscando...' : 'Buscar DNI'}
@@ -2520,6 +2652,7 @@ export default function WorkbenchPage({
                                 value={createForm.data.contacto}
                                 onChange={(event) => createForm.setData('contacto', event.target.value)}
                             />
+                            {renderClientPreview(ui.repairFull)}
                             {lookupFeedback !== '' ? <p className={`${ui.inlineCaption} ${ui.repairFull}`}>{lookupFeedback}</p> : null}
                         </div>
 
@@ -2630,12 +2763,7 @@ export default function WorkbenchPage({
                                             <option value="efectivo">Seña en efectivo</option>
                                             <option value="transferencia">Seña por transferencia</option>
                                         </select>
-                                        <input
-                                            className={ui.input}
-                                            type="date"
-                                            value={job.fecha_estimada}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, fecha_estimada: event.target.value }))}
-                                        />
+                                        {renderEstimatedDateField(index, job, ui.input)}
                                         <select
                                             className={ui.input}
                                             value={job.estado}
