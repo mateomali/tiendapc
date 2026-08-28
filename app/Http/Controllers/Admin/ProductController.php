@@ -324,8 +324,9 @@ class ProductController extends Controller
         $payload['stock_status'] = $payload['stock_status'] ?? 'instock';
         $payload['is_featured'] = (bool) ($payload['is_featured'] ?? false);
         $payload['is_active'] = (bool) ($payload['is_active'] ?? true);
-        $payload['cash_discount_mode'] = in_array(($payload['cash_discount_mode'] ?? 'global'), ['global', 'percentage', 'manual', 'disabled'], true)
-            ? $payload['cash_discount_mode']
+        $cashDiscountMode = (string) ($payload['cash_discount_mode'] ?? 'global');
+        $payload['cash_discount_mode'] = in_array($cashDiscountMode, ['global', 'percentage', 'manual', 'disabled'], true)
+            ? $cashDiscountMode
             : 'global';
 
         if ($payload['cash_discount_mode'] !== 'percentage') {

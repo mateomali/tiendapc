@@ -186,6 +186,21 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
             preserveState: true,
         });
     };
+    const paginationBlock = (
+        <div className={ui.pagination}>
+            <span>
+                Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}. Pagina {pagination.page} de {pagination.totalPages}. Total {listLabel}: {pagination.total}.
+            </span>
+            <div className={ui.inlineActions}>
+                <button type="button" className={buttonClass('soft', 'sm')} disabled={pagination.page <= 1} onClick={() => goToPage(Math.max(1, pagination.page - 1))}>
+                    Anterior
+                </button>
+                <button type="button" className={buttonClass('soft', 'sm')} disabled={pagination.page >= pagination.totalPages} onClick={() => goToPage(Math.min(pagination.totalPages, pagination.page + 1))}>
+                    Siguiente
+                </button>
+            </div>
+        </div>
+    );
 
     return (
         <RepairLayout title={pageTitle}>
@@ -247,19 +262,7 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                     </div>
                 </form>
 
-                <div className={ui.pagination}>
-                    <span>
-                        Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}. Pagina {pagination.page} de {pagination.totalPages}. Total {listLabel}: {pagination.total}.
-                    </span>
-                    <div className={ui.inlineActions}>
-                        <button type="button" className={buttonClass('soft', 'sm')} disabled={pagination.page <= 1} onClick={() => goToPage(Math.max(1, pagination.page - 1))}>
-                            Anterior
-                        </button>
-                        <button type="button" className={buttonClass('soft', 'sm')} disabled={pagination.page >= pagination.totalPages} onClick={() => goToPage(Math.min(pagination.totalPages, pagination.page + 1))}>
-                            Siguiente
-                        </button>
-                    </div>
-                </div>
+                {paginationBlock}
 
                 {isArchived ? (
                     <>
@@ -292,6 +295,7 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                         emptyLabel={emptyLabel}
                     />
                 )}
+                {paginationBlock}
             </section>
         </RepairLayout>
     );

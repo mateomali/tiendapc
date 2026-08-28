@@ -106,6 +106,10 @@ const labels: Record<string, { label: string; hint: string; multiline?: boolean 
         label: 'Carga de nueva orden',
         hint: 'Define si el alta de reparaciones se completa en una sola pantalla o por pasos.',
     },
+    repair_orders_per_page: {
+        label: 'Ordenes por pagina',
+        hint: 'Cantidad de tickets por pagina en consultas, estados, entregados y archivados. Minimo 24.',
+    },
 };
 
 export default function SettingsPage({ settings, whatsappDisplay }: SettingsPageProps): JSX.Element {
@@ -134,6 +138,7 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
         'repair_cash_discount_note',
         'repair_quote_monthly_increment_percentage',
         'repair_intake_mode',
+        'repair_orders_per_page',
     ];
     const productCashKeys = [
         'product_sku_enabled',
@@ -198,8 +203,8 @@ export default function SettingsPage({ settings, whatsappDisplay }: SettingsPage
                 ) : (
                     <input
                         className={ui.input}
-                        type={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' || key === 'catalog_new_days' || key === 'catalog_product_image_rotation_ms' || key === 'product_detail_description_word_limit' ? 'number' : 'text'}
-                        min={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' ? '0' : undefined}
+                        type={key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'repair_orders_per_page' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' || key === 'catalog_new_days' || key === 'catalog_product_image_rotation_ms' || key === 'product_detail_description_word_limit' ? 'number' : 'text'}
+                        min={key === 'repair_orders_per_page' ? '24' : (key === 'repair_cash_discount_threshold' || key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'product_cash_discount_threshold' || key === 'product_cash_discount_percentage' ? '0' : undefined)}
                         step={key === 'repair_cash_discount_percentage' || key === 'repair_quote_monthly_increment_percentage' || key === 'product_cash_discount_percentage' ? '0.1' : undefined}
                         value={value}
                         onChange={(event) =>

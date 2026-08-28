@@ -1,6 +1,6 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { WebcamCaptureButton } from '../../components/WebcamCaptureButton';
@@ -65,6 +65,7 @@ interface WorkbenchPageProps {
         filter_estimada?: string;
         filter_saldo?: string;
         filter_estado?: string;
+        page?: number;
         q_fields?: string[];
     };
     tickets: RepairTicketView[];
@@ -83,6 +84,12 @@ interface WorkbenchPageProps {
     };
     deliveredSearchMatches: number;
     archivedSearchMatches: number;
+    pagination: {
+        page: number;
+        totalPages: number;
+        total: number;
+        perPage: number;
+    };
     states: string[];
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates: ServiceTemplateOption[];
@@ -708,6 +715,7 @@ export default function WorkbenchPage({
     pageMode = 'consultas',
     intakeMode = 'continuous',
     archivedSearchMatches,
+    pagination,
     initialCreateClient = null,
 }: WorkbenchPageProps): JSX.Element {
     const isConsultas = pageMode === 'consultas';
@@ -735,6 +743,7 @@ export default function WorkbenchPage({
         filter_estimada: filters.filter_estimada ?? '',
         filter_saldo: filters.filter_saldo ?? '',
         filter_estado: filters.filter_estado ?? '',
+        page: filters.page ?? 1,
     });
     const createForm = useForm<WorkbenchCreateFormData>({
         id_orden: String(nextOrderId),
@@ -829,6 +838,8 @@ export default function WorkbenchPage({
             ...columnFilterQuery,
             ...overrides,
         });
+    const paginationHref = (page: number): string => route('repairs.workbench', filterQuery({ page }));
+    const paginationSummary = `Mostrando ${visibleRepairs} reparacion${visibleRepairs === 1 ? '' : 'es'} en ${tickets.length} orden${tickets.length === 1 ? '' : 'es'}. Pagina ${pagination.page} de ${pagination.totalPages}. Total: ${pagination.total}.`;
 
     const submitCleanSearch = (preserveScroll = false): void => {
         const query = filtersForm.data.q.trim();
@@ -2976,6 +2987,32 @@ export default function WorkbenchPage({
                         </>
                     ) : null}
                 </div>
+
+                {isConsultas ? (
+                    <div className={ui.pagination}>
+                        <span>{paginationSummary}</span>
+                        <div className={ui.inlineActions}>
+                            {pagination.page > 1 ? (
+                                <Link href={paginationHref(Math.max(1, pagination.page - 1))} preserveScroll className={buttonClass('soft', 'sm')}>
+                                    <FaChevronLeft aria-hidden="true" /> Anterior
+                                </Link>
+                            ) : (
+                                <button type="button" className={buttonClass('soft', 'sm')} disabled>
+                                    <FaChevronLeft aria-hidden="true" /> Anterior
+                                </button>
+                            )}
+                            {pagination.page < pagination.totalPages ? (
+                                <Link href={paginationHref(Math.min(pagination.totalPages, pagination.page + 1))} preserveScroll className={buttonClass('soft', 'sm')}>
+                                    Siguiente <FaChevronRight aria-hidden="true" />
+                                </Link>
+                            ) : (
+                                <button type="button" className={buttonClass('soft', 'sm')} disabled>
+                                    Siguiente <FaChevronRight aria-hidden="true" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ) : null}
             </section>
             ) : null}
         </RepairLayout>

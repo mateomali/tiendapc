@@ -108,6 +108,7 @@ class WorkbenchController extends Controller
             'filter_saldo' => ['nullable', 'string'],
             'filter_estado' => ['nullable', 'string'],
             'from_order' => ['nullable', 'integer', 'min:1'],
+            'page' => ['nullable', 'integer', 'min:1'],
             'q_fields' => ['nullable', 'array'],
             'q_fields.*' => ['string'],
         ]);
@@ -129,11 +130,18 @@ class WorkbenchController extends Controller
         }
 
         $orders = $repairService->activeOrders($filters);
+        $allTickets = collect($this->groupTickets($orders, false));
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $perPage = $this->repairOrdersPerPage();
+        $totalPages = max(1, (int) ceil(max(1, $allTickets->count()) / $perPage));
+        $page = min($page, $totalPages);
+        $tickets = $allTickets->forPage($page, $perPage)->values()->all();
         $deliveredSearchOrders = $searchTerm !== ''
             ? $repairService->deliveredOrders([
                 ...$filters,
                 'estado' => '',
                 'prioridad' => '',
+                'page' => '',
             ])
             : collect();
         $deliveredSearchMatches = $deliveredSearchOrders->count();
@@ -147,7 +155,7 @@ class WorkbenchController extends Controller
 
         return Inertia::render('Repairs/WorkbenchPage', [
             'filters' => $filters,
-            'tickets' => $this->groupTickets($orders, false),
+            'tickets' => $tickets,
             'deliveredSearchTickets' => $this->groupTickets($deliveredSearchOrders, true),
             'summary' => $repairService->summary($filters),
             'deliveredSearchMatches' => $deliveredSearchMatches,
@@ -168,6 +176,12 @@ class WorkbenchController extends Controller
                 'dni' => $prefillOrder->dni,
                 'contacto' => $prefillOrder->contacto,
             ] : null,
+            'pagination' => [
+                'page' => $page,
+                'perPage' => $perPage,
+                'total' => $allTickets->count(),
+                'totalPages' => $totalPages,
+            ],
         ]);
     }
 
@@ -203,7 +217,7 @@ class WorkbenchController extends Controller
         $orders = $repairService->deliveredOrders($filters);
         $allTickets = collect($this->groupTickets($orders, true));
         $page = max(1, (int) ($filters['page'] ?? 1));
-        $perPage = 12;
+        $perPage = $this->repairOrdersPerPage();
         $tickets = $allTickets->forPage($page, $perPage)->values()->all();
 
         return Inertia::render('Repairs/DeliveredPage', [
@@ -238,7 +252,7 @@ class WorkbenchController extends Controller
         $orders = $repairService->archivedOrders($filters);
         $allTickets = collect($this->groupTickets($orders, false));
         $page = max(1, (int) ($filters['page'] ?? 1));
-        $perPage = 12;
+        $perPage = $this->repairOrdersPerPage();
         $tickets = $allTickets->forPage($page, $perPage)->values()->all();
 
         return Inertia::render('Repairs/DeliveredPage', [
@@ -1331,6 +1345,11 @@ class WorkbenchController extends Controller
             ],
             'availableStates' => $availableStates,
         ];
+    }
+
+    private function repairOrdersPerPage(): int
+    {
+        return max(24, min(200, (int) SiteGlobalConfig::value('repair_orders_per_page', '24')));
     }
 
     /**

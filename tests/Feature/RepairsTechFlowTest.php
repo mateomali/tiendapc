@@ -20,6 +20,100 @@ it('authenticates repair tech users and renders workbench', function (): void {
         ->assertInertia(fn (Assert $page) => $page->component('Repairs/WorkbenchPage'));
 });
 
+it('paginates active repair consultations without splitting orders', function (): void {
+    SiteGlobalConfig::putValue('repair_orders_per_page', '24');
+
+    foreach (range(3001, 3025) as $orderId) {
+        RepairOrder::query()->create([
+            'id' => $orderId,
+            'reparacion' => 1,
+            'fecha' => now()->toDateString(),
+            'nombre_cliente' => "Cliente {$orderId}",
+            'dni' => 12345678,
+            'modelo' => "Modelo {$orderId}",
+            'descripcion' => 'Revision general',
+            'estado' => 'PENDIENTE',
+            'entregado' => 'no',
+        ]);
+    }
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 24)
+            ->where('tickets.0.id', 3025)
+            ->where('pagination.page', 1)
+            ->where('pagination.perPage', 24)
+            ->where('pagination.total', 25)
+            ->where('pagination.totalPages', 2));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['page' => 2]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 1)
+            ->where('tickets.0.id', 3001)
+            ->where('pagination.page', 2)
+            ->where('pagination.total', 25)
+            ->where('pagination.totalPages', 2));
+});
+
+it('uses configured repair orders per page for active and delivered lists', function (): void {
+    SiteGlobalConfig::putValue('repair_orders_per_page', '30');
+
+    foreach (range(3101, 3131) as $orderId) {
+        RepairOrder::query()->create([
+            'id' => $orderId,
+            'reparacion' => 1,
+            'fecha' => now()->toDateString(),
+            'nombre_cliente' => "Activo {$orderId}",
+            'dni' => 12345678,
+            'modelo' => "Modelo {$orderId}",
+            'descripcion' => 'Revision general',
+            'estado' => 'PENDIENTE',
+            'entregado' => 'no',
+        ]);
+    }
+
+    foreach (range(3201, 3231) as $orderId) {
+        RepairOrder::query()->create([
+            'id' => $orderId,
+            'reparacion' => 1,
+            'fecha' => now()->toDateString(),
+            'nombre_cliente' => "Entregado {$orderId}",
+            'dni' => 12345678,
+            'modelo' => "Modelo {$orderId}",
+            'descripcion' => 'Revision general',
+            'estado' => 'ENTREGADA',
+            'entregado' => 'si',
+            'fecha_entregado' => now()->toDateString(),
+        ]);
+    }
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->has('tickets', 30)
+            ->where('pagination.perPage', 30)
+            ->where('pagination.total', 31)
+            ->where('pagination.totalPages', 2));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.delivered'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/DeliveredPage')
+            ->has('tickets', 30)
+            ->where('pagination.perPage', 30)
+            ->where('pagination.total', 31)
+            ->where('pagination.totalPages', 2));
+});
+
 it('shows delivered repairs in the dedicated technical view', function (): void {
     RepairOrder::query()->create([
         'id' => 501,
