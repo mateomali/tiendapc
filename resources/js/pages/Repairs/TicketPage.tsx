@@ -30,7 +30,6 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, minute: '2-digit' });
     const trackingVerifier = ticket.trackingVerifier || String(ticket.dni);
-    const trackingVerifierLabel = ticket.hasClientDni ? 'DNI:' : 'PIN:';
     const hasIncrements = ticket.repairs.some((repair) => (repair.payments ?? []).some((payment) => payment.payment_type === 'incremento'));
     const generalFinancial = ticketFinancialSummary(ticket.repairs, ticketPricing);
     const repairPrintItems = ticket.repairs.map((repair, index) => {
@@ -59,7 +58,6 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
             hasDeposits,
             canUseCompactPrice,
             compactPriceLabel: monto > 0 ? formatCurrency(financial.cashTotal) : 'A PRESUPUESTAR',
-            cashDueLabel: financial.cashDue <= 0 ? 'PAGADO' : formatCurrency(financial.cashDue),
         };
     });
     const repairPrintGroups = repairPrintItems.reduce<Array<{ key: string; modelLabel: string; items: typeof repairPrintItems }>>((groups, item) => {
@@ -134,7 +132,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                         <div className="mb-[3px] text-[12px]">{hasIncrements ? 'TICKET ACTUALIZADO' : 'COMPROBANTE DE INGRESO'}</div>
                         <TicketLine label="ORDEN N:" value={`#${ticket.id}`} variant="highlight" />
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
-                        <TicketLine label={trackingVerifierLabel} value={trackingVerifier} />
+                        {!ticket.hasClientDni ? <TicketLine label="CODIGO:" value={trackingVerifier} /> : null}
                         <TicketLine label="FECHA:" value={fecha} />
                         <TicketLine label="HORA:" value={hora} />
                     </section>

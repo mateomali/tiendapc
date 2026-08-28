@@ -4,8 +4,10 @@ namespace App\Http\Middleware;
 
 use App\Services\CartService;
 use App\Services\SiteViewDataService;
+use Closure;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
+use Symfony\Component\HttpFoundation\Response;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -17,6 +19,22 @@ class HandleInertiaRequests extends Middleware
      * @var string
      */
     protected $rootView = 'app';
+
+    public function handle(Request $request, Closure $next): Response
+    {
+        $response = parent::handle($request, $next);
+
+        if ($request->headers->has('X-Inertia') || $response->headers->has('X-Inertia') || str_contains((string) $response->headers->get('Content-Type'), 'text/html')) {
+            $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
+            $response->headers->set('Pragma', 'no-cache');
+            $response->headers->set('Expires', '0');
+            $this->appendVaryHeader($response, 'X-Inertia');
+            $this->appendVaryHeader($response, 'X-Inertia-Version');
+            $this->appendVaryHeader($response, 'Accept');
+        }
+
+        return $response;
+    }
 
     /**
      * Determines the current asset version.
@@ -59,5 +77,19 @@ class HandleInertiaRequests extends Middleware
                 'error' => fn () => $request->session()->get('error'),
             ],
         ];
+    }
+
+    private function appendVaryHeader(Response $response, string $header): void
+    {
+        $vary = collect(explode(',', (string) $response->headers->get('Vary')))
+            ->map(fn (string $value): string => trim($value))
+            ->filter()
+            ->all();
+
+        if (! in_array($header, $vary, true)) {
+            $vary[] = $header;
+        }
+
+        $response->headers->set('Vary', implode(', ', $vary));
     }
 }
