@@ -27,6 +27,7 @@ class RepairService
     public const ACTIVE_STATES = [
         'PENDIENTE',
         'EN REPARACION / ESPERA REPUESTO',
+        'GARANTIA',
         'LISTA',
         'CANCELADA',
     ];
@@ -208,6 +209,50 @@ class RepairService
                 'usage_count' => $deviceModel->usage_count,
             ])
             ->all();
+    }
+
+    public function suggestedPhonePrices(): array
+    {
+        if (! Schema::hasTable('ordenes')) {
+            return [];
+        }
+
+        $suggestions = [];
+
+        RepairOrder::query()
+            ->where('categorias_reparacion', 1)
+            ->whereNotNull('modelo')
+            ->where('modelo', '!=', '')
+            ->whereNotNull('descripcion')
+            ->where('descripcion', '!=', '')
+            ->where('monto', '>', 0)
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->orderByDesc('reparacion')
+            ->limit(1500)
+            ->get(['id', 'reparacion', 'fecha', 'marca', 'modelo', 'descripcion', 'monto'])
+            ->each(function (RepairOrder $order) use (&$suggestions): void {
+                $normalizedModel = $this->stripBrandFromModel(
+                    $this->normalizeDeviceModel((string) $order->modelo),
+                    $this->normalizeDeviceModel((string) $order->marca),
+                );
+                $normalizedModel = $this->stripBrandFromModel($normalizedModel, 'MOTO');
+                $normalizedRepairType = $this->normalizeRepairSuggestionType((string) $order->descripcion);
+
+                if ($normalizedModel === '' || $normalizedRepairType === '' || isset($suggestions[$normalizedModel][$normalizedRepairType])) {
+                    return;
+                }
+
+                $suggestions[$normalizedModel][$normalizedRepairType] = [
+                    'amount' => (float) $order->monto,
+                    'date' => $order->fecha?->toDateString(),
+                    'order_id' => (int) $order->id,
+                    'repair_number' => (int) $order->reparacion,
+                    'repair_type' => $order->descripcion,
+                ];
+            });
+
+        return $suggestions;
     }
 
     public function serviceOptionRows(): array
@@ -565,6 +610,9 @@ class RepairService
             $nextCancellationReason = Str::upper($nextState) === 'CANCELADA'
                 ? $this->normalizeCancellationReason((string) ($payload['cancelado_motivo'] ?? $order->cancelado_motivo ?? ''))
                 : null;
+            $nextWarrantyReason = Str::upper($nextState) === 'GARANTIA'
+                ? $this->normalizeWarrantyReason((string) ($payload['garantia_motivo'] ?? $order->garantia_motivo ?? ''))
+                : $order->garantia_motivo;
 
             $order->fill([
                 'id' => $newOrderId,
@@ -586,6 +634,7 @@ class RepairService
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => $nextState,
                 'cancelado_motivo' => $nextCancellationReason,
+                'garantia_motivo' => $nextWarrantyReason,
                 'fecha_entregado' => $payload['fecha_entregado'] ?? $order->fecha_entregado,
                 'repuesto' => ($activePartRequest || $allocation !== null) && $part !== '' ? $part : null,
                 'repuesto_pedido' => $activePartRequest,
@@ -627,6 +676,35 @@ class RepairService
     public function updateState(RepairOrder $order, string $state, ?string $cancellationReason = null): RepairOrder
     {
         return $this->setState($order, $state, 'CAMBIO_ESTADO_DIRECTO', $cancellationReason);
+    }
+
+    public function reopenWarranty(RepairOrder $order, string $reason): RepairOrder
+    {
+        $reason = $this->normalizeWarrantyReason($reason);
+        $previousState = $order->estado;
+        $originalEntryDate = $order->fecha?->toDateString();
+
+        $order->update([
+            'fecha' => now()->toDateString(),
+            'estado' => 'GARANTIA',
+            'entregado' => 'no',
+            'fecha_entregado' => null,
+            'archivado_at' => null,
+            'archivado_motivo' => null,
+            'cancelado_motivo' => null,
+            'garantia_motivo' => $reason,
+        ]);
+
+        $this->syncTaskQueueForState($order, 'GARANTIA');
+        $this->recordEvent(
+            $order,
+            'GARANTIA_REINGRESO',
+            $previousState,
+            'GARANTIA',
+            $originalEntryDate !== null ? 'Ingreso original: ' . $originalEntryDate : null,
+        );
+
+        return $order->refresh();
     }
 
     public function cancel(RepairOrder $order, string $reason): RepairOrder
@@ -1016,6 +1094,17 @@ class RepairService
         return Str::limit($reason, 1000, '');
     }
 
+    private function normalizeWarrantyReason(string $reason): string
+    {
+        $reason = trim(preg_replace('/\s+/', ' ', $reason) ?? '');
+
+        if ($reason === '') {
+            throw new \RuntimeException('Indica el motivo de garantia.');
+        }
+
+        return Str::limit($reason, 1000, '');
+    }
+
     private function syncTaskQueueForState(RepairOrder $order, string $state): void
     {
         if (! in_array(Str::upper($state), ['LISTA', 'CANCELADA'], true)) {
@@ -1298,13 +1387,14 @@ class RepairService
         return $usage;
     }
 
-    public function recordEvent(RepairOrder $order, string $event, ?string $previousState, ?string $nextState): void
+    public function recordEvent(RepairOrder $order, string $event, ?string $previousState, ?string $nextState, ?string $detail = null): void
     {
         RepairEvent::query()->create([
             'orden_id' => $order->id,
             'reparacion' => $order->reparacion,
-                'usuario' => auth()->check() ? (string) auth()->user()?->name : (session('repair_tech_authenticated') ? 'panel' : 'sistema'),
+            'usuario' => auth()->check() ? (string) auth()->user()?->name : (session('repair_tech_authenticated') ? 'panel' : 'sistema'),
             'evento' => $event,
+            'detalle' => $detail,
             'estado_anterior' => $previousState,
             'estado_nuevo' => $nextState,
         ]);
@@ -2055,6 +2145,21 @@ class RepairService
     private function uppercaseFailure(string $value): string
     {
         return trim(preg_replace('/\s+/', ' ', Str::upper($value)) ?? '');
+    }
+
+    private function normalizeRepairSuggestionType(string $value): string
+    {
+        $lines = preg_split('/\R+/', $value) ?: [];
+
+        foreach ($lines as $line) {
+            $normalized = $this->normalizeDeviceModel($line);
+
+            if ($normalized !== '') {
+                return $normalized;
+            }
+        }
+
+        return '';
     }
 
     /**

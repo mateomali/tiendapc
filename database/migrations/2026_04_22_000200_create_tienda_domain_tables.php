@@ -229,6 +229,7 @@ return new class extends Migration
             $table->string('estado', 80)->default('PENDIENTE');
             $table->string('entregado', 5)->default('no');
             $table->date('fecha_entregado')->nullable();
+            $table->text('garantia_motivo')->nullable();
             $table->string('imagen', 500)->nullable();
             $table->string('imagen3', 500)->nullable();
             $table->string('imagen4', 500)->nullable();
@@ -246,6 +247,7 @@ return new class extends Migration
             $table->unsignedInteger('reparacion')->default(1);
             $table->string('usuario', 120)->default('sistema');
             $table->string('evento', 120);
+            $table->text('detalle')->nullable();
             $table->string('estado_anterior', 120)->nullable();
             $table->string('estado_nuevo', 120)->nullable();
             $table->timestamp('created_at')->nullable()->useCurrent();

@@ -15,6 +15,7 @@ class RepairEvent extends Model
         'reparacion',
         'usuario',
         'evento',
+        'detalle',
         'estado_anterior',
         'estado_nuevo',
         'created_at',

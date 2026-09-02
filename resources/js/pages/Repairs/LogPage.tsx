@@ -12,6 +12,7 @@ interface LogEventView {
     event: string;
     label: string;
     tone: string;
+    detail?: string | null;
     orderId: number;
     repairNumber: number;
     customerName?: string | null;
@@ -49,6 +50,7 @@ function logSearchText(event: LogEventView): string {
         event.customerName ?? '',
         event.model ?? '',
         event.description ?? '',
+        event.detail ?? '',
         event.previousState ?? '',
         event.nextState ?? '',
         event.user ?? '',
@@ -82,6 +84,7 @@ function LogRow({ event }: { event: LogEventView }): JSX.Element {
                 </div>
                 <div className="mt-1 grid gap-0.5 text-sm font-semibold text-[#334155]">
                     <span className="truncate">{event.customerName || 'Sin cliente'}{event.model ? ` - ${event.model}` : ''}</span>
+                    {event.detail ? <span className="truncate text-xs text-[#475569]">{event.detail}</span> : null}
                     {event.description ? <span className="truncate text-xs text-[#64748b]">{event.description}</span> : null}
                     {event.user ? <span className="text-xs text-[#64748b]">Usuario: {event.user}</span> : null}
                 </div>

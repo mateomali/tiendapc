@@ -50,6 +50,7 @@ class RepairOrder extends Model
         'archivado_at',
         'archivado_motivo',
         'cancelado_motivo',
+        'garantia_motivo',
         'imagen',
         'imagen3',
         'imagen4',

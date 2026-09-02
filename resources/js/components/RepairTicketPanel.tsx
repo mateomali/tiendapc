@@ -80,6 +80,7 @@ interface RepairUpdateFormData {
     fecha_estimada: string;
     estado: string;
     cancelado_motivo: string;
+    garantia_motivo: string;
     fecha_entregado: string;
     repuesto: string;
     repuesto_pedido: boolean;
@@ -167,6 +168,7 @@ function repairStatusHeaderClass(status: string): string {
 
     if (normalized === 'LISTA') return 'border-l-4 border-l-[#198754] bg-[#f8fafc] text-[#0f172a]';
     if (normalized === 'CANCELADA') return 'border-l-4 border-l-[#dc3545] bg-[#f8fafc] text-[#0f172a]';
+    if (normalized === 'GARANTIA') return 'border-l-4 border-l-[#0f766e] bg-[#f8fafc] text-[#0f172a]';
     if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-4 border-l-[#6d28d9] bg-[#f8fafc] text-[#0f172a]';
     if (normalized === 'PENDIENTE') return 'border-l-4 border-l-[#d97706] bg-[#f8fafc] text-[#0f172a]';
 
@@ -178,6 +180,7 @@ function repairStatusBadgeClass(status: string): string {
 
     if (normalized === 'LISTA') return 'rounded-full border border-[#86efac] bg-[#dcfce7] text-[#166534]';
     if (normalized === 'CANCELADA') return 'rounded-full border border-[#fecdd3] bg-[#fff1f2] text-[#be123c]';
+    if (normalized === 'GARANTIA') return 'rounded-full border border-[#5eead4] bg-[#ccfbf1] text-[#115e59]';
     if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'rounded-full border border-[#c4b5fd] bg-[#f5f3ff] text-[#5b21b6]';
     if (normalized === 'PENDIENTE') return 'rounded-full border border-[#fde68a] bg-[#fef3c7] text-[#92400e]';
 
@@ -189,6 +192,7 @@ function repairStatusDotClass(status: string): string {
 
     if (normalized === 'LISTA') return 'bg-[#16a34a]';
     if (normalized === 'CANCELADA') return 'bg-[#dc2626]';
+    if (normalized === 'GARANTIA') return 'bg-[#0f766e]';
     if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#7c3aed]';
     if (normalized === 'PENDIENTE') return 'bg-[#f59e0b]';
 
@@ -200,6 +204,7 @@ function repairStatusRailClass(status: string): string {
 
     if (normalized === 'LISTA') return 'border-l-[#16a34a]';
     if (normalized === 'CANCELADA') return 'border-l-[#dc2626]';
+    if (normalized === 'GARANTIA') return 'border-l-[#0f766e]';
     if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-[#7c3aed]';
     if (normalized === 'PENDIENTE') return 'border-l-[#f59e0b]';
 
@@ -211,6 +216,7 @@ function repairStatusRailFillClass(status: string): string {
 
     if (normalized === 'LISTA') return 'before:bg-[#16a34a]';
     if (normalized === 'CANCELADA') return 'before:bg-[#dc2626]';
+    if (normalized === 'GARANTIA') return 'before:bg-[#0f766e]';
     if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'before:bg-[#7c3aed]';
     if (normalized === 'PENDIENTE') return 'before:bg-[#f59e0b]';
 
@@ -230,6 +236,7 @@ function repairStatusSelectClass(status: string): string {
 
     if (normalized === 'LISTA') return 'border-[#198754] bg-[#eaf7ef] text-[#0f5132]';
     if (normalized === 'CANCELADA') return 'border-[#dc3545] bg-[#fdecef] text-[#842029]';
+    if (normalized === 'GARANTIA') return 'border-[#0f766e] bg-[#ccfbf1] text-[#115e59]';
     if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-[#6d28d9] bg-[#f0eaff] text-[#4c1d95]';
     if (normalized === 'PENDIENTE') return 'border-[#ffc107] bg-[#fff8db] text-[#664d03]';
 
@@ -241,6 +248,7 @@ function repairStatusTextClass(status: string): string {
 
     if (normalized === 'LISTA') return 'text-[#198754]';
     if (normalized === 'CANCELADA') return 'text-[#dc3545]';
+    if (normalized === 'GARANTIA') return 'text-[#0f766e]';
     if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'text-[#6d28d9]';
     if (normalized === 'PENDIENTE') return 'text-[#b45309]';
 
@@ -261,6 +269,7 @@ function desktopGroupedRepairClass(index: number): string {
 function nextQuickStatus(status: string): string {
     if (status === 'PENDIENTE') return 'EN REPARACION';
     if (status === 'EN REPARACION' || status === 'EN REPARACION / ESPERA REPUESTO') return 'LISTA';
+    if (status === 'GARANTIA') return 'LISTA';
     if (status === 'LISTA') return 'PENDIENTE';
 
     return status;
@@ -1371,6 +1380,7 @@ function RepairEditCard({
         fecha_estimada: repair.fecha_estimada ?? '',
         estado: repair.estado,
         cancelado_motivo: repair.cancelado_motivo ?? '',
+        garantia_motivo: repair.garantia_motivo ?? '',
         fecha_entregado: repair.fecha_entregado ?? '',
         repuesto: repair.repuesto ?? '',
         repuesto_pedido: Boolean(repair.repuesto_pedido),
@@ -1404,6 +1414,8 @@ function RepairEditCard({
     const [deliveryArchive, setDeliveryArchive] = useState(false);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState(repair.cancelado_motivo ?? '');
+    const [warrantyOpen, setWarrantyOpen] = useState(false);
+    const [warrantyReason, setWarrantyReason] = useState(repair.garantia_motivo ?? '');
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [finalImagePreviews, setFinalImagePreviews] = useState<string[]>([]);
@@ -1413,15 +1425,15 @@ function RepairEditCard({
     const seniaLabel = seniaBadgeLabel(monto, senia);
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
-    const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'].includes(repair.estado);
+    const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA'].includes(repair.estado);
     const canDeliver = ['LISTA', 'CANCELADA'].includes(repair.estado) && repair.entregado !== 'si';
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
-    const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'LISTA'].includes(repair.estado);
+    const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA', 'LISTA'].includes(repair.estado);
     const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
     const nextStatus = nextQuickStatus(repair.estado);
     const displayStatus = statusLabel?.(repair) ?? compactStatus(repair.estado);
     const unlockLabel = phoneUnlockLabel(repair.unlock_type, repair.unlock_value);
-    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.cancelado_motivo || repair.contacto || repair.dni || unlockLabel);
+    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.cancelado_motivo || repair.garantia_motivo || repair.contacto || repair.dni || unlockLabel);
     const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
@@ -1671,6 +1683,14 @@ function RepairEditCard({
         }));
     };
 
+    const changeInlineState = (value: string): void => {
+        form.setData((current) => ({
+            ...current,
+            estado: value,
+            cancelado_motivo: value === 'CANCELADA' ? current.cancelado_motivo : '',
+        }));
+    };
+
     const clearAmountForTyping = (field: 'monto' | 'senia'): void => {
         const value = form.data[field] ?? '';
 
@@ -1739,9 +1759,44 @@ function RepairEditCard({
 
     const moveBackToConsultas = (): void => {
         if (!repair.actions?.moveBack) return;
+
+        if (repair.entregado === 'si') {
+            setWarrantyReason(repair.garantia_motivo ?? '');
+            setWarrantyOpen(true);
+            return;
+        }
+
         if (window.confirm(`Devolver orden #${repair.id} trabajo #${repair.reparacion} a consultas?`)) {
             router.post(repair.actions.moveBack, {}, { preserveScroll: true });
         }
+    };
+
+    const submitWarrantyReentry = (event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        if (!repair.actions?.moveBack) return;
+
+        const reason = warrantyReason.trim();
+        if (reason === '') {
+            window.alert('Indica el motivo de garantia.');
+            return;
+        }
+
+        router.post(
+            repair.actions.moveBack,
+            { garantia_motivo: reason },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    form.setData((current) => ({
+                        ...current,
+                        estado: 'GARANTIA',
+                        garantia_motivo: reason,
+                        fecha_entregado: '',
+                    }));
+                    setWarrantyOpen(false);
+                },
+            },
+        );
     };
 
     const deliverRepair = (event: FormEvent<HTMLFormElement>): void => {
@@ -1862,11 +1917,23 @@ function RepairEditCard({
                                 <input className={ui.repairDenseInput} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                             </EditField>
                             <EditField label="Estado">
-                                <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
+                                <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => changeInlineState(event.target.value)}>
                                     {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
                                 </select>
                             </EditField>
                         </div>
+                        {form.data.estado === 'GARANTIA' ? (
+                            <EditField label="Motivo de garantia">
+                                <textarea
+                                    className={ui.repairDenseTextarea}
+                                    value={form.data.garantia_motivo}
+                                    onChange={(event) => form.setData('garantia_motivo', event.target.value)}
+                                    rows={3}
+                                    required
+                                    placeholder="Ej: volvio por falla intermitente, pantalla sin imagen, bateria no carga..."
+                                />
+                            </EditField>
+                        ) : null}
                         <span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
                     </div>
 
@@ -1981,7 +2048,7 @@ function RepairEditCard({
                     <input className={ui.repairDenseInput} value={form.data.senia} inputMode="decimal" onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
                 </EditField>
                 <EditField label="Estado">
-                    <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
+                    <select className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado))} value={form.data.estado} onChange={(event) => changeInlineState(event.target.value)}>
                         {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
                     </select>
                 </EditField>
@@ -1990,6 +2057,18 @@ function RepairEditCard({
                     <strong className="text-sm text-[#0f172a]">Saldo {formatCurrency(Math.max(0, Number(form.data.monto || 0) - Number(form.data.senia || 0)))}</strong>
                 </div>
             </div>
+            {form.data.estado === 'GARANTIA' ? (
+                <EditField label="Motivo de garantia">
+                    <textarea
+                        className={ui.repairDenseTextarea}
+                        value={form.data.garantia_motivo}
+                        onChange={(event) => form.setData('garantia_motivo', event.target.value)}
+                        rows={3}
+                        required
+                        placeholder="Ej: volvio por falla intermitente, pantalla sin imagen, bateria no carga..."
+                    />
+                </EditField>
+            ) : null}
 
             <div className="grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2 xl:grid-cols-[minmax(180px,1fr)_120px_140px_auto] xl:items-end">
                 <input
@@ -2547,14 +2626,7 @@ function RepairEditCard({
                                     <select
                                         className={cn(ui.repairDenseInput, 'font-extrabold', repairStatusSelectClass(form.data.estado), hasChangedValue(form.data.estado, repair.estado) && 'ring-2 ring-[#2563eb]')}
                                         value={form.data.estado}
-                                        onChange={(event) => {
-                                            const nextState = event.target.value;
-                                            form.setData((current) => ({
-                                                ...current,
-                                                estado: nextState,
-                                                cancelado_motivo: nextState === 'CANCELADA' ? current.cancelado_motivo : '',
-                                            }));
-                                        }}
+                                        onChange={(event) => changeInlineState(event.target.value)}
                                         disabled={readOnly}
                                     >
                                         {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
@@ -2570,6 +2642,19 @@ function RepairEditCard({
                                             disabled={readOnly}
                                             required
                                             placeholder="Ej: el cliente no autoriza el presupuesto, no se consigue repuesto, equipo sin solucion..."
+                                        />
+                                    </EditField>
+                                ) : null}
+                                {form.data.estado === 'GARANTIA' ? (
+                                    <EditField label="Motivo de garantia">
+                                        <textarea
+                                            className={changedTextareaClass(form.data.garantia_motivo, repair.garantia_motivo ?? '')}
+                                            value={form.data.garantia_motivo}
+                                            onChange={(event) => form.setData('garantia_motivo', event.target.value)}
+                                            rows={3}
+                                            disabled={readOnly}
+                                            required
+                                            placeholder="Ej: volvio por falla intermitente, pantalla sin imagen, bateria no carga..."
                                         />
                                     </EditField>
                                 ) : null}
@@ -2668,9 +2753,14 @@ function RepairEditCard({
                             <div className="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
                                 <strong className="text-sm text-[#0f172a]">Historial</strong>
                                 {repair.events.map((event) => (
-                                    <div key={event.id} className="flex justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs">
-                                        <strong>{event.evento}</strong>
-                                        <span>{event.created_at || event.estado_nuevo || 'Actualizado'}</span>
+                                    <div key={event.id} className="grid gap-1 rounded-lg bg-white px-3 py-2 text-xs">
+                                        <div className="flex justify-between gap-3">
+                                            <strong>{event.evento}</strong>
+                                            <span>{event.created_at || event.estado_nuevo || 'Actualizado'}</span>
+                                        </div>
+                                        {event.detalle ? (
+                                            <span className="font-semibold text-[#475569]">{event.detalle}</span>
+                                        ) : null}
                                     </div>
                                 ))}
                             </div>
@@ -2705,6 +2795,31 @@ function RepairEditCard({
                         <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setCancelOpen(false)}>Volver</button>
                             <button type="submit" className={buttonClass('danger', 'sm')}>Confirmar cancelacion</button>
+                        </div>
+                    </form>
+                </ModalShell>
+            ) : null}
+            {warrantyOpen ? (
+                <ModalShell title={`Reingreso por garantia #${repair.id} trabajo #${repair.reparacion}`} onClose={() => setWarrantyOpen(false)}>
+                    <form className="grid gap-3" onSubmit={submitWarrantyReentry}>
+                        <p className="rounded-lg border border-[#5eead4] bg-[#ccfbf1] px-3 py-2 text-sm font-bold text-[#115e59]">
+                            La orden vuelve a consultas con estado GARANTIA y queda disponible para corregirla.
+                        </p>
+                        <label className="grid gap-1.5 text-sm font-black text-[#334155]">
+                            Motivo de garantia
+                            <textarea
+                                className={ui.textarea}
+                                value={warrantyReason}
+                                onChange={(event) => setWarrantyReason(event.target.value)}
+                                rows={4}
+                                required
+                                autoFocus
+                                placeholder="Ej: volvio por falla intermitente, pantalla sin imagen, bateria no carga..."
+                            />
+                        </label>
+                        <div className="flex flex-wrap justify-end gap-2">
+                            <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setWarrantyOpen(false)}>Volver</button>
+                            <button type="submit" className={buttonClass('primary', 'sm')}>Reingresar por garantia</button>
                         </div>
                     </form>
                 </ModalShell>
@@ -2847,7 +2962,7 @@ function RepairEditCard({
                                 ) : null}
                                 {repair.actions?.moveBack ? (
                                     <button type="button" className="rounded-md border border-[#f59e0b] bg-[#fff7ed] px-2 py-1 text-[0.66rem] font-black uppercase text-[#92400e] transition hover:bg-[#ffedd5]" onClick={moveBackToConsultas}>
-                                        A consultas
+                                        Garantia
                                     </button>
                                 ) : null}
                                 {rowIndex === 0 && ticket.newOrderUrl ? (
@@ -2942,6 +3057,7 @@ function RepairEditCard({
                             onClick={!readOnly && canCycleStatus && !form.processing ? cycleDesktopStatus : undefined}
                         />
                         {repair.estado === 'CANCELADA' && repair.cancelado_motivo ? <FieldSummary label="Motivo" value={<HighlightText value={repair.cancelado_motivo} term={highlightTerm} />} className="col-span-2 border border-slate-200 bg-white" onClick={openInlineEditor} /> : null}
+                        {repair.estado === 'GARANTIA' && repair.garantia_motivo ? <FieldSummary label="Garantia" value={<HighlightText value={repair.garantia_motivo} term={highlightTerm} />} className="col-span-2 border border-teal-200 bg-teal-50" onClick={openInlineEditor} /> : null}
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                         {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
@@ -2953,7 +3069,7 @@ function RepairEditCard({
                     ) : null}
                     {readOnly && repair.actions?.moveBack ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={moveBackToConsultas}>
-                            Devolver a consultas
+                            Reingresar por garantia
                         </button>
                     ) : null}
                     {readOnly && rowIndex === 0 && ticket.newOrderUrl ? (
@@ -2973,6 +3089,7 @@ function RepairEditCard({
                                 <FieldSummary label="F. ingreso" value={<HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} />} onClick={openInlineEditor} />
                                 {repair.descripcion ? <FieldSummary label="Descripcion" value={<HighlightText value={repair.descripcion} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.cancelado_motivo ? <FieldSummary label="Motivo cancelacion" value={<HighlightText value={repair.cancelado_motivo} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
+                                {repair.garantia_motivo ? <FieldSummary label="Motivo garantia" value={<HighlightText value={repair.garantia_motivo} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.repuesto ? <FieldSummary label="Repuesto" value={repair.repuesto} onClick={openInlineEditor} /> : null}
                                 {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                                 {repair.observaciones ? <FieldSummary label="Observaciones" value={repair.observaciones} onClick={openInlineEditor} /> : null}

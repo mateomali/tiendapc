@@ -130,6 +130,7 @@ class PublicTrackingController extends Controller
             'fecha_estimada' => $this->rawOrderDate($order, 'fecha_estimada'),
             'estado' => $order->estado,
             'cancelado_motivo' => $order->cancelado_motivo,
+            'garantia_motivo' => $order->garantia_motivo,
             'entregado' => $order->entregado,
             'fecha_entregado' => $this->rawOrderDate($order, 'fecha_entregado'),
             'imagenes' => $this->serializePublicImageFiles($this->parseImageList((string) ($order->getRawOriginal('imagen') ?? '')), false),
@@ -143,6 +144,7 @@ class PublicTrackingController extends Controller
             ] : null,
             'events' => $order->events()->get()->map(fn ($event): array => [
                 'evento' => $event->evento,
+                'detalle' => $event->detalle,
                 'estado_anterior' => $event->estado_anterior,
                 'estado_nuevo' => $event->estado_nuevo,
                 'created_at' => optional($event->created_at)->format('Y-m-d H:i'),

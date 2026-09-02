@@ -43,6 +43,14 @@ interface DeviceModelOption {
     usage_count: number;
 }
 
+interface SuggestedRepairPrice {
+    amount: number;
+    date: string | null;
+    order_id: number;
+    repair_number: number;
+    repair_type: string;
+}
+
 interface WorkbenchPageProps {
     filters: {
         q?: string;
@@ -97,6 +105,7 @@ interface WorkbenchPageProps {
     serviceOptionUsage: Record<string, number>;
     partInventory: RepairPartInventoryOption[];
     deviceModels: DeviceModelOption[];
+    suggestedPricesByPhoneModel: Record<string, Record<string, SuggestedRepairPrice>>;
     nextOrderId: number;
     ticketPricing: TicketPricingSettings;
     pageMode?: 'consultas' | 'ingreso';
@@ -232,6 +241,27 @@ function removeBrandPrefix(value: string, brand: string): string {
     return normalizedValue === normalizedBrand
         ? ''
         : normalizedValue.replace(new RegExp(`^${normalizedBrand}\\s+`), '').trim();
+}
+
+function normalizeSuggestedPriceModel(value: string, brand = ''): string {
+    let normalized = removeBrandPrefix(value, brand);
+
+    for (const knownBrand of phoneBrandOptions) {
+        if (knownBrand === 'OTRAS') {
+            continue;
+        }
+
+        normalized = removeBrandPrefix(normalized, knownBrand);
+    }
+    normalized = removeBrandPrefix(normalized, 'MOTO');
+
+    return normalized;
+}
+
+function normalizeSuggestedRepairType(value: string): string {
+    const firstLine = value.split('\n').map((line) => line.trim()).find(Boolean) ?? '';
+
+    return normalizeDeviceSearch(firstLine);
 }
 
 function repairColorLabel(color?: string | null): string {
@@ -705,6 +735,7 @@ export default function WorkbenchPage({
     serviceOptionUsage,
     partInventory,
     deviceModels,
+    suggestedPricesByPhoneModel = {},
     nextOrderId,
     ticketPricing = {
         cashDiscountEnabled: true,
@@ -762,6 +793,7 @@ export default function WorkbenchPage({
     const [activeIntakeStep, setActiveIntakeStep] = useState<IntakeStep>('client');
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
+    const [selectedDeviceModelKeys, setSelectedDeviceModelKeys] = useState<Record<number, string>>({});
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
     const [activeSearchFields, setActiveSearchFields] = useState<SearchFieldKey[]>(() => {
         const incoming = filters.q_fields ?? defaultSearchFields;
@@ -994,6 +1026,11 @@ export default function WorkbenchPage({
 
     const changeJobModel = (index: number, value: string): void => {
         updateJob(index, (current) => ({ ...current, modelo: value }));
+        setSelectedDeviceModelKeys((current) => {
+            const next = { ...current };
+            delete next[index];
+            return next;
+        });
 
         if (isPhoneCategory(createForm.data.jobs[index]?.categorias_reparacion ?? '')) {
             setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(value) }));
@@ -1010,6 +1047,11 @@ export default function WorkbenchPage({
             unlock_type: phoneCategory ? current.unlock_type : '',
             unlock_value: phoneCategory ? current.unlock_value : '',
         }));
+        setSelectedDeviceModelKeys((current) => {
+            const next = { ...current };
+            delete next[index];
+            return next;
+        });
     };
 
     const changeJobBrand = (index: number, value: string): void => {
@@ -1019,6 +1061,11 @@ export default function WorkbenchPage({
             modelo: partSearchFromModel(current.modelo),
         }));
         setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(createForm.data.jobs[index]?.modelo ?? '') }));
+        setSelectedDeviceModelKeys((current) => {
+            const next = { ...current };
+            delete next[index];
+            return next;
+        });
     };
 
     const matchingDeviceModels = (index: number): DeviceModelOption[] => {
@@ -1075,12 +1122,19 @@ export default function WorkbenchPage({
     };
 
     const selectDeviceModel = (index: number, deviceModel: DeviceModelOption): void => {
+        const model = partSearchFromModel(deviceModel.model);
+        const brand = isPhoneCategory(createForm.data.jobs[index]?.categorias_reparacion ?? '') && deviceModel.brand ? deviceModel.brand : createForm.data.jobs[index]?.marca ?? '';
+
         updateJob(index, (current) => ({
             ...current,
-            marca: isPhoneCategory(current.categorias_reparacion) && deviceModel.brand ? deviceModel.brand : current.marca,
-            modelo: partSearchFromModel(deviceModel.model),
+            marca: brand,
+            modelo: model,
         }));
-        setPartSearches((current) => ({ ...current, [index]: partSearchFromModel(deviceModel.model) }));
+        setPartSearches((current) => ({ ...current, [index]: model }));
+        setSelectedDeviceModelKeys((current) => ({
+            ...current,
+            [index]: `${Number(deviceModel.category_id)}:${normalizeSuggestedPriceModel(model, brand)}`,
+        }));
     };
 
     const hasExactDeviceModel = (index: number): boolean => {
@@ -1095,6 +1149,13 @@ export default function WorkbenchPage({
         const job = createForm.data.jobs[index];
         const suggestions = matchingDeviceModels(index);
         const typedModel = job?.modelo.trim() ?? '';
+        const selectedKey = job
+            ? `${Number(job.categorias_reparacion || 0)}:${normalizeSuggestedPriceModel(job.modelo, job.marca)}`
+            : '';
+
+        if (selectedKey !== '' && selectedDeviceModelKeys[index] === selectedKey) {
+            return null;
+        }
 
         if (suggestions.length === 0) {
             return typedModel.length >= 2 && !hasExactDeviceModel(index)
@@ -1160,6 +1221,18 @@ export default function WorkbenchPage({
         );
         setImagePreviews((current) => {
             const next: Record<number, string[]> = {};
+            Object.entries(current).forEach(([key, value]) => {
+                const numericKey = Number(key);
+                if (numericKey < index) {
+                    next[numericKey] = value;
+                } else if (numericKey > index) {
+                    next[numericKey - 1] = value;
+                }
+            });
+            return next;
+        });
+        setSelectedDeviceModelKeys((current) => {
+            const next: Record<number, string> = {};
             Object.entries(current).forEach(([key, value]) => {
                 const numericKey = Number(key);
                 if (numericKey < index) {
@@ -1261,6 +1334,50 @@ export default function WorkbenchPage({
     };
 
     const formatMoney = (value: number): string => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+    const suggestedPriceForJob = (job: RepairJobFormData): SuggestedRepairPrice | null => {
+        if (!isPhoneCategory(job.categorias_reparacion)) {
+            return null;
+        }
+
+        const normalizedModel = normalizeSuggestedPriceModel(job.modelo, job.marca);
+        const normalizedRepairType = normalizeSuggestedRepairType(job.descripcion);
+
+        return normalizedModel !== '' && normalizedRepairType !== ''
+            ? suggestedPricesByPhoneModel[normalizedModel]?.[normalizedRepairType] ?? null
+            : null;
+    };
+    const suggestedPriceDateLabel = (value: string | null): string => {
+        if (!value) {
+            return 'fecha sin dato';
+        }
+
+        const [year, month, day] = value.split('-');
+
+        return year && month && day ? `${day}/${month}/${year}` : value;
+    };
+    const suggestedPriceIndicator = (index: number, compact = false): JSX.Element | null => {
+        const job = createForm.data.jobs[index];
+
+        if (!job) {
+            return null;
+        }
+
+        const suggestion = suggestedPriceForJob(job);
+
+        if (suggestion === null) {
+            return null;
+        }
+
+        return (
+            <span className={cn(
+                'flex min-h-5 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold leading-5 text-[#166534]',
+                compact && 'leading-4',
+            )}>
+                <span>Sugerido: {formatMoney(suggestion.amount)}</span>
+                <span className="text-[#64748b]">{suggestedPriceDateLabel(suggestion.date)}</span>
+            </span>
+        );
+    };
     const cashDiscountApplies = (cashAmount: number): boolean => {
         return ticketPricing.cashDiscountEnabled
             && ticketPricing.cashDiscountPercentage > 0
@@ -2400,6 +2517,7 @@ export default function WorkbenchPage({
                                                                     onKeyDown={preventAmountArrowStep}
                                                                     onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value }))}
                                                                 />
+                                                                {suggestedPriceIndicator(jobIndex, true)}
                                                                 {regularPriceIndicator(rowJob.monto, true)}
                                                             </label>
                                                             <label className="col-start-2 grid content-start gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
@@ -2755,6 +2873,7 @@ export default function WorkbenchPage({
                                             onKeyDown={preventAmountArrowStep}
                                             onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))}
                                         />
+                                        {suggestedPriceIndicator(index)}
                                         <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2">
                                             {regularPriceIndicator(job.monto)}
                                         </div>

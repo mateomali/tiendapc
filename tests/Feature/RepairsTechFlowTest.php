@@ -709,6 +709,72 @@ it('allows delivering repairs with explicit date and delivery channel', function
     expect(RepairEvent::query()->where('orden_id', 777)->where('evento', 'ENTREGA_VIA_TICKET')->exists())->toBeTrue();
 });
 
+it('reopens delivered repairs as warranty and allows delivering them again', function (): void {
+    $originalEntryDate = now()->subDays(4)->toDateString();
+
+    $order = RepairOrder::query()->create([
+        'id' => 781,
+        'reparacion' => 1,
+        'fecha' => $originalEntryDate,
+        'nombre_cliente' => 'Cliente Garantia',
+        'dni' => 33444558,
+        'modelo' => 'Moto G82',
+        'descripcion' => 'Cambio de modulo',
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'fecha_entregado' => now()->subDay()->toDateString(),
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.move_back', $order), [
+            'garantia_motivo' => 'Volvio sin tactil despues de retirar.',
+        ])
+        ->assertRedirect();
+
+    $reopened = $order->fresh();
+
+    expect($reopened?->estado)->toBe('GARANTIA');
+    expect($reopened?->entregado)->toBe('no');
+    expect(optional($reopened?->fecha)->format('Y-m-d'))->toBe(now()->toDateString());
+    expect($reopened?->fecha_entregado)->toBeNull();
+    expect($reopened?->garantia_motivo)->toBe('Volvio sin tactil despues de retirar.');
+
+    $warrantyEvent = RepairEvent::query()
+        ->where('orden_id', 781)
+        ->where('evento', 'GARANTIA_REINGRESO')
+        ->first();
+
+    expect($warrantyEvent)->not->toBeNull();
+    expect($warrantyEvent?->detalle)->toBe('Ingreso original: ' . $originalEntryDate);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['estado' => 'GARANTIA']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('tickets.0.repairs.0.estado', 'GARANTIA')
+            ->where('tickets.0.repairs.0.garantia_motivo', 'Volvio sin tactil despues de retirar.'));
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.mark_ready', $reopened))
+        ->assertRedirect();
+
+    expect($order->fresh()?->estado)->toBe('LISTA');
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.deliver', $order->fresh()), [
+            'fecha_entregado' => '2026-09-02',
+            'entrega_via' => 'persona',
+        ])
+        ->assertRedirect();
+
+    $redelivered = $order->fresh();
+
+    expect($redelivered?->estado)->toBe('LISTA');
+    expect($redelivered?->entregado)->toBe('si');
+    expect(optional($redelivered?->fecha_entregado)->format('Y-m-d'))->toBe('2026-09-02');
+});
+
 it('keeps delivered job data visible when reopening a multi job ticket', function (): void {
     RepairOrder::query()->create([
         'id' => 779,
@@ -1096,4 +1162,64 @@ it('reads internal order info from any job in the ticket', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/WorkbenchPage')
             ->where('tickets.0.info', 'Nota guardada en otro trabajo.'));
+});
+
+it('suggests phone repair prices by model and repair type', function (): void {
+    RepairOrder::query()->create([
+        'id' => 940,
+        'reparacion' => 1,
+        'fecha' => '2026-08-20',
+        'nombre_cliente' => 'Cliente Precio Modulo',
+        'dni' => 30111226,
+        'marca' => 'MOTOROLA',
+        'modelo' => 'G82',
+        'descripcion' => 'CAMBIO DE MODULO',
+        'monto' => 78000,
+        'senia' => 0,
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'categorias_reparacion' => 1,
+    ]);
+
+    RepairOrder::query()->create([
+        'id' => 941,
+        'reparacion' => 1,
+        'fecha' => '2026-08-22',
+        'nombre_cliente' => 'Cliente Precio Bateria',
+        'dni' => 30111227,
+        'marca' => 'MOTOROLA',
+        'modelo' => 'G82',
+        'descripcion' => 'CAMBIO DE BATERIA',
+        'monto' => 26000,
+        'senia' => 0,
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'categorias_reparacion' => 1,
+    ]);
+
+    RepairOrder::query()->create([
+        'id' => 942,
+        'reparacion' => 1,
+        'fecha' => '2026-08-25',
+        'nombre_cliente' => 'Cliente Precio Modulo Reciente',
+        'dni' => 30111228,
+        'marca' => 'MOTOROLA',
+        'modelo' => 'Moto G82',
+        'descripcion' => 'CAMBIO DE MODULO',
+        'monto' => 83000,
+        'senia' => 0,
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'categorias_reparacion' => 1,
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.ingress'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('suggestedPricesByPhoneModel.G82.CAMBIO DE MODULO.amount', 83000)
+            ->where('suggestedPricesByPhoneModel.G82.CAMBIO DE MODULO.order_id', 942)
+            ->where('suggestedPricesByPhoneModel.G82.CAMBIO DE BATERIA.amount', 26000)
+            ->where('suggestedPricesByPhoneModel.G82.CAMBIO DE BATERIA.order_id', 941));
 });

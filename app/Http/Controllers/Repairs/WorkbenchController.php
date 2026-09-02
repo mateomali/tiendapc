@@ -167,6 +167,7 @@ class WorkbenchController extends Controller
             'serviceOptionUsage' => $repairService->serviceOptionUsage(),
             'partInventory' => $this->partInventoryOptions(),
             'deviceModels' => $repairService->deviceModelOptions(),
+            'suggestedPricesByPhoneModel' => $repairService->suggestedPhonePrices(),
             'nextOrderId' => $repairService->nextOrderId(),
             'ticketPricing' => $this->ticketPricingSettings(),
             'pageMode' => $pageMode,
@@ -1082,7 +1083,7 @@ class WorkbenchController extends Controller
     public function updateState(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
         $validated = $request->validate([
-            'estado' => ['required', 'string', 'in:PENDIENTE,EN REPARACION,EN REPARACION / ESPERA REPUESTO,LISTA,CANCELADA,ENTREGADA'],
+            'estado' => ['required', 'string', 'in:PENDIENTE,EN REPARACION,EN REPARACION / ESPERA REPUESTO,GARANTIA,LISTA,CANCELADA,ENTREGADA'],
             'cancelado_motivo' => ['nullable', 'required_if:estado,CANCELADA', 'string', 'max:1000'],
         ]);
 
@@ -1202,8 +1203,18 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Orden cancelada. Queda pendiente de retiro.');
     }
 
-    public function moveBack(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    public function moveBack(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
+        if ($repairOrder->entregado === 'si') {
+            $validated = $request->validate([
+                'garantia_motivo' => ['required', 'string', 'max:1000'],
+            ]);
+
+            $repairService->reopenWarranty($repairOrder, $validated['garantia_motivo']);
+
+            return back()->with('success', 'Orden reingresada por garantia.');
+        }
+
         $repairService->moveBackToConsultas($repairOrder);
 
         return back()->with('success', 'Orden devuelta a consultas.');
@@ -1307,6 +1318,7 @@ class WorkbenchController extends Controller
             'archivado_at' => optional($order->archivado_at)->format('Y-m-d H:i'),
             'archivado_motivo' => $order->archivado_motivo,
             'cancelado_motivo' => $order->cancelado_motivo,
+            'garantia_motivo' => $order->garantia_motivo,
             'repuesto' => $order->repuesto,
             'repuesto_pedido' => (bool) $order->repuesto_pedido,
             'repuesto_pedido_at' => optional($order->repuesto_pedido_at)->format('Y-m-d H:i'),
@@ -1320,6 +1332,7 @@ class WorkbenchController extends Controller
             'events' => $events->map(fn (RepairEvent $event): array => [
                 'id' => $event->id,
                 'evento' => $event->evento,
+                'detalle' => $event->detalle,
                 'estado_anterior' => $event->estado_anterior,
                 'estado_nuevo' => $event->estado_nuevo,
                 'created_at' => optional($event->created_at)->format('Y-m-d H:i'),
@@ -1364,6 +1377,7 @@ class WorkbenchController extends Controller
             'event' => $event->evento,
             'label' => $this->logEventLabel((string) $event->evento),
             'tone' => $this->logEventTone((string) $event->evento),
+            'detail' => $event->detalle,
             'orderId' => $event->orden_id,
             'repairNumber' => $event->reparacion,
             'customerName' => $order?->nombre_cliente,
@@ -1384,6 +1398,7 @@ class WorkbenchController extends Controller
             'CAMBIO_ESTADO' => 'Cambio de estado',
             'CANCELADA' => 'Orden cancelada',
             'ENTREGADA' => 'Orden entregada',
+            'GARANTIA_REINGRESO' => 'Reingreso por garantia',
             'INCREMENTO_REGISTRADO' => 'Incremento registrado',
             'INCREMENTO_ELIMINADO' => 'Incremento eliminado',
             'PAGO_REGISTRADO' => 'Pago registrado',

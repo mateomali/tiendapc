@@ -231,6 +231,7 @@ export interface RepairOrderView {
     archivado_at?: string | null;
     archivado_motivo?: string | null;
     cancelado_motivo?: string | null;
+    garantia_motivo?: string | null;
     repuesto?: string | null;
     repuesto_pedido?: boolean;
     repuesto_pedido_at?: string | null;
@@ -284,6 +285,7 @@ export interface RepairImageView {
 export interface RepairEventView {
     id: number;
     evento: string;
+    detalle?: string | null;
     estado_anterior?: string | null;
     estado_nuevo?: string | null;
     created_at?: string | null;
