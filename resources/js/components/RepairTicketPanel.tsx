@@ -23,6 +23,7 @@ import {
 } from 'react-icons/fa';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { PhoneUnlockFields, phoneUnlockLabel } from './PhoneUnlockFields';
+import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from './RepairPartAccessoriesFields';
 import { WebcamCaptureButton } from './WebcamCaptureButton';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
@@ -85,6 +86,8 @@ interface RepairUpdateFormData {
     repuesto: string;
     repuesto_pedido: boolean;
     inventory_part_id: string;
+    repuesto_agregados: RepairPartAccessory[];
+    repuesto_agregado_otro: string;
     categorias_reparacion: string;
     unlock_type: string;
     unlock_value: string;
@@ -106,6 +109,8 @@ interface AddRepairFormData {
     repuesto: string;
     repuesto_pedido: boolean;
     inventory_part_id: string;
+    repuesto_agregados: RepairPartAccessory[];
+    repuesto_agregado_otro: string;
     categorias_reparacion: string;
     unlock_type: string;
     unlock_value: string;
@@ -1017,6 +1022,8 @@ function AddRepairModal({
         repuesto: '',
         repuesto_pedido: false,
         inventory_part_id: '',
+        repuesto_agregados: [],
+        repuesto_agregado_otro: '',
         categorias_reparacion: String(baseRepair?.categorias_reparacion ?? 4),
         unlock_type: baseRepair?.unlock_type ?? '',
         unlock_value: baseRepair?.unlock_value ?? '',
@@ -1079,6 +1086,8 @@ function AddRepairModal({
             marca: phoneCategory ? current.marca : '',
             unlock_type: phoneCategory ? current.unlock_type : '',
             unlock_value: phoneCategory ? current.unlock_value : '',
+            repuesto_agregados: phoneCategory ? current.repuesto_agregados : [],
+            repuesto_agregado_otro: phoneCategory ? current.repuesto_agregado_otro : '',
         }));
     };
 
@@ -1189,15 +1198,25 @@ function AddRepairModal({
                             <RepairColorCombobox className={ui.input} value={form.data.color} onChange={(value) => form.setData('color', value)} />
                         </EditField>
                         {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
-                            <EditField label="Desbloqueo">
-                                <PhoneUnlockFields
-                                    unlockType={form.data.unlock_type}
-                                    unlockValue={form.data.unlock_value}
-                                    onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
-                                    selectClassName={ui.input}
+                            <>
+                                <EditField label="Desbloqueo">
+                                    <PhoneUnlockFields
+                                        unlockType={form.data.unlock_type}
+                                        unlockValue={form.data.unlock_value}
+                                        onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                        selectClassName={ui.input}
+                                        inputClassName={ui.input}
+                                    />
+                                </EditField>
+                                <RepairPartAccessoriesFields
+                                    selected={form.data.repuesto_agregados}
+                                    other={form.data.repuesto_agregado_otro}
                                     inputClassName={ui.input}
+                                    className="sm:col-span-2"
+                                    onChange={(selected, other) => form.setData((current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
+                                    onOtherChange={(value) => form.setData('repuesto_agregado_otro', value)}
                                 />
-                            </EditField>
+                            </>
                         ) : null}
                         <EditField label="Tipo de servicio">
                             <select className={ui.input} value="" onChange={(event) => applyDescriptionOption(event.target.value)}>
@@ -1385,6 +1404,8 @@ function RepairEditCard({
         repuesto: repair.repuesto ?? '',
         repuesto_pedido: Boolean(repair.repuesto_pedido),
         inventory_part_id: repair.inventory_part_id ? String(repair.inventory_part_id) : '',
+        repuesto_agregados: normalizePartAccessories(repair.repuesto_agregados),
+        repuesto_agregado_otro: repair.repuesto_agregado_otro ?? '',
         categorias_reparacion: String(repair.categorias_reparacion ?? 4),
         unlock_type: repair.unlock_type ?? '',
         unlock_value: repair.unlock_value ?? '',
@@ -1672,6 +1693,8 @@ function RepairEditCard({
             marca: phoneCategory ? current.marca : '',
             unlock_type: phoneCategory ? current.unlock_type : '',
             unlock_value: phoneCategory ? current.unlock_value : '',
+            repuesto_agregados: phoneCategory ? current.repuesto_agregados : [],
+            repuesto_agregado_otro: phoneCategory ? current.repuesto_agregado_otro : '',
         }));
     };
 
@@ -1882,15 +1905,25 @@ function RepairEditCard({
                             </EditField>
                         </div>
                         {inlinePhoneCategory ? (
-                            <EditField label="Desbloqueo">
-                                <PhoneUnlockFields
-                                    unlockType={form.data.unlock_type}
-                                    unlockValue={form.data.unlock_value}
-                                    onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
-                                    selectClassName={ui.repairDenseInput}
+                            <>
+                                <EditField label="Desbloqueo">
+                                    <PhoneUnlockFields
+                                        unlockType={form.data.unlock_type}
+                                        unlockValue={form.data.unlock_value}
+                                        onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                        selectClassName={ui.repairDenseInput}
+                                        inputClassName={ui.repairDenseInput}
+                                    />
+                                </EditField>
+                                <RepairPartAccessoriesFields
+                                    selected={form.data.repuesto_agregados}
+                                    other={form.data.repuesto_agregado_otro}
                                     inputClassName={ui.repairDenseInput}
+                                    onChange={(selected, other) => form.setData((current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
+                                    onOtherChange={(value) => form.setData('repuesto_agregado_otro', value)}
+                                    disabled={readOnly}
                                 />
-                            </EditField>
+                            </>
                         ) : null}
                     </div>
 
@@ -2498,16 +2531,26 @@ function RepairEditCard({
                                     </select>
                                 </EditField>
                                 {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
-                                    <EditField label="Desbloqueo">
-                                        <PhoneUnlockFields
-                                            unlockType={form.data.unlock_type}
-                                            unlockValue={form.data.unlock_value}
-                                            onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
-                                            selectClassName={changedInputClass(form.data.unlock_type, repair.unlock_type ?? '')}
-                                            inputClassName={changedInputClass(form.data.unlock_value, repair.unlock_value ?? '')}
+                                    <>
+                                        <EditField label="Desbloqueo">
+                                            <PhoneUnlockFields
+                                                unlockType={form.data.unlock_type}
+                                                unlockValue={form.data.unlock_value}
+                                                onChange={(unlockType, unlockValue) => form.setData((current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                                selectClassName={changedInputClass(form.data.unlock_type, repair.unlock_type ?? '')}
+                                                inputClassName={changedInputClass(form.data.unlock_value, repair.unlock_value ?? '')}
+                                                disabled={readOnly}
+                                            />
+                                        </EditField>
+                                        <RepairPartAccessoriesFields
+                                            selected={form.data.repuesto_agregados}
+                                            other={form.data.repuesto_agregado_otro}
+                                            inputClassName={ui.repairDenseInput}
+                                            onChange={(selected, other) => form.setData((current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
+                                            onOtherChange={(value) => form.setData('repuesto_agregado_otro', value)}
                                             disabled={readOnly}
                                         />
-                                    </EditField>
+                                    </>
                                 ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Monto ($)">

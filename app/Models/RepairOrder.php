@@ -58,6 +58,8 @@ class RepairOrder extends Model
         'repuesto_pedido',
         'repuesto_pedido_at',
         'repuesto_pedido_oculto_at',
+        'repuesto_agregados',
+        'repuesto_agregado_otro',
         'inventory_part_id',
         'inventory_part_model',
         'inventory_part_box',
@@ -80,6 +82,7 @@ class RepairOrder extends Model
             'repuesto_pedido' => 'boolean',
             'repuesto_pedido_at' => 'datetime',
             'repuesto_pedido_oculto_at' => 'datetime',
+            'repuesto_agregados' => 'array',
             'inventory_part_id' => 'integer',
         ];
     }

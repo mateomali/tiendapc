@@ -235,6 +235,8 @@ export interface RepairOrderView {
     repuesto?: string | null;
     repuesto_pedido?: boolean;
     repuesto_pedido_at?: string | null;
+    repuesto_agregados?: string[] | null;
+    repuesto_agregado_otro?: string | null;
     inventory_part_id?: number | null;
     inventory_part_model?: string | null;
     inventory_part_box?: string | null;

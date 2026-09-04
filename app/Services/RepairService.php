@@ -312,6 +312,7 @@ class RepairService
                 if ($requestedInventoryPartId > 0 && $allocation === null) {
                     throw new \RuntimeException('El repuesto seleccionado ya no esta disponible.');
                 }
+                $partAccessories = $this->normalizePartAccessories($job, (int) $job['categorias_reparacion']);
 
                 $order = RepairOrder::query()->create([
                     'id' => $orderId,
@@ -338,6 +339,8 @@ class RepairService
                     'repuesto_pedido' => $job['pedir_repuesto'],
                     'repuesto_pedido_at' => $job['pedir_repuesto'] ? now() : null,
                     'repuesto_pedido_oculto_at' => null,
+                    'repuesto_agregados' => $partAccessories['items'],
+                    'repuesto_agregado_otro' => $partAccessories['other'],
                     'inventory_part_id' => $allocation['id'] ?? null,
                     'inventory_part_model' => $allocation['model'] ?? null,
                     'inventory_part_box' => $allocation['box'] ?? null,
@@ -373,6 +376,7 @@ class RepairService
             if ($requestedInventoryPartId > 0 && $allocation === null) {
                 throw new \RuntimeException('El repuesto seleccionado ya no esta disponible.');
             }
+            $partAccessories = $this->normalizePartAccessories($payload, (int) ($payload['categorias_reparacion'] ?? 4));
 
             $repair = RepairOrder::query()->create([
                 'id' => $order->id,
@@ -399,6 +403,8 @@ class RepairService
                 'repuesto_pedido' => $requestedInventoryPartId <= 0 && $partRequested && $part !== '',
                 'repuesto_pedido_at' => $requestedInventoryPartId <= 0 && $partRequested && $part !== '' ? now() : null,
                 'repuesto_pedido_oculto_at' => null,
+                'repuesto_agregados' => $partAccessories['items'],
+                'repuesto_agregado_otro' => $partAccessories['other'],
                 'inventory_part_id' => $allocation['id'] ?? null,
                 'inventory_part_model' => $allocation['model'] ?? null,
                 'inventory_part_box' => $allocation['box'] ?? null,
@@ -605,6 +611,7 @@ class RepairService
 
             $model = $this->rememberDeviceModel($payload['modelo'] ?? null, (int) ($payload['categorias_reparacion'] ?? 4), $payload['marca'] ?? null);
             $brand = $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? ''));
+            $partAccessories = $this->normalizePartAccessories($payload, (int) ($payload['categorias_reparacion'] ?? 4));
 
             $nextState = (string) ($payload['estado'] ?? $order->estado);
             $nextCancellationReason = Str::upper($nextState) === 'CANCELADA'
@@ -640,6 +647,8 @@ class RepairService
                 'repuesto_pedido' => $activePartRequest,
                 'repuesto_pedido_at' => $activePartRequest ? ($order->repuesto_pedido_at ?? now()) : null,
                 'repuesto_pedido_oculto_at' => $activePartRequest ? null : $order->repuesto_pedido_oculto_at,
+                'repuesto_agregados' => $partAccessories['items'],
+                'repuesto_agregado_otro' => $partAccessories['other'],
                 'inventory_part_id' => $allocation['id'] ?? null,
                 'inventory_part_model' => $allocation['model'] ?? null,
                 'inventory_part_box' => $allocation['box'] ?? null,
@@ -2177,6 +2186,8 @@ class RepairService
      *     repuesto:?string,
      *     pedir_repuesto:bool,
      *     inventory_part_id:int,
+     *     repuesto_agregados:array<int, string>,
+     *     repuesto_agregado_otro:?string,
      *     categorias_reparacion:int,
      *     unlock_type:?string,
      *     unlock_value:?string
@@ -2196,6 +2207,8 @@ class RepairService
             'fecha_estimada',
             'estado',
             'repuesto',
+            'repuesto_agregados',
+            'repuesto_agregado_otro',
             'inventory_part_id',
             'categorias_reparacion',
             'unlock_type',
@@ -2214,6 +2227,7 @@ class RepairService
                 $inventoryPartId = max(0, (int) ($job['inventory_part_id'] ?? 0));
                 $categoryId = max(1, (int) ($job['categorias_reparacion'] ?? 4));
                 $unlock = $this->normalizeUnlockData($job, $categoryId);
+                $partAccessories = $this->normalizePartAccessories($job, $categoryId);
 
                 if ($description === '' && $fallbackDescription !== '') {
                     $description = $fallbackDescription;
@@ -2238,6 +2252,8 @@ class RepairService
                     'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                     'pedir_repuesto' => $shouldRequestPart,
                     'inventory_part_id' => $inventoryPartId,
+                    'repuesto_agregados' => $partAccessories['items'],
+                    'repuesto_agregado_otro' => $partAccessories['other'],
                     'categorias_reparacion' => $categoryId,
                     'unlock_type' => $unlock['type'],
                     'unlock_value' => $unlock['value'],
@@ -2259,6 +2275,7 @@ class RepairService
             $inventoryPartId = max(0, (int) ($payload['inventory_part_id'] ?? 0));
             $categoryId = max(1, (int) ($payload['categorias_reparacion'] ?? 4));
             $unlock = $this->normalizeUnlockData($payload, $categoryId);
+            $partAccessories = $this->normalizePartAccessories($payload, $categoryId);
 
             return [[
                 'modelo' => trim((string) ($payload['modelo'] ?? '')) !== '' ? trim((string) $payload['modelo']) : null,
@@ -2274,6 +2291,8 @@ class RepairService
                 'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
                 'pedir_repuesto' => $shouldRequestPart,
                 'inventory_part_id' => $inventoryPartId,
+                'repuesto_agregados' => $partAccessories['items'],
+                'repuesto_agregado_otro' => $partAccessories['other'],
                 'categorias_reparacion' => $categoryId,
                 'unlock_type' => $unlock['type'],
                 'unlock_value' => $unlock['value'],
@@ -2281,6 +2300,31 @@ class RepairService
         }
 
         return $jobs;
+    }
+
+    /**
+     * @return array{items:array<int, string>,other:?string}
+     */
+    private function normalizePartAccessories(array $payload, int $categoryId): array
+    {
+        if ($categoryId !== 1) {
+            return ['items' => [], 'other' => null];
+        }
+
+        $allowed = ['funda', 'sim', 'memoria', 'sin_porta_chip', 'otro'];
+        $items = collect($payload['repuesto_agregados'] ?? [])
+            ->filter(fn ($item): bool => is_string($item))
+            ->map(fn (string $item): string => Str::lower(trim($item)))
+            ->filter(fn (string $item): bool => in_array($item, $allowed, true))
+            ->unique()
+            ->values()
+            ->all();
+        $other = trim((string) ($payload['repuesto_agregado_otro'] ?? ''));
+
+        return [
+            'items' => $items,
+            'other' => in_array('otro', $items, true) && $other !== '' ? $other : null,
+        ];
     }
 
     /**

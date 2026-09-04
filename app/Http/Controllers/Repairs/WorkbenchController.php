@@ -1322,6 +1322,8 @@ class WorkbenchController extends Controller
             'repuesto' => $order->repuesto,
             'repuesto_pedido' => (bool) $order->repuesto_pedido,
             'repuesto_pedido_at' => optional($order->repuesto_pedido_at)->format('Y-m-d H:i'),
+            'repuesto_agregados' => $order->repuesto_agregados ?? [],
+            'repuesto_agregado_otro' => $order->repuesto_agregado_otro,
             'inventory_part_id' => $order->inventory_part_id,
             'inventory_part_model' => $order->inventory_part_model,
             'inventory_part_box' => $order->inventory_part_box,

@@ -2,6 +2,7 @@ import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
+import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from '../../components/RepairPartAccessoriesFields';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { WebcamCaptureButton } from '../../components/WebcamCaptureButton';
 import { RepairLayout } from '../../layouts/RepairLayout';
@@ -140,6 +141,8 @@ interface RepairJobFormData {
     repuesto: string;
     pedir_repuesto: boolean;
     inventory_part_id: string;
+    repuesto_agregados: RepairPartAccessory[];
+    repuesto_agregado_otro: string;
     categorias_reparacion: string;
     unlock_type: string;
     unlock_value: string;
@@ -193,6 +196,8 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         repuesto: '',
         pedir_repuesto: false,
         inventory_part_id: '',
+        repuesto_agregados: [],
+        repuesto_agregado_otro: '',
         categorias_reparacion: '4',
         unlock_type: '',
         unlock_value: '',
@@ -1046,6 +1051,8 @@ export default function WorkbenchPage({
             marca: phoneCategory ? current.marca : '',
             unlock_type: phoneCategory ? current.unlock_type : '',
             unlock_value: phoneCategory ? current.unlock_value : '',
+            repuesto_agregados: phoneCategory ? current.repuesto_agregados : [],
+            repuesto_agregado_otro: phoneCategory ? current.repuesto_agregado_otro : '',
         }));
         setSelectedDeviceModelKeys((current) => {
             const next = { ...current };
@@ -1196,6 +1203,8 @@ export default function WorkbenchPage({
             categorias_reparacion: source.categorias_reparacion,
             unlock_type: source.unlock_type,
             unlock_value: source.unlock_value,
+            repuesto_agregados: source.repuesto_agregados,
+            repuesto_agregado_otro: source.repuesto_agregado_otro,
             fecha_estimada: source.fecha_estimada,
             observaciones: source.observaciones,
         };
@@ -2463,6 +2472,13 @@ export default function WorkbenchPage({
                                                         inputClassName={compactInputClass}
                                                     />
                                                 </label>
+                                                <RepairPartAccessoriesFields
+                                                    selected={job.repuesto_agregados}
+                                                    other={job.repuesto_agregado_otro}
+                                                    inputClassName={compactInputClass}
+                                                    onChange={(selected, other) => updateJob(index, (current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
+                                                    onOtherChange={(value) => updateJob(index, (current) => ({ ...current, repuesto_agregado_otro: value }))}
+                                                />
                                             </div>
                                         ) : null}
                                             </>
@@ -2844,13 +2860,23 @@ export default function WorkbenchPage({
                                         />
                                         <RepairColorCombobox className={ui.input} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
                                         {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <PhoneUnlockFields
-                                                unlockType={job.unlock_type}
-                                                unlockValue={job.unlock_value}
-                                                onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
-                                                selectClassName={ui.input}
-                                                inputClassName={ui.input}
-                                            />
+                                            <>
+                                                <PhoneUnlockFields
+                                                    unlockType={job.unlock_type}
+                                                    unlockValue={job.unlock_value}
+                                                    onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
+                                                    selectClassName={ui.input}
+                                                    inputClassName={ui.input}
+                                                />
+                                                <RepairPartAccessoriesFields
+                                                    selected={job.repuesto_agregados}
+                                                    other={job.repuesto_agregado_otro}
+                                                    inputClassName={ui.input}
+                                                    className={ui.repairFull}
+                                                    onChange={(selected, other) => updateJob(index, (current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
+                                                    onOtherChange={(value) => updateJob(index, (current) => ({ ...current, repuesto_agregado_otro: value }))}
+                                                />
+                                            </>
                                         ) : null}
                                         {renderDeviceModelSuggestions(index)}
                                         <textarea

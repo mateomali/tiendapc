@@ -322,6 +322,60 @@ it('uses the device model catalog to keep repair model names unified', function 
             ->where('serviceOptionUsage.service:modulo', 1));
 });
 
+it('stores and exposes phone part accessories only for phone repairs', function (): void {
+    $response = $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.store'), [
+            'nombre_cliente' => 'Cliente Accesorios',
+            'dni' => 30999112,
+            'jobs' => [
+                [
+                    'marca' => 'SAMSUNG',
+                    'modelo' => 'A52',
+                    'descripcion' => 'Cambio de modulo',
+                    'observaciones' => '',
+                    'monto' => 1000,
+                    'senia' => 0,
+                    'estado' => 'PENDIENTE',
+                    'repuesto' => '',
+                    'categorias_reparacion' => 1,
+                    'repuesto_agregados' => ['funda', 'otro', 'otro'],
+                    'repuesto_agregado_otro' => 'Vidrio templado',
+                ],
+                [
+                    'modelo' => 'Notebook',
+                    'descripcion' => 'No enciende',
+                    'observaciones' => '',
+                    'monto' => 2000,
+                    'senia' => 0,
+                    'estado' => 'PENDIENTE',
+                    'repuesto' => '',
+                    'categorias_reparacion' => 2,
+                    'repuesto_agregados' => ['sim'],
+                    'repuesto_agregado_otro' => 'Debe ignorarse',
+                ],
+            ],
+        ]);
+
+    $orderId = (int) RepairOrder::query()->max('id');
+    $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $orderId]));
+
+    $phoneRepair = RepairOrder::query()->where('id', $orderId)->where('reparacion', 1)->firstOrFail();
+    $otherRepair = RepairOrder::query()->where('id', $orderId)->where('reparacion', 2)->firstOrFail();
+
+    expect($phoneRepair->repuesto_agregados)->toBe(['funda', 'otro']);
+    expect($phoneRepair->repuesto_agregado_otro)->toBe('Vidrio templado');
+    expect($otherRepair->repuesto_agregados)->toBe([]);
+    expect($otherRepair->repuesto_agregado_otro)->toBeNull();
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/WorkbenchPage')
+            ->where('tickets.0.repairs.0.repuesto_agregados', ['funda', 'otro'])
+            ->where('tickets.0.repairs.0.repuesto_agregado_otro', 'Vidrio templado'));
+});
+
 it('allows managing repair intake lists', function (): void {
     $this->withSession(['repair_tech_authenticated' => true])
         ->get(route('repairs.lists'))
