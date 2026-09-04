@@ -23,7 +23,7 @@ import {
 } from 'react-icons/fa';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { PhoneUnlockFields, phoneUnlockLabel } from './PhoneUnlockFields';
-import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from './RepairPartAccessoriesFields';
+import { RepairPartAccessoriesFields, normalizePartAccessories, partAccessoriesLabel, type RepairPartAccessory } from './RepairPartAccessoriesFields';
 import { WebcamCaptureButton } from './WebcamCaptureButton';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
@@ -1454,7 +1454,8 @@ function RepairEditCard({
     const nextStatus = nextQuickStatus(repair.estado);
     const displayStatus = statusLabel?.(repair) ?? compactStatus(repair.estado);
     const unlockLabel = phoneUnlockLabel(repair.unlock_type, repair.unlock_value);
-    const showMore = Boolean(repair.descripcion || repair.repuesto || repair.observaciones || repair.cancelado_motivo || repair.garantia_motivo || repair.contacto || repair.dni || unlockLabel);
+    const accessoriesLabel = partAccessoriesLabel(repair.repuesto_agregados, repair.repuesto_agregado_otro);
+    const showMore = Boolean(repair.descripcion || repair.repuesto || accessoriesLabel || repair.observaciones || repair.cancelado_motivo || repair.garantia_motivo || repair.contacto || repair.dni || unlockLabel);
     const hasInfo = (ticket.info ?? '').trim() !== '';
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
@@ -2425,6 +2426,12 @@ function RepairEditCard({
                                     <p className="whitespace-pre-wrap font-semibold text-[#7c2d12]"><HighlightText value={repair.repuesto} term={highlightTerm} /></p>
                                 </section>
                             ) : null}
+                            {accessoriesLabel ? (
+                                <section className="grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-3">
+                                    <div className="text-xs font-black uppercase text-[#475569]">Incluye</div>
+                                    <p className="whitespace-pre-wrap font-semibold text-[#0f172a]"><HighlightText value={accessoriesLabel} term={highlightTerm} /></p>
+                                </section>
+                            ) : null}
                             {ticket.info ? (
                                 <section className="grid gap-2 rounded-md border border-[#99f6e4] bg-[#f0fdfa] p-3">
                                     <div className="text-xs font-black uppercase text-[#0f766e]">Info interna</div>
@@ -3104,6 +3111,7 @@ function RepairEditCard({
                         {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                         {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
+                        {accessoriesLabel ? <FieldSummary label="Incluye" value={<HighlightText value={accessoriesLabel} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                     </div>
                     {readOnly && repair.actions?.deliver ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={openDeliveryModal}>
@@ -3134,6 +3142,7 @@ function RepairEditCard({
                                 {repair.cancelado_motivo ? <FieldSummary label="Motivo cancelacion" value={<HighlightText value={repair.cancelado_motivo} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.garantia_motivo ? <FieldSummary label="Motivo garantia" value={<HighlightText value={repair.garantia_motivo} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {repair.repuesto ? <FieldSummary label="Repuesto" value={repair.repuesto} onClick={openInlineEditor} /> : null}
+                                {accessoriesLabel ? <FieldSummary label="Incluye" value={<HighlightText value={accessoriesLabel} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                                 {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                                 {repair.observaciones ? <FieldSummary label="Observaciones" value={repair.observaciones} onClick={openInlineEditor} /> : null}
                             </div>

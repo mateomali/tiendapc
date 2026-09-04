@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toDataURL } from 'qrcode';
+import { partAccessoriesLabel } from '../../components/RepairPartAccessoriesFields';
 import type { RepairOrderView, RepairPaymentView, RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass } from '../../repairUi';
 import { formatCurrency } from '../../utils';
@@ -37,6 +38,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
         const financial = repairFinancialSummary(repair, ticketPricing);
         const modelLabel = ticketRepairModel(repair);
         const failureLabel = ticketRepairFailure(repair, modelLabel);
+        const accessoriesLabel = partAccessoriesLabel(repair.repuesto_agregados, repair.repuesto_agregado_otro);
         const increments = (repair.payments ?? []).filter((payment) => payment.payment_type === 'incremento');
         const deposits = (repair.payments ?? []).filter((payment) => payment.payment_type === 'senia' && Number(payment.amount ?? 0) > 0);
         const hasDeposits = deposits.length > 0;
@@ -50,6 +52,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
             modelLabel,
             modelKey: normalizeTicketText(modelLabel),
             failureLabel,
+            accessoriesLabel,
             monto,
             financial,
             deliveredLabel: repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null,
@@ -151,6 +154,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                     items={group.items.map((item) => ({
                                         key: item.key,
                                         failure: item.failureLabel,
+                                        accessories: item.accessoriesLabel,
                                         price: ticketRepairLinePriceLabel(item, subtotal.discountApplies, ticketPricing),
                                     }))}
                                     subtotal={group.items.length > 1 ? subtotal : null}
@@ -473,7 +477,7 @@ function TicketRepairGroupSummary({
 }: {
     label: string;
     model: string;
-    items: Array<{ key: string; failure: string; price: string | null }>;
+    items: Array<{ key: string; failure: string; accessories: string; price: string | null }>;
     subtotal: { cashLabel: string; listLabel: string; discountApplies: boolean } | null;
     showRegularSubtotal: boolean;
 }): JSX.Element {
@@ -487,9 +491,12 @@ function TicketRepairGroupSummary({
             <div className="text-[12px] leading-[1.15]">FALLAS:</div>
             <div className="grid gap-px">
                 {items.map((item) => (
-                    <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
-                        <strong className="min-w-0 break-words text-[12px] leading-[1.15]">{item.failure}</strong>
-                        {item.price !== null ? <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{item.price}</strong> : null}
+                    <div key={item.key} className="grid gap-px">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-[6px]">
+                            <strong className="min-w-0 break-words text-[12px] leading-[1.15]">{item.failure}</strong>
+                            {item.price !== null ? <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{item.price}</strong> : null}
+                        </div>
+                        {item.accessories !== '' ? <div className="break-words text-[11px] leading-[1.15]">INCLUYE: {item.accessories.toUpperCase()}</div> : null}
                     </div>
                 ))}
             </div>
