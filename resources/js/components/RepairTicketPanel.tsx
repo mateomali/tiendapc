@@ -2506,8 +2506,8 @@ function RepairEditCard({
             ) : null}
             {editOpen ? (
                 <ModalShell title={`Edición rápida de orden #${repair.id}`} onClose={() => setEditOpen(false)} tone="primary">
-                    <form className="grid gap-4" onSubmit={submitEdit}>
-                        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+                    <form className="repair-quick-edit grid gap-4" onSubmit={submitEdit}>
+                        <div className="quick-edit-columns grid gap-4 md:grid-cols-2">
                             <EditSection title="Datos Editables">
                                 <EditField label="ID de la orden" note="Si lo cambias, se renumeran todos los trabajos de esta orden.">
                                     <input className={changedInputClass(form.data.id_nuevo, String(repair.id))} type="number" min="1" value={form.data.id_nuevo} onChange={(event) => form.setData('id_nuevo', event.target.value)} disabled={readOnly} />
