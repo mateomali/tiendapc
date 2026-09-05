@@ -287,7 +287,6 @@
     padding: 0;
     box-shadow: none;
 }
-.repair-intake > summary { border: 0; border-bottom: 1px solid #e2e8f0; border-radius: 0; }
 .repair-intake > div { max-width: none; padding: 16px 24px 24px; }
 .repair-intake > div > section,
 .repair-intake .intake-form { border: 0; padding: 0; box-shadow: none; max-width: none; }
@@ -299,7 +298,6 @@
 .repair-intake .intake-dni > button { color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; padding: 6px 10px; gap: 8px; }
 .repair-intake .intake-dni > button:hover { background: #dbeafe; }
 .repair-intake .intake-unlock:not(.hidden) { display: grid; gap: 16px; }
-.repair-intake .intake-failure-row > label > span[aria-hidden=true] { display: none; }
 .repair-intake .intake-client { padding: 16px 0; border: 0; border-top: 1px solid #e2e8f0; border-radius: 0; background: white; gap: 16px 24px; }
 .repair-intake .intake-client > div,
 .repair-intake .intake-client > p { grid-column: 1 / -1; }
@@ -393,6 +391,103 @@
     :is(.repair-intake,.repair-quick-edit) { overflow-wrap: anywhere; }
 }
 
+/* ---------------------------------------------------------------------------
+   /ingreso - refinamiento visual del intake (scoped: no afecta quick-edit)
+   Mantiene la densidad de mostrador y ordena jerarquía, superficies y foco.
+--------------------------------------------------------------------------- */
+.repair-intake {
+    max-width: 1240px;
+    background: #f3f6fc;
+    border-color: #d6e2f3;
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 18px 36px -26px rgba(15, 23, 42, 0.25);
+}
+.repair-intake > header {
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+}
+.repair-intake > div { padding: 20px 22px 26px; }
+.repair-intake .intake-form {
+    gap: 18px;
+    background: #fff;
+    border: 1px solid #e2e9f4;
+    border-radius: 14px;
+    padding: 4px 0 6px;
+}
+.repair-intake .intake-section-title {
+    min-height: 32px;
+    padding: 6px 12px;
+    border-left-width: 4px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+.repair-intake .intake-section-title + * { margin-top: 2px; }
+.repair-intake .intake-client {
+    border-top: 1px solid #e7edf7;
+    background: #fbfdff;
+    gap: 18px 24px;
+}
+.repair-intake .intake-form article {
+    border-color: #e7edf7;
+}
+.repair-intake .intake-failures { gap: 10px; }
+.repair-intake .intake-failure-row {
+    border: 1px solid #e6edf8;
+    border-radius: 12px;
+    background: #fbfdff;
+    padding: 12px 12px 14px;
+}
+.repair-intake .intake-failure-row > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-top: 0.15rem;
+    padding-top: 0;
+    border-radius: 999px;
+    background: #e8effc;
+    color: #1d4ed8;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+.repair-intake .intake-failure-row > button { margin-top: 0; align-self: center; }
+.repair-intake .intake-form > section {
+    background: #fbfdff;
+    border-radius: 12px;
+    padding: 18px 18px 4px;
+}
+.repair-intake .intake-form > section > div:nth-child(2) > div {
+    border-left: 2px solid #e6edf8;
+    padding: 6px 14px;
+}
+.repair-intake .intake-form > section > div:nth-child(2) strong { font-size: 18px; }
+:is(.repair-intake) :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea) {
+    border-radius: 8px;
+}
+:is(.repair-intake) :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea)::placeholder {
+    color: #94a3b8;
+    opacity: 1;
+}
+:is(.repair-intake) :is(input,select,textarea,button,a,summary):focus-visible {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+:is(.repair-intake) :is(button,a,summary) { border-radius: 8px; }
+.repair-intake .intake-unlock > div > span,
+.repair-intake .intake-field > label,
+.repair-intake .intake-client > label,
+.repair-intake .intake-failure-row > label {
+    font-size: 0.8125rem;
+}
+@media (max-width: 767px) {
+    .repair-intake > div { padding: 12px; }
+    .repair-intake .intake-form > section { padding: 14px 14px 2px; }
+}
+
 @layer utilities {
     .cart-nudge-active {
         animation: cart-nudge 1.18s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
@@ -406,5 +501,16 @@
     .cart-nudge-active [data-cart-badge] {
         animation: cart-badge-pop 1.18s cubic-bezier(0.2, 0.8, 0.2, 1) 1;
         transform-origin: center;
+    }
+}
+
+/* Pantalla de ingreso rediseñada: campos alineados por columna.
+   Mantiene 16px en táctil para evitar el zoom automático de iOS. */
+.ingreso-flow :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea) {
+    font-size: 16px;
+}
+@media (min-width: 768px) {
+    .ingreso-flow :is(input:not([type=checkbox]):not([type=radio]):not([type=file]),select,textarea) {
+        font-size: 14px;
     }
 }

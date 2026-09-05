@@ -1,6 +1,6 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronDown, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from '../../components/RepairPartAccessoriesFields';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
@@ -134,6 +134,7 @@ interface RepairJobFormData {
     descripcion: string;
     observaciones: string;
     monto: string;
+    a_presupuestar: boolean;
     senia: string;
     senia_method: string;
     fecha_estimada: string;
@@ -189,6 +190,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         descripcion: '',
         observaciones: 'sin observaciones',
         monto: '0',
+        a_presupuestar: false,
         senia: '0',
         senia_method: 'efectivo',
         fecha_estimada: localDateWithOffset(0),
@@ -1222,6 +1224,7 @@ export default function WorkbenchPage({
             unlock_value: source.unlock_value,
             repuesto_agregados: source.repuesto_agregados,
             repuesto_agregado_otro: source.repuesto_agregado_otro,
+            a_presupuestar: source.a_presupuestar,
             fecha_estimada: source.fecha_estimada,
             observaciones: source.observaciones,
         };
@@ -1359,6 +1362,23 @@ export default function WorkbenchPage({
         return indexes;
     };
 
+    const deviceOrdinalForJob = (index: number): number =>
+        createForm.data.jobs.slice(0, index + 1).filter((job, jobIndex) => !(job.same_device && jobIndex > 0)).length;
+
+    const jobIsUnpriced = (job: RepairJobFormData): boolean => job.a_presupuestar || Number(job.monto || 0) <= 0;
+    const jobStatusLabel = (job: RepairJobFormData): string => jobIsUnpriced(job)
+        ? 'A presupuestar'
+        : Number(job.senia || 0) > 0 ? 'Con seña' : 'Presupuestado';
+    const jobStatusChipClass = (job: RepairJobFormData): string => jobIsUnpriced(job)
+        ? 'border-[#fde68a] bg-[#fffbeb] text-[#92400e]'
+        : Number(job.senia || 0) > 0 ? 'border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]' : 'border-[#dbe3ee] bg-[#f6f8fb] text-[#475569]';
+    const jobStatusChip = (job: RepairJobFormData): JSX.Element => (
+        <span className={cn('inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[0.7rem] font-black leading-5', jobStatusChipClass(job))}>
+            {jobIsUnpriced(job) ? <FaHourglassEnd aria-hidden="true" /> : Number(job.senia || 0) > 0 ? <FaCheckCircle aria-hidden="true" /> : <FaCheck aria-hidden="true" />}
+            {jobStatusLabel(job)}
+        </span>
+    );
+
     const formatMoney = (value: number): string => `$${value.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
     const suggestedPriceForJob = (job: RepairJobFormData): SuggestedRepairPrice | null => {
         if (!isPhoneCategory(job.categorias_reparacion)) {
@@ -1477,7 +1497,7 @@ export default function WorkbenchPage({
                 return `job-${index}-description`;
             }
 
-            if (job.monto.trim() === '' || Number(job.monto) <= 0) {
+            if (!job.a_presupuestar && (job.monto.trim() === '' || Number(job.monto) <= 0)) {
                 return `job-${index}-amount`;
             }
 
@@ -1534,7 +1554,7 @@ export default function WorkbenchPage({
                     && (!isPhoneCategory(job.categorias_reparacion) || job.marca.trim() !== '')
                 );
 
-                return hasDeviceData && job.descripcion.trim() !== '' && hasValidAmount(job.monto);
+                return hasDeviceData && job.descripcion.trim() !== '' && (hasValidAmount(job.monto) || job.a_presupuestar);
             });
         }
 
@@ -1968,6 +1988,9 @@ export default function WorkbenchPage({
             />
         ));
 
+    const intakeControl =
+        'min-h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.92rem] font-semibold text-[#0f172a] outline-none transition placeholder:text-slate-400 focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/25 disabled:bg-slate-100 disabled:text-slate-500';
+
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
@@ -2354,661 +2377,499 @@ export default function WorkbenchPage({
             ) : null}
 
             {isIngreso ? (
-            <>
-            <details className={cn(ui.repairShell, 'repair-intake group mx-auto w-full max-w-7xl')} open>
-                <summary className="cursor-pointer list-none rounded-md border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] transition hover:bg-[#f8fafc] md:px-5">
-                    <span className="inline-flex items-center gap-2">
-                        <FaPlusCircle aria-hidden="true" />
-                        Nueva orden de reparacion
-                    </span>
-                </summary>
-                <div className="mx-auto grid w-full max-w-6xl gap-3 pt-3 md:gap-4">
-                    <section className="rounded-md border border-[#cbd5e1] bg-white p-3 shadow-sm">
-                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-                                <h2 className="text-lg font-black tracking-tight text-[#0f172a] md:text-xl">Nueva orden de reparacion</h2>
-                                <span className="text-sm font-bold text-[#475569]">Orden #{createForm.data.id_orden || nextOrderId}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                                <Link href={route('repairs.workbench')} className={buttonClass('primary', 'sm')}>Ver ordenes</Link>
-                                <Link href={route('repairs.delivered')} className={buttonClass('soft', 'sm')}>Entregados</Link>
-                            </div>
+            <div className="ingreso-flow mx-auto grid w-full max-w-6xl gap-4">
+                <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-[#dce5f2] bg-white px-4 py-3 shadow-sm md:px-5">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#2563eb] text-white"><FaPlusCircle aria-hidden="true" /></span>
+                        <div className="min-w-0">
+                            <h2 className="text-lg font-black tracking-tight text-[#0f172a] md:text-xl">Nueva orden de reparación</h2>
+                            <p className="text-xs font-semibold text-[#64748b]">Cargá el cliente, el/los equipo(s) y el presupuesto de cada reparación.</p>
                         </div>
-                    </section>
+                        <span className="rounded-md bg-[#eff6ff] px-2 py-1 text-sm font-black text-[#1d4ed8]">Orden #{createForm.data.id_orden || nextOrderId}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link href={route('repairs.workbench')} className={buttonClass('soft', 'sm')}><FaSearch aria-hidden="true" />Ver órdenes</Link>
+                        <Link href={route('repairs.delivered')} className={buttonClass('soft', 'sm')}>Entregados</Link>
+                    </div>
+                </header>
 
-                    <form
-                        className="intake-form mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 rounded-md border border-[#cbd5e1] bg-white p-3 shadow-sm md:p-4"
-                        noValidate={isWizardIntake}
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            submitCreateForm();
-                        }}
-                    >
-                        {isWizardIntake ? (
-                            <div className="grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3">
-                                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                                    {intakeSteps.map((step, stepIndex) => (
+                <form
+                    id="intake-flow-form"
+                    className="grid gap-5 rounded-xl border border-[#dce5f2] bg-white p-3 shadow-sm md:p-5"
+                    noValidate={isWizardIntake}
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        submitCreateForm();
+                    }}
+                >
+                    {isWizardIntake ? (
+                        <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-2.5 sm:p-3">
+                            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                                {intakeSteps.map((step, stepIndex) => {
+                                    const isDone = stepIndex < activeIntakeStepIndex;
+                                    const isActive = activeIntakeStep === step.key;
+
+                                    return (
                                         <button
                                             key={step.key}
                                             type="button"
                                             className={cn(
-                                                'min-h-10 rounded-md border px-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45',
-                                                activeIntakeStep === step.key
-                                                    ? 'border-[#0f172a] bg-[#0f172a] text-white'
-                                                    : stepIndex < activeIntakeStepIndex
-                                                        ? 'border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]'
-                                                        : 'border-[#cbd5e1] bg-white text-[#334155]',
+                                                'flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45',
+                                                isActive
+                                                    ? 'border-[#2563eb] bg-[#2563eb] text-white shadow-[0_2px_6px_rgba(37,99,235,0.25)]'
+                                                    : isDone
+                                                        ? 'border-[#86efac] bg-[#f0fdf4] text-[#166534] hover:bg-[#dcfce7]'
+                                                        : 'border-[#cbd5e1] bg-white text-[#475569] hover:border-[#93c5fd] hover:bg-[#eff6ff]',
                                             )}
                                             onClick={() => canSelectIntakeStep(stepIndex) ? setActiveIntakeStep(step.key) : undefined}
                                             disabled={!canSelectIntakeStep(stepIndex)}
+                                            aria-current={isActive ? 'step' : undefined}
                                         >
-                                            {stepIndex + 1}. {step.label}
+                                            <span className={cn(
+                                                'grid h-6 w-6 shrink-0 place-items-center rounded-full text-[0.72rem] font-black leading-none',
+                                                isActive ? 'bg-white text-[#2563eb]' : isDone ? 'bg-[#bbf7d0] text-[#15803d]' : 'bg-[#eef2f7] text-[#475569]',
+                                            )}>
+                                                {isDone ? <FaCheck aria-hidden="true" /> : stepIndex + 1}
+                                            </span>
+                                            <span className="min-w-0 truncate">{step.label}</span>
                                         </button>
-                                    ))}
+                                    );
+                                })}
+                            </div>
+                            {activeCreateFlowFieldLabel !== '' ? (
+                                <div className="mt-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">
+                                    Falta: {activeCreateFlowFieldLabel}
                                 </div>
-                                {activeCreateFlowFieldLabel !== '' ? (
-                                    <div className="rounded-md border border-[#bfdbfe] bg-white px-3 py-2 text-sm font-bold text-[#1d4ed8]">
-                                        Falta: {activeCreateFlowFieldLabel}
-                                    </div>
-                                ) : null}
+                            ) : null}
+                        </div>
+                    ) : null}
+
+                    {/* ============ CLIENTE ============ */}
+                    <section className={cn('grid gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('client') && 'hidden')}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#2563eb]" aria-hidden="true" />Cliente</h3>
+                            <span className="text-xs font-semibold text-[#64748b]">Campos con <span className="font-black text-[#dc2626]">*</span> obligatorios</span>
+                        </div>
+                        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[12rem_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                            <label className="grid content-start gap-1.5">
+                                <span className="text-[13px] font-bold text-[#334155]">ID de orden <span className="text-[#dc2626]">*</span></span>
+                                <input className={intakeControl} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required />
+                                <span className="text-xs font-semibold text-[#64748b]">Editable si está libre.</span>
+                            </label>
+                            <label className="grid content-start gap-1.5">
+                                <span className="text-[13px] font-bold text-[#334155]">Nombre del cliente <span className="text-[#dc2626]">*</span></span>
+                                <input className={intakeControl} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required placeholder="Ej: Juan Pérez" />
+                            </label>
+                            <label className="grid content-start gap-1.5">
+                                <span className="text-[13px] font-bold text-[#334155]">DNI</span>
+                                <div className="relative">
+                                    <input className={cn(intakeControl, 'pr-11')} type="number" min="1" max="99999999" inputMode="numeric" value={createForm.data.dni} onChange={(event) => handleDniChange(event.target.value)} onBlur={() => void lookupByDni()} placeholder="00000000" />
+                                    <button
+                                        type="button"
+                                        aria-label="Buscar por DNI"
+                                        title="Buscar por DNI"
+                                        className="absolute inset-y-1.5 right-1.5 grid w-9 place-items-center rounded-md bg-[#eff6ff] text-[#1d4ed8] transition hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:opacity-60"
+                                        onClick={() => void lookupByDni()}
+                                        disabled={lookupBusy}
+                                    >
+                                        <FaSearch aria-hidden="true" />
+                                    </button>
+                                </div>
+                                <span className="text-xs font-semibold text-[#64748b]">Recupera datos previos del cliente.</span>
+                            </label>
+                            <label className="grid content-start gap-1.5">
+                                <span className="text-[13px] font-bold text-[#334155]">Teléfono / contacto</span>
+                                <input className={intakeControl} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} placeholder="Ej: 11 5555 5555" />
+                                <span className="text-xs font-semibold text-[#64748b]">Opcional.</span>
+                            </label>
+                        </div>
+                        {clientPreview ? (
+                            <div className="grid gap-3 rounded-xl border border-[#bbf7d0] bg-[#f0fdf4] p-4 text-sm text-[#14532d]">
+                                <div className="grid gap-1 font-semibold">
+                                    <span>Cliente encontrado en orden #{clientPreview.ultima_orden ?? '-'}</span>
+                                    <span>{clientPreview.nombre_cliente ?? 'Sin nombre'} - DNI {clientPreview.dni ?? '-'}</span>
+                                    <span>Contacto: {clientPreview.contacto && clientPreview.contacto.trim() !== '' ? clientPreview.contacto : 'Sin contacto'}</span>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <button className={buttonClass('success', 'sm')} type="button" onClick={importClientPreview}><FaCheckCircle aria-hidden="true" />Importar datos</button>
+                                    <button className={buttonClass('soft', 'sm')} type="button" onClick={() => setClientPreview(null)}>Ignorar</button>
+                                </div>
                             </div>
                         ) : null}
+                        {lookupFeedback !== '' ? <p className="rounded-lg bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
+                    </section>
 
-                        <div className={cn('intake-client grid items-start gap-3 rounded-md border border-[#cbd5e1] bg-[#fbfdff] p-3 md:grid-cols-2', !showIntakeStep('client') && 'hidden')}>
-                            <div className="md:col-span-2 xl:col-span-4">
-                                <div className={intakeSectionTitleClass}>Cliente</div>
-                            </div>
-                            <label className={guidedInlineLabelClass('order-id')}>ID de orden *<input className={guidedInputClass('order-id')} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required /><span className="text-xs font-semibold text-[#64748b]">Editable si esta libre.</span></label>
-                            <label className={guidedInlineLabelClass('customer-name')}>Nombre del cliente *<input className={guidedInputClass('customer-name')} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required /></label>
-                            <label className={repairLabelClass}>DNI<div className="intake-dni grid gap-2"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => handleDniChange(event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm', 'justify-self-start whitespace-nowrap')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}><FaSearch aria-hidden="true" />{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
-                            <label className={repairLabelClass}>Telefono / contacto<input className={compactInputClass} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Si queda vacio se guarda sin contacto.</span></label>
-                            {renderClientPreview('md:col-span-2 xl:col-span-4')}
-                            {lookupFeedback !== '' ? <p className="md:col-span-2 xl:col-span-4 rounded-md bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
-                        </div>
+                    {/* ============ EQUIPOS / REPARACIONES ============ */}
+                    <div className={cn('grid gap-5', !showIntakeStep('device') && !showIntakeStep('extras') && 'hidden')}>
+                        {createForm.data.jobs.map((job, index) => {
+                            if (job.same_device && index > 0) {
+                                return null;
+                            }
 
-                        <div className={cn('grid gap-4', !showIntakeStep('device') && !showIntakeStep('extras') && 'hidden')}>
-                            {createForm.data.jobs.map((job, index) => {
-                                if (job.same_device && index > 0) {
-                                    return null;
-                                }
+                            const groupedIndexes = groupedJobIndexes(index);
 
-                                const groupedIndexes = groupedJobIndexes(index);
-                                const hasGroupedFailures = groupedIndexes.length > 1;
-
-                                return (
-                                <article key={`job-v2-${index}`} className={cn('rounded-md border bg-white p-3 shadow-sm md:p-4', Number(job.monto || 0) <= 0 ? 'border-[#fed7aa]' : Number(job.senia || 0) > 0 ? 'border-[#86efac]' : 'border-[#cbd5e1]')}>
-                                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-[#e2e8f0] pb-3">
-                                        <h3 className="text-base font-black tracking-tight text-ink-950 md:text-lg">Trabajo #{index + 1}</h3>
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className={ui.repairMiniChip}>{Number(job.monto || 0) <= 0 ? 'A presupuestar' : Number(job.senia || 0) > 0 ? 'Con seña' : 'Presupuestado'}</span>
-                                            <span className={ui.repairMiniChip}>{imagePreviews[index]?.length ? `${imagePreviews[index].length} foto(s)` : 'Sin fotos'}</span>
-                                            <button className={buttonClass('soft', 'sm')} type="button" onClick={() => duplicateJob(index)} aria-label="Duplicar trabajo"><FaCopy aria-hidden="true" /></button>
-                                            {createForm.data.jobs.length > 1 ? <button type="button" className={buttonClass('danger', 'sm')} onClick={() => removeJob(index)} aria-label="Eliminar trabajo"><FaTimes aria-hidden="true" /></button> : null}
-                                        </div>
+                            return (
+                            <article key={`job-v2-${index}`} className="overflow-hidden rounded-xl border border-[#dce5f2] bg-white shadow-sm">
+                                <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6edf7] bg-[#f8fafc] px-4 py-3">
+                                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                                        <h3 className="text-base font-black tracking-tight text-[#0f172a]">Equipo #{deviceOrdinalForJob(index)}</h3>
+                                        <span className="text-xs font-bold text-[#64748b]">{groupedIndexes.length > 1 ? `Reparaciones #${groupedIndexes[0] + 1}–#${groupedIndexes[groupedIndexes.length - 1] + 1}` : `Reparación #${groupedIndexes[0] + 1}`}</span>
                                     </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {jobStatusChip(job)}
+                                        <span className="inline-flex items-center gap-1 rounded-md border border-[#dbeafe] bg-[#eff6ff] px-2 py-0.5 text-[0.7rem] font-bold leading-5 text-[#1d4ed8]">{imagePreviews[index]?.length ? `${imagePreviews[index].length} foto(s)` : 'Sin fotos'}</span>
+                                        <button className={buttonClass('soft', 'sm')} type="button" onClick={() => duplicateJob(index)} aria-label="Duplicar reparación" title="Duplicar reparación"><FaCopy aria-hidden="true" /></button>
+                                        {createForm.data.jobs.length > 1 ? <button type="button" className={buttonClass('danger', 'sm')} onClick={() => removeJob(index)} aria-label="Quitar reparación" title="Quitar reparación"><FaTimes aria-hidden="true" /></button> : null}
+                                    </div>
+                                </header>
 
-                                    <div className="intake-equipment grid min-w-0 items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                        {job.same_device && index > 0 ? (
-                                            <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-semibold text-[#334155] md:col-span-2 xl:col-span-4">
-                                                Misma unidad que el trabajo anterior: {[createForm.data.jobs[index - 1]?.marca, createForm.data.jobs[index - 1]?.modelo].map((value) => value?.trim()).filter(Boolean).join(' ') || 'equipo compartido'}.
-                                            </div>
-                                        ) : (
-                                            <>
-                                        <div className={cn(intakeSectionSpanClass, !showIntakeStep('device') && 'hidden')}>
-                                            <div className={cn(intakeSectionTitleClass, 'intake-section-equipment')}>Equipo</div>
-                                        </div>
-                                        <div className={cn(fieldPanelPurple, !showIntakeStep('device') && 'hidden')}>
-                                            <label className={repairLabelClass}>Categoría<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
-                                        </div>
-                                        {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <div className={cn(guidedPanelClass(fieldPanelPurple, `job-${index}-brand`), !showIntakeStep('device') && 'hidden')}>
-                                                <label className={repairLabelClass}>
-                                                    Marca
-                                                    <select className={guidedInputClass(`job-${index}-brand`)} value={job.marca} onChange={(event) => changeJobBrand(index, event.target.value)}>
+                                <div className="grid gap-5 p-4 md:p-5">
+                                    {/* --- Datos del equipo --- */}
+                                    <div className={cn('grid gap-4', !showIntakeStep('device') && 'hidden')}>
+                                        <h4 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#0d9488]" aria-hidden="true" />Datos del equipo</h4>
+                                        <div className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-[11rem_10rem_minmax(0,1fr)_10rem]">
+                                            <label className="grid content-start gap-1.5">
+                                                <span className="text-[13px] font-bold text-[#334155]">Categoría</span>
+                                                <select className={intakeControl} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>
+                                                    {serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+                                                </select>
+                                            </label>
+                                            {isPhoneCategory(job.categorias_reparacion) ? (
+                                                <label className="grid content-start gap-1.5">
+                                                    <span className="text-[13px] font-bold text-[#334155]">Marca</span>
+                                                    <select className={intakeControl} value={job.marca} onChange={(event) => changeJobBrand(index, event.target.value)}>
                                                         <option value="">Elegir marca...</option>
-                                                        {phoneBrandOptions.map((brand) => (
-                                                            <option key={brand} value={brand}>
-                                                                {brand}
-                                                            </option>
-                                                        ))}
+                                                        {phoneBrandOptions.map((brand) => (<option key={brand} value={brand}>{brand}</option>))}
                                                     </select>
                                                 </label>
+                                            ) : null}
+                                            <div className={cn('grid content-start gap-1.5', !isPhoneCategory(job.categorias_reparacion) && 'sm:col-span-2 xl:col-span-2')}>
+                                                <label className="grid content-start gap-1.5">
+                                                    <span className="text-[13px] font-bold text-[#334155]">Modelo / equipo <span className="text-[#dc2626]">*</span></span>
+                                                    <input className={intakeControl} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} placeholder="Ej: Samsung A54" />
+                                                </label>
+                                                {renderDeviceModelSuggestions(index)}
                                             </div>
-                                        ) : null}
-                                        <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-model`), 'intake-model', !isPhoneCategory(job.categorias_reparacion) && 'intake-model-wide', !showIntakeStep('device') && 'hidden')}>
-                                            <label className={repairLabelClass}>Modelo / equipo<input className={guidedInputClass(`job-${index}-model`)} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} /></label>
-                                            {renderDeviceModelSuggestions(index)}
-                                        </div>
-                                        <div className={cn(fieldPanelBlue, !showIntakeStep('device') && 'hidden')}>
-                                            <label className={repairLabelClass}>
-                                                Color
-                                                <RepairColorCombobox className={compactInputClass} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
+                                            <label className="grid content-start gap-1.5">
+                                                <span className="text-[13px] font-bold text-[#334155]">Color</span>
+                                                <RepairColorCombobox className={intakeControl} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
                                             </label>
-                                        </div>
-                                        {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <div className={cn(fieldPanelPurple, 'intake-unlock md:col-span-2 xl:col-span-4', !showIntakeStep('device') && 'hidden')}>
-                                                <label className={repairLabelClass}>
-                                                    Desbloqueo
+                                            {isPhoneCategory(job.categorias_reparacion) ? (
+                                                <div className="grid gap-3 sm:grid-cols-2 sm:col-span-2 xl:col-span-4">
                                                     <PhoneUnlockFields
                                                         unlockType={job.unlock_type}
                                                         unlockValue={job.unlock_value}
                                                         onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
-                                                        selectClassName={compactInputClass}
-                                                        inputClassName={compactInputClass}
+                                                        selectClassName={intakeControl}
+                                                        inputClassName={intakeControl}
                                                     />
-                                                </label>
-                                                <RepairPartAccessoriesFields
-                                                    selected={job.repuesto_agregados}
-                                                    other={job.repuesto_agregado_otro}
-                                                    inputClassName={compactInputClass}
-                                                    onChange={(selected, other) => updateJob(index, (current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
-                                                    onOtherChange={(value) => updateJob(index, (current) => ({ ...current, repuesto_agregado_otro: value }))}
-                                                />
-                                            </div>
-                                        ) : null}
-                                            </>
-                                        )}
-                                        <div className={cn(intakeSectionSpanClass, !showIntakeStep('device') && 'hidden')}>
-                                            <div className={cn(intakeSectionTitleClass, 'intake-section-budget')}>Falla y presupuesto</div>
+                                                    <RepairPartAccessoriesFields
+                                                        selected={job.repuesto_agregados}
+                                                        other={job.repuesto_agregado_otro}
+                                                        inputClassName={intakeControl}
+                                                        onChange={(selected, other) => updateJob(index, (current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
+                                                        onOtherChange={(value) => updateJob(index, (current) => ({ ...current, repuesto_agregado_otro: value }))}
+                                                    />
+                                                </div>
+                                            ) : null}
                                         </div>
-                                        <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'intake-failures md:col-span-2 xl:col-span-4', !showIntakeStep('device') && 'hidden')}>
-                                            <label className={repairLabelClass}>Falla / trabajo a realizar *</label>
-                                            <div className="grid gap-2">
-                                                <select
-                                                    className={guidedInputClass(`job-${index}-description`)}
-                                                    value={pendingFailureOptions[index] ?? ''}
-                                                    onChange={(event) => {
-                                                        const optionKey = event.target.value;
-                                                        setPendingFailureOptions((current) => ({ ...current, [index]: optionKey }));
-                                                        if (optionKey !== '') {
-                                                            addFailureFromSelectedOption(index, optionKey);
-                                                        }
-                                                    }}
-                                                >
-                                                    <option value="">Elegir falla...</option>
-                                                    {descriptionOptions.map((option) => (
-                                                        <option key={option.key} value={option.key}>
-                                                            {option.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="intake-failure-list grid gap-2">
-                                                {groupedIndexes.map((jobIndex, rowIndex) => {
-                                                    const rowJob = createForm.data.jobs[jobIndex];
+                                    </div>
 
-                                                    return (
-                                                        <div
-                                                            key={`failure-row-${jobIndex}`}
-                                                            className="intake-failure-row grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 rounded-md border border-[#e2e8f0] bg-white p-2 sm:grid-cols-[2rem_minmax(0,1fr)_7.5rem_7.5rem] lg:grid-cols-[2rem_minmax(0,1fr)_7.25rem_7.25rem_9.25rem_auto] lg:items-start"
-                                                        >
-                                                            <span className="pt-2 text-sm font-black text-[#475569]">#{rowIndex + 1}</span>
-                                                            <label className="intake-failure-description grid content-start gap-1 text-xs font-bold text-[#475569]">
-                                                                Detalle de la falla
+                                    {/* --- Falla y presupuesto --- */}
+                                    <div className={cn('grid gap-3', !showIntakeStep('device') && 'hidden')}>
+                                        <h4 className="flex items-center justify-between gap-2 text-sm font-black text-[#0f172a]">
+                                            <span className="flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-[#d97706]" aria-hidden="true" />Falla y presupuesto</span>
+                                            <span className="text-xs font-semibold text-[#64748b]">Agregá fallas para el mismo equipo o <button type="button" className="font-bold text-[#2563eb] underline-offset-2 hover:underline" onClick={() => addJobForSameDevice()}>cargá otra reparación</button>.</span>
+                                        </h4>
+                                        <div className="grid gap-1.5">
+                                            <select
+                                                className={intakeControl}
+                                                value={pendingFailureOptions[index] ?? ''}
+                                                onChange={(event) => {
+                                                    const optionKey = event.target.value;
+                                                    setPendingFailureOptions((current) => ({ ...current, [index]: optionKey }));
+                                                    if (optionKey !== '') {
+                                                        addFailureFromSelectedOption(index, optionKey);
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Elegir falla o servicio frecuente...</option>
+                                                {descriptionOptions.map((option) => (<option key={option.key} value={option.key}>{option.label}</option>))}
+                                            </select>
+                                            <p className="text-xs font-semibold text-[#64748b]">Elegí una falla y se agrega automáticamente a la lista de abajo.</p>
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <div className="hidden items-center gap-x-3 rounded-lg bg-[#f1f5f9] px-3 py-2 text-[11px] font-black uppercase tracking-wide text-[#64748b] md:grid md:grid-cols-[2rem_minmax(0,1fr)_9.5rem_8rem_8.5rem_2rem]">
+                                                <span aria-hidden="true" />
+                                                <span className="pl-3">Detalle de la falla <span className="text-[#dc2626]">*</span></span>
+                                                <span className="pl-3">Monto</span>
+                                                <span className="pl-3">Seña</span>
+                                                <span className="pl-3">Medio</span>
+                                                <span aria-hidden="true" />
+                                            </div>
+                                            {groupedIndexes.map((jobIndex, rowIndex) => {
+                                                const rowJob = createForm.data.jobs[jobIndex];
+                                                const isOnlyRow = groupedIndexes.length === 1;
+
+                                                return (
+                                                    <div key={`failure-row-${jobIndex}`} className="grid gap-2 rounded-lg border border-[#e6edf7] bg-[#fbfdff] p-3 md:grid md:grid-cols-[2rem_minmax(0,1fr)_9.5rem_8rem_8.5rem_2rem] md:items-start md:gap-x-3">
+                                                        <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e8effc] text-[0.72rem] font-black text-[#1d4ed8]">{jobIndex + 1}</span>
+                                                        <label className="grid content-start gap-1.5">
+                                                            <span className="text-xs font-bold text-[#475569] md:hidden">Detalle de la falla <span className="text-[#dc2626]">*</span></span>
                                                             <textarea
-                                                                className={guidedInputClass(`job-${jobIndex}-description`, cn(compactTextareaClass, 'col-start-2 min-h-[4.25rem] sm:col-start-auto'))}
                                                                 rows={2}
+                                                                className={cn(intakeControl, 'min-h-11 resize-y')}
                                                                 value={rowJob.descripcion}
                                                                 onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, descripcion: event.target.value }))}
                                                                 required
+                                                                aria-label="Detalle de la falla"
                                                                 placeholder="Detalle de la falla"
                                                             />
-                                                            </label>
-                                                            <label className="col-start-2 grid content-start gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
-                                                                Monto
+                                                        </label>
+                                                        <label className="grid content-start gap-1.5">
+                                                            <span className="text-xs font-bold text-[#475569] md:hidden">Monto</span>
+                                                            {rowJob.a_presupuestar ? (
+                                                                <div className="grid gap-1.5">
+                                                                    <span className="inline-flex w-fit items-center gap-1 rounded-md border border-dashed border-[#f59e0b] bg-[#fffbeb] px-2 py-1.5 text-sm font-bold text-[#92400e]"><FaHourglassEnd aria-hidden="true" />A presupuestar</span>
+                                                                    <button type="button" className={buttonClass('soft', 'sm', 'justify-self-start whitespace-nowrap')} onClick={() => updateJob(jobIndex, (current) => ({ ...current, a_presupuestar: false }))}>Poner precio</button>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="relative">
+                                                                        <span className="pointer-events-none absolute inset-y-0 left-2.5 grid place-items-center text-sm font-semibold text-[#64748b]" aria-hidden="true">$</span>
+                                                                        <input
+                                                                            className={cn(intakeControl, 'pl-7')}
+                                                                            style={{ paddingLeft: '1.6rem' }}
+                                                                            inputMode="decimal"
+                                                                            value={rowJob.monto}
+                                                                            onFocus={() => clearAmountForTyping(jobIndex, 'monto')}
+                                                                            onKeyDown={preventAmountArrowStep}
+                                                                            onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value, a_presupuestar: Number(event.target.value) > 0 ? false : current.a_presupuestar }))}
+                                                                            aria-label="Monto"
+                                                                        />
+                                                                    </div>
+                                                                    {suggestedPriceIndicator(jobIndex, true)}
+                                                                    {regularPriceIndicator(rowJob.monto, true)}
+                                                                    <button type="button" className={buttonClass('soft', 'sm', 'justify-self-start whitespace-nowrap text-[#92400e]')} onClick={() => updateJob(jobIndex, (current) => ({ ...current, a_presupuestar: true, monto: '' }))}>A presupuestar</button>
+                                                                </>
+                                                            )}
+                                                        </label>
+                                                        <label className="grid content-start gap-1.5">
+                                                            <span className="text-xs font-bold text-[#475569] md:hidden">Seña</span>
+                                                            <div className="relative">
+                                                                <span className="pointer-events-none absolute inset-y-0 left-2.5 grid place-items-center text-sm font-semibold text-[#64748b]" aria-hidden="true">$</span>
                                                                 <input
-                                                                    className={guidedInputClass(`job-${jobIndex}-amount`)}
-                                                                    inputMode="decimal"
-                                                                    value={rowJob.monto}
-                                                                    onFocus={() => clearAmountForTyping(jobIndex, 'monto')}
-                                                                    onKeyDown={preventAmountArrowStep}
-                                                                    onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value }))}
-                                                                />
-                                                                {suggestedPriceIndicator(jobIndex, true)}
-                                                                {regularPriceIndicator(rowJob.monto, true)}
-                                                            </label>
-                                                            <label className="col-start-2 grid content-start gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
-                                                                Seña
-                                                                <input
-                                                                    className={compactInputClass}
+                                                                    className={intakeControl}
+                                                                    style={{ paddingLeft: '1.6rem' }}
                                                                     inputMode="decimal"
                                                                     value={rowJob.senia}
                                                                     onFocus={() => clearAmountForTyping(jobIndex, 'senia')}
                                                                     onKeyDown={preventAmountArrowStep}
                                                                     onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia: event.target.value }))}
+                                                                    aria-label="Seña"
                                                                 />
-                                                                <span className="block min-h-5 text-xs leading-5 text-transparent" aria-hidden="true">.</span>
-                                                            </label>
-                                                            <label className="col-start-2 grid content-start gap-1 text-xs font-bold text-[#475569] sm:col-start-auto">
-                                                                Medio
-                                                                <select
-                                                                    className={compactInputClass}
-                                                                    value={rowJob.senia_method}
-                                                                    onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia_method: event.target.value }))}
-                                                                >
-                                                                    <option value="efectivo">Efectivo</option>
-                                                                    <option value="transferencia">Transferencia</option>
-                                                                </select>
-                                                                <span className="block min-h-5 text-xs leading-5 text-transparent" aria-hidden="true">.</span>
-                                                            </label>
-                                                            {rowIndex > 0 ? (
-                                                                <button
-                                                                    type="button"
-                                                                    className={cn(buttonClass('danger', 'sm'), 'col-start-2 w-full sm:col-start-auto lg:w-auto')}
-                                                                    onClick={() => removeJob(jobIndex)}
-                                                                    aria-label="Quitar falla"
-                                                                >
-                                                                    <FaTimes aria-hidden="true" />
-                                                                </button>
-                                                            ) : (
-                                                                <span className="hidden lg:block" />
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                            <span className="text-xs font-semibold text-[#64748b]">Elegí una falla y se agrega automáticamente. Si ya hay una cargada, se apila como otro trabajo del mismo equipo.</span>
-                                        </div>
-                                        <div className={cn(intakeSectionSpanClass, !showIntakeStep('extras') && 'hidden')}>
-                                            <div className={cn(intakeSectionTitleClass, 'intake-section-delivery')}>Entrega y repuesto</div>
-                                        </div>
-                                        <div className={cn(guidedPanelClass(fieldPanelAmber, `job-${index}-date`), !showIntakeStep('extras') && 'hidden')}>
-                                            <label className={repairLabelClass}>Fecha estimada{renderEstimatedDateField(index, job, guidedInputClass(`job-${index}-date`))}</label>
-                                        </div>
-                                        <div className={cn(fieldPanelPurple, 'intake-notes md:col-span-2 xl:col-span-3', !showIntakeStep('extras') && 'hidden')}>
-                                            <label className={repairLabelClass}>Observaciones<textarea className={compactTextareaClass} rows={4} value={job.observaciones} onFocus={() => { if (job.observaciones.trim().toLowerCase() === 'sin observaciones') updateJob(index, (current) => ({ ...current, observaciones: '' })); }} onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))} /></label>
-                                        </div>
-                                        <div className={cn('intake-images grid min-w-0 gap-2.5 rounded-md border border-dashed border-[#94a3b8] bg-[#fbfdff] p-2.5 md:col-span-2 xl:col-span-2', !showIntakeStep('extras') && 'hidden')}>
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <strong className="text-sm text-[#0f172a]">Imagenes ({imagePreviews[index]?.length ?? 0}/2)</strong>
-                                                <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{imagePreviews[index]?.length ?? 0}/2</span>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <label className={buttonClass('primary', 'sm', 'px-2')}><FaCamera aria-hidden="true" /> Foto<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => setJobImages(index, event.target.files)} /></label>
-                                                <WebcamCaptureButton className={buttonClass('soft', 'sm', 'px-2')} label="Webcam" onCapture={(file) => setJobImageFiles(index, [file])} />
-                                                <label className={buttonClass('soft', 'sm', 'px-2')}><FaImages aria-hidden="true" /> Galeria<input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => setJobImages(index, event.target.files)} /></label>
-                                            </div>
-                                            <span className="text-[0.75rem] font-semibold text-slate-500">Estas imagenes se guardan como fotos iniciales del trabajo. Maximo 2.</span>
-                                            {imagePreviews[index]?.length ? (
-                                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                                    {imagePreviews[index].map((src, previewIndex) => (
-                                                        <div key={`${src}-${previewIndex}`} className="relative overflow-hidden rounded-lg border border-[#bfdbfe] bg-white">
-                                                            <img className="aspect-[4/3] w-full object-cover" src={src} alt={`Vista previa ${previewIndex + 1}`} />
-                                                            <span className="absolute bottom-1 left-1 rounded bg-slate-950/70 px-1.5 py-0.5 text-[0.65rem] font-bold text-white">Nueva {previewIndex + 1}</span>
-                                                            <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-[#ef4444] text-xs font-bold text-white" onClick={() => removeJobImage(index, previewIndex)} aria-label={`Quitar imagen ${previewIndex + 1}`}>
+                                                            </div>
+                                                        </label>
+                                                        <label className="grid content-start gap-1.5">
+                                                            <span className="text-xs font-bold text-[#475569] md:hidden">Medio</span>
+                                                            <select
+                                                                className={intakeControl}
+                                                                value={rowJob.senia_method}
+                                                                onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia_method: event.target.value }))}
+                                                                aria-label="Medio de pago de la seña"
+                                                            >
+                                                                <option value="efectivo">Efectivo</option>
+                                                                <option value="transferencia">Transferencia</option>
+                                                            </select>
+                                                        </label>
+                                                        {!isOnlyRow ? (
+                                                            <button
+                                                                type="button"
+                                                                className={cn(buttonClass('danger', 'sm'), 'justify-self-start')}
+                                                                onClick={() => removeJob(jobIndex)}
+                                                                aria-label={`Quitar falla ${jobIndex + 1}`}
+                                                                title="Quitar falla"
+                                                            >
                                                                 <FaTimes aria-hidden="true" />
                                                             </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <span className="rounded-md border border-dashed border-[#bfdbfe] bg-white px-3 py-3 text-center text-sm font-semibold text-slate-500">No hay imagenes seleccionadas.</span>
-                                            )}
+                                                        ) : <span aria-hidden="true" />}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
-                                        <details
-                                            className={cn(fieldPanelAmber, 'md:col-span-2 xl:col-span-2', !showIntakeStep('extras') && 'hidden')}
-                                            open={Boolean(expandedPartPanels[index] || job.pedir_repuesto || job.repuesto.trim() !== '' || job.inventory_part_id !== '')}
-                                            onToggle={(event) => {
-                                                const isOpen = event.currentTarget.open;
+                                    </div>
 
-                                                setExpandedPartPanels((current) => ({ ...current, [index]: isOpen }));
-                                            }}
-                                        >
-                                            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
-                                                <span className="text-sm font-black text-[#334155]">Repuesto / caja</span>
-                                                <label className="inline-flex items-center gap-2 rounded-md border border-[#f59e0b33] bg-white px-3 py-1 text-xs font-bold text-[#92400e]" onClick={(event) => event.stopPropagation()}>
-                                                    <input type="checkbox" checked={job.pedir_repuesto} onChange={(event) => togglePartRequest(index, event.target.checked)} />
-                                                    Mandar a pedidos
-                                                </label>
-                                            </summary>
-                                            <label className={cn(repairLabelClass, 'mt-2')}>
-                                                Buscar en cajas
+                                    {/* --- Entrega, fotos y repuesto --- */}
+                                    <div className={cn('grid gap-5', !showIntakeStep('extras') && 'hidden')}>
+                                        <h4 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#475569]" aria-hidden="true" />Entrega, fotos y repuesto</h4>
+
+                                        <div className="grid items-start gap-x-5 gap-y-4 lg:grid-cols-[12rem_minmax(0,1fr)]">
+                                            <label className="grid content-start gap-1.5">
+                                                <span className="text-[13px] font-bold text-[#334155]">Fecha estimada</span>
+                                                {renderEstimatedDateField(index, job, intakeControl)}
+                                            </label>
+                                            <label className="grid content-start gap-1.5">
+                                                <span className="text-[13px] font-bold text-[#334155]">Observaciones</span>
+                                                <textarea
+                                                    rows={3}
+                                                    className={cn(intakeControl, 'min-h-24 resize-y')}
+                                                    value={job.observaciones}
+                                                    onFocus={() => { if (job.observaciones.trim().toLowerCase() === 'sin observaciones') updateJob(index, (current) => ({ ...current, observaciones: '' })); }}
+                                                    onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))}
+                                                />
+                                            </label>
+                                        </div>
+
+                                        <div className="grid items-start gap-x-5 gap-y-4 lg:grid-cols-2">
+                                            <div className="grid min-w-0 gap-2.5 rounded-xl border border-dashed border-[#94a3b8] bg-[#fbfdff] p-3">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <strong className="text-sm font-black text-[#0f172a]">Fotos iniciales ({imagePreviews[index]?.length ?? 0}/2)</strong>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <label className={buttonClass('primary', 'sm', 'px-2')}><FaCamera aria-hidden="true" />Foto<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => setJobImages(index, event.target.files)} /></label>
+                                                    <WebcamCaptureButton className={buttonClass('soft', 'sm', 'px-2')} label="Webcam" onCapture={(file) => setJobImageFiles(index, [file])} />
+                                                    <label className={buttonClass('soft', 'sm', 'px-2')}><FaImages aria-hidden="true" />Galería<input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => setJobImages(index, event.target.files)} /></label>
+                                                </div>
+                                                <p className="text-xs font-semibold text-[#64748b]">Se guardan como fotos iniciales del trabajo. Máximo 2.</p>
+                                                {imagePreviews[index]?.length ? (
+                                                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                                        {imagePreviews[index].map((src, previewIndex) => (
+                                                            <div key={`${src}-${previewIndex}`} className="relative overflow-hidden rounded-lg border border-[#bfdbfe] bg-white">
+                                                                <img className="aspect-[4/3] w-full object-cover" src={src} alt={`Vista previa ${previewIndex + 1}`} />
+                                                                <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-[#ef4444] text-xs font-bold text-white" onClick={() => removeJobImage(index, previewIndex)} aria-label={`Quitar imagen ${previewIndex + 1}`}>
+                                                                    <FaTimes aria-hidden="true" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <span className="rounded-lg border border-dashed border-[#bfdbfe] bg-white px-3 py-3 text-center text-sm font-semibold text-[#64748b]">Sin fotos seleccionadas.</span>
+                                                )}
+                                            </div>
+
+                                            <div className="grid min-w-0 gap-2.5 rounded-xl border border-[#fde68a] bg-[#fffaf0] p-3">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <strong className="text-sm font-black text-[#7c2d12]">Repuesto / caja</strong>
+                                                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-[#fcd34d] bg-white px-3 py-1.5 text-xs font-bold text-[#92400e]">
+                                                        <input type="checkbox" checked={job.pedir_repuesto} onChange={(event) => togglePartRequest(index, event.target.checked)} />
+                                                        Mandar a pedidos
+                                                    </label>
+                                                </div>
                                                 <div className="relative">
                                                     <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#92400e]" aria-hidden="true" />
                                                     <input
-                                                        className={cn(compactInputClass, 'pl-9')}
+                                                        className={cn(intakeControl, 'pl-9')}
                                                         value={partSearches[index] ?? job.repuesto}
                                                         onChange={(event) => {
                                                             const value = event.target.value;
                                                             setPartSearches((current) => ({ ...current, [index]: value }));
                                                             updateJob(index, (current) => ({ ...current, repuesto: value, inventory_part_id: '' }));
                                                         }}
-                                                        placeholder="Buscar modulo, bateria, modelo..."
+                                                        placeholder="Buscar módulo, batería, modelo..."
                                                     />
                                                 </div>
-                                            </label>
-                                            {matchingInventoryParts(index).length > 0 ? (
-                                                <div className="mt-2 grid gap-1">
-                                                    {matchingInventoryParts(index).map((part) => (
-                                                        <button
-                                                            key={part.id}
-                                                            type="button"
-                                                            className={cn(
-                                                                'grid gap-1 rounded-lg border px-3 py-2 text-left text-sm transition hover:bg-[#f8fafc]',
-                                                                job.inventory_part_id === String(part.id)
-                                                                    ? 'border-[#16a34a] bg-[#dcfce7] text-[#14532d]'
-                                                                    : 'border-[#fed7aa] bg-white text-[#334155] hover:bg-[#fff7ed]',
-                                                            )}
-                                                            onClick={() => selectInventoryPart(index, part)}
-                                                        >
-                                                            <span className="font-black">{part.model}</span>
-                                                            <span className="text-xs font-bold text-slate-500">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            ) : (partSearches[index] ?? job.repuesto).trim().length >= 2 ? (
-                                                <div className="mt-2 rounded-lg border border-dashed border-[#fed7aa] bg-white px-3 py-2 text-sm font-bold text-[#92400e]">
-                                                    No hay coincidencias en cajas. Si hace falta pedirlo, marca Mandar a pedidos.
-                                                </div>
-                                            ) : null}
-                                            {job.inventory_part_id !== '' ? (
-                                                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
-                                                    <span>Asignado desde caja. Al guardar se descuenta del inventario.</span>
-                                                    <button type="button" className="text-xs font-bold text-[#15803d] underline-offset-2 hover:underline" onClick={() => clearInventoryPart(index)}>
-                                                        Quitar seleccion
-                                                    </button>
-                                                </div>
-                                            ) : null}
-                                            <textarea
-                                                className={compactTextareaClass}
-                                                rows={2}
-                                                placeholder="Detalle del repuesto. Ej: modulo Samsung A54 negro"
-                                                value={job.repuesto}
-                                                onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))}
-                                            />
-                                            <span className="mt-1 block text-xs font-semibold text-[#92400e]">Si elegis un repuesto disponible no hace falta mandarlo a pedidos. Si no hay stock, marca Mandar a pedidos.</span>
-                                        </details>
-                                    </div>
-                                </article>
-                                );
-                            })}
-                        </div>
-
-                        <section className={cn('grid gap-3 rounded-md border border-[#cbd5e1] bg-[#fbfdff] p-3 md:p-4', !showIntakeStep('summary') && 'hidden')}>
-                            <div className="grid gap-2">
-                                <strong className="text-sm font-black text-[#0f172a]">Resumen de trabajos</strong>
-                                <div className="overflow-hidden rounded-md border border-[#cbd5e1] bg-white">
-                                    {jobSubtotalRows.map((row) => (
-                                        <div key={`subtotal-${row.index}`} className="grid gap-1 border-b border-[#e2e8f0] px-3 py-2 text-sm last:border-b-0 md:grid-cols-[3rem_minmax(0,1fr)_8rem_8rem] md:items-center">
-                                            <span className="font-black text-[#475569]">#{row.index + 1}</span>
-                                            <span className="min-w-0">
-                                                <strong className="block truncate text-[#0f172a]">{row.description}</strong>
-                                                <span className="block truncate text-xs font-semibold text-[#64748b]">{row.model}</span>
-                                            </span>
-                                            <span className="font-bold text-[#334155]">Seña {formatMoney(row.deposit)}</span>
-                                            <strong className="text-[#0f172a] md:text-right">{row.amount > 0 ? formatMoney(row.amount) : 'A presupuestar'}</strong>
+                                                {matchingInventoryParts(index).length > 0 ? (
+                                                    <div className="grid max-h-40 gap-1 overflow-y-auto">
+                                                        {matchingInventoryParts(index).map((part) => (
+                                                            <button
+                                                                key={part.id}
+                                                                type="button"
+                                                                className={cn('grid gap-0.5 rounded-lg border px-3 py-2 text-left text-sm transition',
+                                                                    job.inventory_part_id === String(part.id) ? 'border-[#16a34a] bg-[#dcfce7] text-[#14532d]' : 'border-[#fed7aa] bg-white text-[#334155] hover:bg-[#fff7ed]')}
+                                                                onClick={() => selectInventoryPart(index, part)}
+                                                            >
+                                                                <span className="font-black">{part.model}</span>
+                                                                <span className="text-xs font-bold text-[#64748b]">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ) : (partSearches[index] ?? job.repuesto).trim().length >= 2 ? (
+                                                    <div className="rounded-lg border border-dashed border-[#fed7aa] bg-white px-3 py-2 text-sm font-bold text-[#92400e]">Sin coincidencias en cajas. Si hace falta pedirlo, marcá "Mandar a pedidos".</div>
+                                                ) : null}
+                                                {job.inventory_part_id !== '' ? (
+                                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-sm font-bold text-[#166534]">
+                                                        <span>Asignado desde caja. Al guardar se descuenta del inventario.</span>
+                                                        <button type="button" className="text-xs font-bold text-[#15803d] underline-offset-2 hover:underline" onClick={() => clearInventoryPart(index)}>Quitar selección</button>
+                                                    </div>
+                                                ) : null}
+                                                <textarea
+                                                    rows={2}
+                                                    className={cn(intakeControl, 'min-h-14 resize-y')}
+                                                    placeholder="Detalle del repuesto. Ej: módulo Samsung A54 negro"
+                                                    value={job.repuesto}
+                                                    onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))}
+                                                />
+                                                <p className="text-xs font-semibold text-[#92400e]">Si elegís un repuesto disponible no hace falta pedirlo. Sin stock → "Mandar a pedidos".</p>
+                                            </div>
                                         </div>
-                                    ))}
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
-                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong><span className={cn('block text-xs font-semibold text-[#64748b]', regularTotal > totals.monto && 'font-black text-[#92400e]')}>Regular sin descuento: {regularTotal > 0 ? formatMoney(regularTotal) : 'sin monto'}</span></div>
-                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
-                            <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
-                            </div>
-                            <div className={cn('hidden gap-2 border-t border-[#dbeafe] pt-3 lg:grid lg:grid-cols-[auto_auto] lg:justify-end', isWizardIntake && 'lg:hidden')}>
-                                <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Otro equipo</button>
-                                <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}><FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
-                            </div>
-                        </section>
+                            </article>
+                            );
+                        })}
+                    </div>
 
-                        {isWizardIntake ? (
-                            <div className="grid gap-2 border-t border-[#e2e8f0] pt-3 sm:flex sm:items-center sm:justify-between">
-                                <button className={buttonClass('soft')} type="button" onClick={goToPreviousIntakeStep} disabled={activeIntakeStepIndex === 0}>
-                                    Anterior
-                                </button>
-                                {activeIntakeStep === 'summary' ? (
-                                    <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}>
-                                        <FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}
-                                    </button>
-                                ) : (
-                                    <button className={buttonClass('primary')} type="button" onClick={goToNextIntakeStep} disabled={!canGoToNextIntakeStep}>
-                                        Siguiente
-                                    </button>
-                                )}
-                            </div>
-                        ) : null}
-
-                        <div className={cn('grid gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between lg:hidden', isWizardIntake && 'hidden')}>
-                            <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" /> Otro equipo</button>
-                            <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}><FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
-                        </div>
-                        {duplicateNotice !== '' ? <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-[#111827] px-4 py-2 text-sm font-bold text-white shadow-lg">{duplicateNotice}</div> : null}
-                    </form>
-                </div>
-            </details>
-
-            <details className="hidden">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-[#334155]">
-                    Nueva orden
-                </summary>
-                <div className="px-4 pb-4">
-                    <form
-                        className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            submitCreateForm();
-                        }}
-                    >
-                        <div className={ui.repairCardHeading}>
-                            <div className={ui.cardTitleWrap}>
-                                <p className={ui.eyebrow}>Ingreso técnico</p>
-                                <h2 className={ui.cardTitle}>Nueva orden multi-trabajo</h2>
-                                <p className={ui.inlineCaption}>
-                                    Recupera cliente por DNI, arma varios trabajos en un mismo ticket y redirige al ticket técnico al guardar.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className={ui.repairFormGrid}>
-                            <input
-                                className={ui.input}
-                                placeholder="Cliente"
-                                value={createForm.data.nombre_cliente}
-                                onChange={(event) => createForm.setData('nombre_cliente', event.target.value)}
-                            />
-                            <div className="flex gap-3">
-                                <input
-                                    className={ui.input}
-                                    placeholder="DNI"
-                                    value={createForm.data.dni}
-                                    onChange={(event) => handleDniChange(event.target.value)}
-                                    onBlur={() => void lookupByDni()}
-                                />
-                                <button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>
-                                    {lookupBusy ? 'Buscando...' : 'Buscar DNI'}
-                                </button>
-                            </div>
-                            <input
-                                className={`${ui.input} ${ui.repairFull}`}
-                                placeholder="Contacto"
-                                value={createForm.data.contacto}
-                                onChange={(event) => createForm.setData('contacto', event.target.value)}
-                            />
-                            {renderClientPreview(ui.repairFull)}
-                            {lookupFeedback !== '' ? <p className={`${ui.inlineCaption} ${ui.repairFull}`}>{lookupFeedback}</p> : null}
-                        </div>
-
-                        <div className="grid gap-4">
-                            {createForm.data.jobs.map((job, index) => (
-                                <article key={`job-${index}`} className={ui.repairRepairCard}>
-                                    <div className={ui.repairRepairHead}>
-                                        <div className={ui.cardTitleWrap}>
-                                            <p className={ui.eyebrow}>Trabajo #{index + 1}</p>
-                                            <h3 className="text-xl font-black tracking-tight text-ink-950">
-                                                {job.modelo.trim() !== '' ? job.modelo : 'Nuevo trabajo'}
-                                            </h3>
-                                        </div>
-                                        <div className={ui.inlineActions}>
-                                            <span className={ui.repairMiniChip}>{job.estado}</span>
-                                            {createForm.data.jobs.length > 1 ? (
-                                                <button
-                                                    type="button"
-                                                    className={buttonClass('danger', 'sm')}
-                                                    onClick={() =>
-                                                        createForm.setData(
-                                                            'jobs',
-                                                            createForm.data.jobs.filter((_, jobIndex) => jobIndex !== index),
-                                                        )
-                                                    }
-                                                >
-                                                    Quitar trabajo
-                                                </button>
-                                            ) : null}
-                                        </div>
+                    {/* ============ RESUMEN ============ */}
+                    <section className={cn('grid gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('summary') && 'hidden')}>
+                        <div className="grid gap-3">
+                            <h3 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#2563eb]" aria-hidden="true" />Resumen de trabajos</h3>
+                            <div className="overflow-hidden rounded-xl border border-[#e2e9f4] bg-white">
+                                {jobSubtotalRows.map((row) => (
+                                    <div key={`subtotal-${row.index}`} className="grid gap-1 border-b border-[#eef2f8] px-4 py-2.5 text-sm last:border-b-0 md:grid-cols-[3.5rem_minmax(0,1fr)_8rem_9rem] md:items-center">
+                                        <span className="font-black text-[#475569]">#{row.index + 1}</span>
+                                        <span className="min-w-0">
+                                            <strong className="block truncate text-[#0f172a]">{row.description}</strong>
+                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{row.model}</span>
+                                        </span>
+                                        <span className="font-bold text-[#334155]">Seña {formatMoney(row.deposit)}</span>
+                                        <strong className="text-[#0f172a] md:text-right">{row.amount > 0 ? formatMoney(row.amount) : 'A presupuestar'}</strong>
                                     </div>
-
-                                    <div className={ui.repairFormGrid}>
-                                        <select
-                                            className={ui.input}
-                                            value={job.categorias_reparacion}
-                                            onChange={(event) => changeJobCategory(index, event.target.value)}
-                                        >
-                                            {serviceCategories.map((category) => (
-                                                <option key={category.value} value={category.value}>
-                                                    {category.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <select className={ui.input} value={job.marca} onChange={(event) => changeJobBrand(index, event.target.value)}>
-                                                <option value="">Marca</option>
-                                                {phoneBrandOptions.map((brand) => (
-                                                    <option key={brand} value={brand}>
-                                                        {brand}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        ) : null}
-                                        <input
-                                            className={ui.input}
-                                            placeholder="Modelo"
-                                            value={job.modelo}
-                                            onChange={(event) => changeJobModel(index, event.target.value)}
-                                        />
-                                        <RepairColorCombobox className={ui.input} value={job.color} onChange={(value) => updateJob(index, (current) => ({ ...current, color: value }))} />
-                                        {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <>
-                                                <PhoneUnlockFields
-                                                    unlockType={job.unlock_type}
-                                                    unlockValue={job.unlock_value}
-                                                    onChange={(unlockType, unlockValue) => updateJob(index, (current) => ({ ...current, unlock_type: unlockType, unlock_value: unlockValue }))}
-                                                    selectClassName={ui.input}
-                                                    inputClassName={ui.input}
-                                                />
-                                                <RepairPartAccessoriesFields
-                                                    selected={job.repuesto_agregados}
-                                                    other={job.repuesto_agregado_otro}
-                                                    inputClassName={ui.input}
-                                                    className={ui.repairFull}
-                                                    onChange={(selected, other) => updateJob(index, (current) => ({ ...current, repuesto_agregados: normalizePartAccessories(selected), repuesto_agregado_otro: other }))}
-                                                    onOtherChange={(value) => updateJob(index, (current) => ({ ...current, repuesto_agregado_otro: value }))}
-                                                />
-                                            </>
-                                        ) : null}
-                                        {renderDeviceModelSuggestions(index)}
-                                        <textarea
-                                            className={`${ui.textarea} ${ui.repairFull}`}
-                                            placeholder="Tipo de servicio / descripcion"
-                                            value={job.descripcion}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, descripcion: event.target.value }))}
-                                        />
-                                        <textarea
-                                            className={`${ui.textarea} ${ui.repairFull}`}
-                                            placeholder="Observaciones"
-                                            value={job.observaciones}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))}
-                                        />
-                                        <input
-                                            className={ui.input}
-                                            placeholder="Monto"
-                                            value={job.monto}
-                                            onFocus={() => clearAmountForTyping(index, 'monto')}
-                                            onKeyDown={preventAmountArrowStep}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))}
-                                        />
-                                        {suggestedPriceIndicator(index)}
-                                        <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2">
-                                            {regularPriceIndicator(job.monto)}
-                                        </div>
-                                        <input
-                                            className={ui.input}
-                                            placeholder="Seña"
-                                            value={job.senia}
-                                            onFocus={() => clearAmountForTyping(index, 'senia')}
-                                            onKeyDown={preventAmountArrowStep}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))}
-                                        />
-                                        <select
-                                            className={ui.input}
-                                            value={job.senia_method}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}
-                                        >
-                                            <option value="efectivo">Seña en efectivo</option>
-                                            <option value="transferencia">Seña por transferencia</option>
-                                        </select>
-                                        {renderEstimatedDateField(index, job, ui.input)}
-                                        <select
-                                            className={ui.input}
-                                            value={job.estado}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, estado: event.target.value }))}
-                                        >
-                                            {states.map((state) => (
-                                                <option key={state} value={state}>
-                                                    {state}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <input
-                                            className={ui.input}
-                                            placeholder="Repuesto"
-                                            value={job.repuesto}
-                                            onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value }))}
-                                        />
-                                        <label className={`${ui.repairUploadField} ${ui.repairFull}`}>
-                                            <span>Fotos iniciales</span>
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                multiple
-                                                capture="environment"
-                                                onChange={(event) =>
-                                                    updateJob(index, (current) => ({
-                                                        ...current,
-                                                        images: event.target.files ? Array.from(event.target.files) : null,
-                                                    }))
-                                                }
-                                            />
-                                        </label>
-                                    </div>
-                                </article>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-
-                        <div className={ui.inlineActions}>
-                            <button
-                                className={buttonClass('soft')}
-                                type="button"
-                                onClick={() =>
-                                    createForm.setData('jobs', [
-                                        ...createForm.data.jobs,
-                                        createEmptyJob(states[0] ?? 'PENDIENTE'),
-                                    ])
-                                }
-                            >
-                                Agregar otro trabajo
-                            </button>
-                            <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}>
-                                {createForm.processing ? 'Guardando...' : 'Crear orden y abrir ticket'}
-                            </button>
+                        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong><span className={cn('block text-xs font-semibold text-[#64748b]', regularTotal > totals.monto && 'font-black text-[#92400e]')}>{regularTotal > 0 ? `Regular sin descuento: ${formatMoney(regularTotal)}` : ''}</span></div>
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
                         </div>
-                    </form>
-                </div>
-            </details>
-            </>
+                    </section>
+
+                    {isWizardIntake ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e6edf7] pt-4">
+                            <button className={buttonClass('soft')} type="button" onClick={goToPreviousIntakeStep} disabled={activeIntakeStepIndex === 0}>
+                                Anterior
+                            </button>
+                            {activeIntakeStep === 'summary' ? (
+                                <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}>
+                                    <FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}
+                                </button>
+                            ) : (
+                                <button className={buttonClass('primary')} type="button" onClick={goToNextIntakeStep} disabled={!canGoToNextIntakeStep}>
+                                    Siguiente
+                                </button>
+                            )}
+                        </div>
+                    ) : null}
+                </form>
+
+                {!isWizardIntake ? (
+                    <div className="sticky bottom-2 z-30 grid gap-2 rounded-xl border border-[#dce5f2] bg-white px-4 py-3 shadow-[0_10px_24px_-12px_rgba(15,23,42,0.25)] md:flex md:flex-wrap md:items-center md:justify-between md:gap-3">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm font-bold text-[#334155]">
+                            <span>{createForm.data.jobs.length} reparación{createForm.data.jobs.length === 1 ? '' : 'es'}</span>
+                            <span>Total <strong className="text-[#0f172a]">{formatMoney(totals.monto)}</strong></span>
+                            <span>Señas <strong className="text-[#0f172a]">{formatMoney(totals.senia)}</strong></span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" />Otro equipo</button>
+                            <button className={buttonClass('primary')} type="submit" form="intake-flow-form" disabled={createForm.processing}><FaSave aria-hidden="true" />{createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
+                        </div>
+                    </div>
+                ) : null}
+                {duplicateNotice !== '' ? <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-[#111827] px-4 py-2 text-sm font-bold text-white shadow-lg">{duplicateNotice}</div> : null}
+            </div>
             ) : null}
-
             {isConsultas ? (
             <section className="grid gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-[0.84rem] font-bold text-[#475569] xl:hidden">
