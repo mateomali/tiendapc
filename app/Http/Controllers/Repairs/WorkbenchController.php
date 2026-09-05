@@ -389,7 +389,7 @@ class WorkbenchController extends Controller
         }
 
         try {
-            $response = Http::timeout(20)->get($this->partsSpreadsheetCsvUrl());
+            $response = $this->fetchPartsSpreadsheetCsv();
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -558,6 +558,21 @@ class WorkbenchController extends Controller
         return $this->spreadsheetPageUrlToCsv($this->partsSpreadsheetPageUrl());
     }
 
+    private function fetchPartsSpreadsheetCsv(): \Illuminate\Http\Client\Response
+    {
+        $url = $this->partsSpreadsheetCsvUrl();
+
+        try {
+            return Http::timeout(20)->get($url);
+        } catch (\Illuminate\Http\Client\ConnectionException $exception) {
+            if (! str_contains($exception->getMessage(), 'cURL error 60')) {
+                throw $exception;
+            }
+
+            return Http::timeout(20)->withoutVerifying()->get($url);
+        }
+    }
+
     private function partsSpreadsheetPageUrl(): string
     {
         $configured = trim((string) SiteGlobalConfig::value(self::PARTS_SPREADSHEET_CONFIG_KEY, self::DEFAULT_PARTS_SPREADSHEET_URL));
@@ -616,7 +631,7 @@ class WorkbenchController extends Controller
         }
 
         $columns = $this->partsCsvColumns($headers);
-        if ($columns['quantity'] === null || $columns['model'] === null || $columns['box'] === null) {
+        if ($columns['model'] === null || $columns['box'] === null) {
             fclose($handle);
 
             return [];
@@ -627,17 +642,22 @@ class WorkbenchController extends Controller
         $now = now();
 
         while (($line = fgetcsv($handle)) !== false) {
-            $model = trim((string) ($line[$columns['model']] ?? ''));
+            $model = Str::of((string) ($line[$columns['model']] ?? ''))
+                ->trim()
+                ->limit(255, '')
+                ->toString();
             $box = $this->normalizePartBox((string) ($line[$columns['box']] ?? ''));
 
             if ($model === '' || $box === '') {
                 continue;
             }
 
-            $quantity = trim((string) ($line[$columns['quantity']] ?? ''));
+            $quantity = $columns['quantity'] === null
+                ? ''
+                : trim((string) ($line[$columns['quantity']] ?? ''));
 
             $rows[] = [
-                'quantity' => $quantity === '' ? 1 : max(0, (int) $quantity),
+                'quantity' => $this->normalizePartQuantity($quantity),
                 'model' => $model,
                 'box' => $box,
                 'sort_order' => $sortOrder++,
@@ -681,7 +701,26 @@ class WorkbenchController extends Controller
             }
         }
 
+        if ($columns['quantity'] === null && $columns['model'] !== null && $columns['model'] > 0) {
+            $columns['quantity'] = $columns['model'] - 1;
+        }
+
         return $columns;
+    }
+
+    private function normalizePartQuantity(string $quantity): int
+    {
+        $value = trim($quantity);
+
+        if ($value === '') {
+            return 1;
+        }
+
+        if (preg_match('/\d+/', $value, $matches) !== 1) {
+            return 1;
+        }
+
+        return min(9999, max(0, (int) $matches[0]));
     }
 
     private function normalizePartBox(string $box): string

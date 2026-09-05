@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toDataURL } from 'qrcode';
-import { partAccessoriesLabel } from '../../components/RepairPartAccessoriesFields';
+import { normalizePartAccessories, partAccessoriesLabel } from '../../components/RepairPartAccessoriesFields';
 import type { RepairOrderView, RepairPaymentView, RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass } from '../../repairUi';
 import { formatCurrency } from '../../utils';
@@ -38,7 +38,9 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
         const financial = repairFinancialSummary(repair, ticketPricing);
         const modelLabel = ticketRepairModel(repair);
         const failureLabel = ticketRepairFailure(repair, modelLabel);
+        const accessories = normalizePartAccessories(repair.repuesto_agregados);
         const accessoriesLabel = partAccessoriesLabel(repair.repuesto_agregados, repair.repuesto_agregado_otro);
+        const showAccessoriesPrefix = !(accessories.length === 1 && accessories[0] === 'sin_porta_chip');
         const increments = (repair.payments ?? []).filter((payment) => payment.payment_type === 'incremento');
         const deposits = (repair.payments ?? []).filter((payment) => payment.payment_type === 'senia' && Number(payment.amount ?? 0) > 0);
         const hasDeposits = deposits.length > 0;
@@ -53,6 +55,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
             modelKey: normalizeTicketText(modelLabel),
             failureLabel,
             accessoriesLabel,
+            showAccessoriesPrefix,
             monto,
             financial,
             deliveredLabel: repair.entregado === 'si' ? formatDeliveredTicketDate(repair.fecha_entregado) : null,
@@ -155,6 +158,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                         key: item.key,
                                         failure: item.failureLabel,
                                         accessories: item.accessoriesLabel,
+                                        showAccessoriesPrefix: item.showAccessoriesPrefix,
                                         price: ticketRepairLinePriceLabel(item, subtotal.discountApplies, ticketPricing),
                                     }))}
                                     subtotal={group.items.length > 1 ? subtotal : null}
@@ -477,7 +481,7 @@ function TicketRepairGroupSummary({
 }: {
     label: string;
     model: string;
-    items: Array<{ key: string; failure: string; accessories: string; price: string | null }>;
+    items: Array<{ key: string; failure: string; accessories: string; showAccessoriesPrefix: boolean; price: string | null }>;
     subtotal: { cashLabel: string; listLabel: string; discountApplies: boolean } | null;
     showRegularSubtotal: boolean;
 }): JSX.Element {
@@ -496,7 +500,11 @@ function TicketRepairGroupSummary({
                             <strong className="min-w-0 break-words text-[12px] leading-[1.15]">{item.failure}</strong>
                             {item.price !== null ? <strong className="whitespace-nowrap text-right text-[12px] leading-[1.15]">{item.price}</strong> : null}
                         </div>
-                        {item.accessories !== '' ? <div className="break-words text-[11px] leading-[1.15]">INCLUYE: {item.accessories.toUpperCase()}</div> : null}
+                        {item.accessories !== '' ? (
+                            <div className="break-words text-[11px] leading-[1.15]">
+                                {item.showAccessoriesPrefix ? 'INCLUYE: ' : ''}{item.accessories.toUpperCase()}
+                            </div>
+                        ) : null}
                     </div>
                 ))}
             </div>

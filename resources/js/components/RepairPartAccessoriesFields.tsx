@@ -60,11 +60,11 @@ export function RepairPartAccessoriesFields({
     };
 
     return (
-        <div className={cn('grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-3', className)}>
+        <div className={cn('grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-2.5', className)}>
             <span className="text-sm font-black text-[#334155]">Incluye</span>
-            <div className="grid gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {partAccessoryOptions.map((option) => (
-                    <label key={option.value} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#334155]">
+                    <label key={option.value} className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2 text-sm font-bold text-[#334155]">
                         <input
                             type="checkbox"
                             checked={selectedSet.has(option.value)}

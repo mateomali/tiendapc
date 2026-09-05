@@ -1,6 +1,6 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaReceipt, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheckCircle, FaChevronDown, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from '../../components/RepairPartAccessoriesFields';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
@@ -756,7 +756,7 @@ export default function WorkbenchPage({
 }: WorkbenchPageProps): JSX.Element {
     const isConsultas = pageMode === 'consultas';
     const isIngreso = pageMode === 'ingreso';
-    const isWizardIntake = intakeMode === 'wizard';
+    const configuredWizardIntake = intakeMode === 'wizard';
     const highlightTerm = (filters.q ?? '').trim();
     const filtersForm = useForm({
         q: filters.q ?? '',
@@ -796,8 +796,10 @@ export default function WorkbenchPage({
     const [pendingFailureOptions, setPendingFailureOptions] = useState<Record<number, string>>({});
     const [customEstimatedDateJobs, setCustomEstimatedDateJobs] = useState<Record<number, boolean>>({});
     const [activeIntakeStep, setActiveIntakeStep] = useState<IntakeStep>('client');
+    const [mobileWizardIntake, setMobileWizardIntake] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
+    const [expandedPartPanels, setExpandedPartPanels] = useState<Record<number, boolean>>({});
     const [selectedDeviceModelKeys, setSelectedDeviceModelKeys] = useState<Record<number, string>>({});
     const [expandedDesktopTickets, setExpandedDesktopTickets] = useState<Record<number, boolean>>({});
     const [activeSearchFields, setActiveSearchFields] = useState<SearchFieldKey[]>(() => {
@@ -811,6 +813,21 @@ export default function WorkbenchPage({
     const ticketDateGroups = groupTicketsByEntryDate(tickets);
     const isTaskQueueView = filters.prioridad === 'tareas';
     const taskTickets = splitTaskTickets(tickets);
+    const isWizardIntake = configuredWizardIntake || (isIngreso && mobileWizardIntake);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        const query = window.matchMedia('(max-width: 767px)');
+        const sync = (): void => setMobileWizardIntake(query.matches);
+
+        sync();
+        query.addEventListener('change', sync);
+
+        return () => query.removeEventListener('change', sync);
+    }, []);
 
     useEffect(() => () => {
         if (gridFilterSubmitTimeout.current !== null) {
@@ -1411,6 +1428,9 @@ export default function WorkbenchPage({
     const regularPriceIndicator = (value: string, compact = false): JSX.Element => {
         const amount = Number(value || 0);
         const applies = Number.isFinite(amount) && amount > 0 && cashDiscountApplies(amount);
+        const label = compact
+            ? regularPriceLabel(value).replace('Regular sin descuento', 'Regular')
+            : regularPriceLabel(value);
 
         return (
             <span className={cn(
@@ -1418,21 +1438,22 @@ export default function WorkbenchPage({
                 compact ? 'text-[#64748b]' : 'text-[#475569]',
                 applies && 'font-black text-[#92400e]',
             )}>
-                {regularPriceLabel(value)}
+                {label}
             </span>
         );
     };
     const regularTotal = regularPriceForCashAmount(totals.monto);
-    const repairLabelClass = 'grid min-w-0 content-start gap-1.5 text-sm font-semibold leading-tight text-[#334155]';
+    const repairLabelClass = 'grid min-w-0 content-start gap-1 text-[0.82rem] font-bold leading-tight text-[#334155]';
     const compactInputClass = ui.repairDenseInput;
     const guidedFieldClass = 'border-[#2563eb] bg-[#eff6ff] ring-1 ring-[#2563eb33]';
     const guidedLabelClass = 'rounded-md border border-[#2563eb] bg-[#eff6ff] p-2 ring-1 ring-[#2563eb33]';
     const compactTextareaClass = ui.repairDenseTextarea;
-    const fieldPanelBase = 'min-w-0 rounded-lg border p-3';
+    const fieldPanelBase = 'min-w-0 rounded-md border p-2.5';
     const fieldPanelBlue = `${fieldPanelBase} border-[#cbd5e1] bg-white`;
-    const fieldPanelGreen = `${fieldPanelBase} border-[#bbf7d0] bg-[#f0fdf4]`;
-    const fieldPanelAmber = `${fieldPanelBase} border-[#fed7aa] bg-[#fff7ed]`;
-    const fieldPanelPurple = `${fieldPanelBase} border-[#ddd6fe] bg-[#f5f3ff]`;
+    const fieldPanelAmber = `${fieldPanelBase} border-[#fed7aa] bg-[#fffaf3]`;
+    const fieldPanelPurple = `${fieldPanelBase} border-[#cbd5e1] bg-white`;
+    const intakeSectionTitleClass = 'flex min-h-7 items-center border-b border-[#cbd5e1] text-sm font-black text-[#0f172a]';
+    const intakeSectionSpanClass = 'md:col-span-2 xl:col-span-4';
 
     const nextCreateFlowField = (): CreateFlowField | null => {
         if (createForm.data.id_orden.trim() === '') {
@@ -1469,6 +1490,21 @@ export default function WorkbenchPage({
     };
 
     const activeCreateFlowField = nextCreateFlowField();
+    const activeCreateFlowFieldLabel = activeCreateFlowField === 'order-id'
+        ? 'ID de orden'
+        : activeCreateFlowField === 'customer-name'
+            ? 'Nombre del cliente'
+            : activeCreateFlowField?.endsWith('-brand')
+                ? 'Marca'
+                : activeCreateFlowField?.endsWith('-model')
+                    ? 'Modelo / equipo'
+                    : activeCreateFlowField?.endsWith('-description')
+                        ? 'Falla / trabajo'
+                        : activeCreateFlowField?.endsWith('-amount')
+                            ? 'Monto'
+                            : activeCreateFlowField?.endsWith('-date')
+                                ? 'Fecha estimada'
+                                : '';
     const isGuidedField = (field: CreateFlowField): boolean => activeCreateFlowField === field;
     const guidedPanelClass = (baseClass: string, field: CreateFlowField): string => cn(baseClass, isGuidedField(field) && guidedFieldClass);
     const guidedInputClass = (field: CreateFlowField, baseClass = compactInputClass): string => cn(baseClass, isGuidedField(field) && 'border-[#2563eb] bg-[#eff6ff] ring-2 ring-[#2563eb24]');
@@ -2319,51 +2355,41 @@ export default function WorkbenchPage({
 
             {isIngreso ? (
             <>
-            <details className={cn(ui.repairShell, 'group mx-auto w-full max-w-6xl')} open>
-                <summary className="cursor-pointer list-none rounded-lg border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] transition hover:bg-[#f8fafc] md:px-5">
+            <details className={cn(ui.repairShell, 'group mx-auto w-full max-w-7xl')} open>
+                <summary className="cursor-pointer list-none rounded-md border border-[#cbd5e1] bg-white px-4 py-3 text-sm font-bold text-[#334155] transition hover:bg-[#f8fafc] md:px-5">
                     <span className="inline-flex items-center gap-2">
                         <FaPlusCircle aria-hidden="true" />
                         Nueva orden de reparacion
                     </span>
                 </summary>
-                <div className="mx-auto grid w-full max-w-5xl gap-3 pt-3 md:gap-4">
-                    <section className="rounded-lg border border-[#cbd5e1] bg-white p-4 shadow-sm">
-                        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center lg:gap-4">
-                            <div>
-                                <div className="mb-1.5 inline-flex items-center gap-2 text-[0.78rem] font-semibold text-[#475569] md:mb-2 md:text-xs">
-                                    <FaClipboardList aria-hidden="true" /> Panel de ingreso
-                                </div>
-                                <h2 className="text-xl font-black tracking-tight text-[#0f172a] md:text-2xl">Nueva orden de reparacion</h2>
-                                <p className="mt-1 max-w-3xl text-xs font-semibold text-[#64748b] md:text-sm">Carga al cliente una sola vez y suma una o varias reparaciones dentro de la misma orden.</p>
+                <div className="mx-auto grid w-full max-w-6xl gap-3 pt-3 md:gap-4">
+                    <section className="rounded-md border border-[#cbd5e1] bg-white p-3 shadow-sm">
+                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+                                <h2 className="text-lg font-black tracking-tight text-[#0f172a] md:text-xl">Nueva orden de reparacion</h2>
+                                <span className="text-sm font-bold text-[#475569]">Orden #{createForm.data.id_orden || nextOrderId}</span>
                             </div>
-                            <div className="flex items-center justify-between gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 sm:justify-start md:px-4 md:py-3">
-                                <div>
-                                    <div className="text-[0.78rem] font-semibold text-[#64748b] md:text-xs">Orden actual</div>
-                                    <div className="text-xl font-black text-[#0f172a] md:text-2xl">#{createForm.data.id_orden || nextOrderId}</div>
-                                </div>
-                                <FaReceipt className="text-2xl text-[#16a34a] md:text-3xl" aria-hidden="true" />
+                            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+                                <Link href={route('repairs.workbench')} className={buttonClass('primary', 'sm')}>Ver ordenes</Link>
+                                <Link href={route('repairs.delivered')} className={buttonClass('soft', 'sm')}>Entregados</Link>
                             </div>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap md:mt-4">
-                            <Link href={route('repairs.workbench')} className={buttonClass('primary', 'sm')}>Ver ordenes</Link>
-                            <Link href={route('repairs.delivered')} className={buttonClass('soft', 'sm')}>Entregados</Link>
                         </div>
                     </section>
 
                     <form
-                        className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 rounded-lg border border-[#cbd5e1] bg-white p-4 shadow-sm md:p-5 xl:p-6"
+                        className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-3 rounded-md border border-[#cbd5e1] bg-white p-3 shadow-sm md:p-4"
                         noValidate={isWizardIntake}
                         onSubmit={(event) => {
                             event.preventDefault();
                             submitCreateForm();
                         }}
                     >
-                        <div className={ui.repairCardHeading}>
-                            <div className={ui.cardTitleWrap}>
-                                <p className={ui.eyebrow}>Datos del cliente</p>
-                                <h2 className={ui.cardTitle}>Nueva orden guiada</h2>
-                                <p className={ui.inlineCaption}>Cargá el cliente una vez y agregá cada falla como un trabajo separado con su precio.</p>
-                            </div>
+                        <div className={cn('hidden rounded-md border border-[#cbd5e1] bg-[#fbfdff] px-3 py-2 lg:grid lg:grid-cols-[minmax(0,1fr)_auto_auto_auto_auto] lg:items-center lg:gap-4', isWizardIntake && 'lg:hidden')}>
+                            <strong className="text-sm text-[#0f172a]">Orden #{createForm.data.id_orden || nextOrderId}</strong>
+                            <span className="text-sm font-bold text-[#334155]">Trabajos: {createForm.data.jobs.length}</span>
+                            <span className="text-sm font-bold text-[#334155]">Total: {formatMoney(totals.monto)}</span>
+                            <span className="text-sm font-bold text-[#334155]">Señas: {formatMoney(totals.senia)}</span>
+                            <strong className="text-sm text-[#0f172a]">Saldo: {formatMoney(Math.max(0, totals.monto - totals.senia))}</strong>
                         </div>
 
                         {isWizardIntake ? (
@@ -2388,16 +2414,24 @@ export default function WorkbenchPage({
                                         </button>
                                     ))}
                                 </div>
+                                {activeCreateFlowFieldLabel !== '' ? (
+                                    <div className="rounded-md border border-[#bfdbfe] bg-white px-3 py-2 text-sm font-bold text-[#1d4ed8]">
+                                        Falta: {activeCreateFlowFieldLabel}
+                                    </div>
+                                ) : null}
                             </div>
                         ) : null}
 
-                        <div className={cn('grid items-start gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-3 md:grid-cols-2 md:p-4 xl:grid-cols-[10rem_minmax(18rem,1fr)_12rem_14rem]', !showIntakeStep('client') && 'hidden')}>
+                        <div className={cn('grid items-start gap-3 rounded-md border border-[#cbd5e1] bg-[#fbfdff] p-3 md:grid-cols-2 xl:grid-cols-[8rem_minmax(20rem,1fr)_16rem_12.5rem]', !showIntakeStep('client') && 'hidden')}>
+                            <div className="md:col-span-2 xl:col-span-4">
+                                <div className={intakeSectionTitleClass}>Cliente</div>
+                            </div>
                             <label className={guidedInlineLabelClass('order-id')}>ID de orden *<input className={guidedInputClass('order-id')} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required /><span className="text-xs font-semibold text-[#64748b]">Editable si esta libre.</span></label>
                             <label className={guidedInlineLabelClass('customer-name')}>Nombre del cliente *<input className={guidedInputClass('customer-name')} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required /></label>
-                            <label className={repairLabelClass}>DNI<div className="grid gap-2 sm:grid-cols-[1fr_auto] lg:grid-cols-1"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => handleDniChange(event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
+                            <label className={repairLabelClass}>DNI<div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><input className={compactInputClass} type="number" min="1" max="99999999" value={createForm.data.dni} onChange={(event) => handleDniChange(event.target.value)} onBlur={() => void lookupByDni()} /><button className={buttonClass('soft', 'sm', 'min-h-9 whitespace-nowrap')} type="button" onClick={() => void lookupByDni()} disabled={lookupBusy}>{lookupBusy ? 'Buscando...' : 'Buscar DNI'}</button></div></label>
                             <label className={repairLabelClass}>Telefono / contacto<input className={compactInputClass} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} /><span className="text-xs font-semibold text-[#64748b]">Opcional. Si queda vacio se guarda sin contacto.</span></label>
-                            {renderClientPreview('md:col-span-4')}
-                            {lookupFeedback !== '' ? <p className="md:col-span-4 rounded-md bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
+                            {renderClientPreview('md:col-span-2 xl:col-span-4')}
+                            {lookupFeedback !== '' ? <p className="md:col-span-2 xl:col-span-4 rounded-md bg-[#eff6ff] px-3 py-2 text-sm font-bold text-[#1d4ed8]">{lookupFeedback}</p> : null}
                         </div>
 
                         <div className={cn('grid gap-4', !showIntakeStep('device') && !showIntakeStep('extras') && 'hidden')}>
@@ -2410,13 +2444,9 @@ export default function WorkbenchPage({
                                 const hasGroupedFailures = groupedIndexes.length > 1;
 
                                 return (
-                                <article key={`job-v2-${index}`} className={cn('rounded-lg border bg-white p-3 shadow-sm md:p-4', Number(job.monto || 0) <= 0 ? 'border-[#fed7aa]' : Number(job.senia || 0) > 0 ? 'border-[#bbf7d0]' : 'border-[#cbd5e1]')}>
-                                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2 md:mb-4 md:gap-3">
-                                        <div className={ui.cardTitleWrap}>
-                                            <p className={ui.eyebrow}>Trabajo de la orden</p>
-                                            <h3 className="text-base font-black tracking-tight text-ink-950 md:text-xl">Trabajo #{index + 1}</h3>
-                                            <p className="text-xs font-semibold text-slate-500 md:text-sm">Cada falla se carga por separado y suma al total del ticket.</p>
-                                        </div>
+                                <article key={`job-v2-${index}`} className={cn('rounded-md border bg-white p-3 shadow-sm md:p-4', Number(job.monto || 0) <= 0 ? 'border-[#fed7aa]' : Number(job.senia || 0) > 0 ? 'border-[#86efac]' : 'border-[#cbd5e1]')}>
+                                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-[#e2e8f0] pb-3">
+                                        <h3 className="text-base font-black tracking-tight text-ink-950 md:text-lg">Trabajo #{index + 1}</h3>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className={ui.repairMiniChip}>{Number(job.monto || 0) <= 0 ? 'A presupuestar' : Number(job.senia || 0) > 0 ? 'Con seña' : 'Presupuestado'}</span>
                                             <span className={ui.repairMiniChip}>{imagePreviews[index]?.length ? `${imagePreviews[index].length} foto(s)` : 'Sin fotos'}</span>
@@ -2425,13 +2455,16 @@ export default function WorkbenchPage({
                                         </div>
                                     </div>
 
-                                    <div className="grid min-w-0 items-start gap-3 md:grid-cols-2">
+                                    <div className="grid min-w-0 items-start gap-2.5 md:grid-cols-2 xl:grid-cols-[12rem_11rem_minmax(20rem,1fr)_10.5rem]">
                                         {job.same_device && index > 0 ? (
-                                            <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-semibold text-[#334155] md:col-span-2">
+                                            <div className="rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-semibold text-[#334155] md:col-span-2 xl:col-span-4">
                                                 Misma unidad que el trabajo anterior: {[createForm.data.jobs[index - 1]?.marca, createForm.data.jobs[index - 1]?.modelo].map((value) => value?.trim()).filter(Boolean).join(' ') || 'equipo compartido'}.
                                             </div>
                                         ) : (
                                             <>
+                                        <div className={cn(intakeSectionSpanClass, !showIntakeStep('device') && 'hidden')}>
+                                            <div className={intakeSectionTitleClass}>Equipo</div>
+                                        </div>
                                         <div className={cn(fieldPanelPurple, !showIntakeStep('device') && 'hidden')}>
                                             <label className={repairLabelClass}>Categoría<select className={compactInputClass} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>{serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
                                         </div>
@@ -2461,7 +2494,7 @@ export default function WorkbenchPage({
                                             </label>
                                         </div>
                                         {isPhoneCategory(job.categorias_reparacion) ? (
-                                            <div className={cn(fieldPanelPurple, !showIntakeStep('device') && 'hidden')}>
+                                            <div className={cn(fieldPanelPurple, 'md:col-span-2 xl:col-span-4', !showIntakeStep('device') && 'hidden')}>
                                                 <label className={repairLabelClass}>
                                                     Desbloqueo
                                                     <PhoneUnlockFields
@@ -2483,7 +2516,10 @@ export default function WorkbenchPage({
                                         ) : null}
                                             </>
                                         )}
-                                        <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'md:col-span-2', !showIntakeStep('device') && 'hidden')}>
+                                        <div className={cn(intakeSectionSpanClass, !showIntakeStep('device') && 'hidden')}>
+                                            <div className={intakeSectionTitleClass}>Falla y presupuesto</div>
+                                        </div>
+                                        <div className={cn(guidedPanelClass(fieldPanelBlue, `job-${index}-description`), 'md:col-span-2 xl:col-span-4', !showIntakeStep('device') && 'hidden')}>
                                             <label className={repairLabelClass}>Falla / trabajo a realizar *</label>
                                             <div className="grid gap-2">
                                                 <select
@@ -2505,18 +2541,18 @@ export default function WorkbenchPage({
                                                     ))}
                                                 </select>
                                             </div>
-                                            <div className="grid gap-2 rounded-md border border-[#cbd5e1] bg-white p-2">
+                                            <div className="grid gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] p-2">
                                                 {groupedIndexes.map((jobIndex, rowIndex) => {
                                                     const rowJob = createForm.data.jobs[jobIndex];
 
                                                     return (
                                                         <div
                                                             key={`failure-row-${jobIndex}`}
-                                                            className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 sm:grid-cols-[2rem_minmax(0,1fr)_7.5rem_7.5rem] lg:grid-cols-[2rem_minmax(0,1fr)_8rem_8rem_10rem_auto] lg:items-start"
+                                                            className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-2 rounded-md border border-[#e2e8f0] bg-white p-2 sm:grid-cols-[2rem_minmax(0,1fr)_7.5rem_7.5rem] lg:grid-cols-[2rem_minmax(0,1fr)_7.25rem_7.25rem_9.25rem_auto] lg:items-start"
                                                         >
                                                             <span className="pt-2 text-sm font-black text-[#475569]">#{rowIndex + 1}</span>
                                                             <textarea
-                                                                className={guidedInputClass(`job-${jobIndex}-description`, cn(compactTextareaClass, 'min-h-[4.25rem]'))}
+                                                                className={guidedInputClass(`job-${jobIndex}-description`, cn(compactTextareaClass, 'col-start-2 min-h-[4.25rem] sm:col-start-auto'))}
                                                                 rows={2}
                                                                 value={rowJob.descripcion}
                                                                 onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, descripcion: event.target.value }))}
@@ -2578,34 +2614,24 @@ export default function WorkbenchPage({
                                             </div>
                                             <span className="text-xs font-semibold text-[#64748b]">Elegí una falla y se agrega automáticamente. Si ya hay una cargada, se apila como otro trabajo del mismo equipo.</span>
                                         </div>
-                                        {false ? (
-                                            <>
-                                        <div className={guidedPanelClass(fieldPanelGreen, `job-${index}-amount`)}>
-                                            <label className={repairLabelClass}>Monto ($)<input className={guidedInputClass(`job-${index}-amount`)} inputMode="decimal" value={job.monto} onFocus={() => clearAmountForTyping(index, 'monto')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, monto: event.target.value }))} />{regularPriceIndicator(job.monto)}</label>
+                                        <div className={cn(intakeSectionSpanClass, !showIntakeStep('extras') && 'hidden')}>
+                                            <div className={intakeSectionTitleClass}>Entrega y repuesto</div>
                                         </div>
-                                        <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
-                                            <label className={repairLabelClass}>Seña ($)<input className={compactInputClass} inputMode="decimal" value={job.senia} onFocus={() => clearAmountForTyping(index, 'senia')} onKeyDown={preventAmountArrowStep} onChange={(event) => updateJob(index, (current) => ({ ...current, senia: event.target.value }))} /></label>
-                                        </div>
-                                        <div className={cn(fieldPanelGreen, 'min-w-[10rem]')}>
-                                            <label className={repairLabelClass}>Medio de seña<select className={compactInputClass} value={job.senia_method} onChange={(event) => updateJob(index, (current) => ({ ...current, senia_method: event.target.value }))}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
-                                        </div>
-                                            </>
-                                        ) : null}
                                         <div className={cn(guidedPanelClass(fieldPanelAmber, `job-${index}-date`), !showIntakeStep('extras') && 'hidden')}>
                                             <label className={repairLabelClass}>Fecha estimada{renderEstimatedDateField(index, job, guidedInputClass(`job-${index}-date`))}</label>
                                         </div>
-                                        <div className={cn(fieldPanelPurple, !showIntakeStep('extras') && 'hidden')}>
+                                        <div className={cn(fieldPanelPurple, 'md:col-span-2 xl:col-span-3', !showIntakeStep('extras') && 'hidden')}>
                                             <label className={repairLabelClass}>Observaciones<textarea className={compactTextareaClass} rows={4} value={job.observaciones} onFocus={() => { if (job.observaciones.trim().toLowerCase() === 'sin observaciones') updateJob(index, (current) => ({ ...current, observaciones: '' })); }} onChange={(event) => updateJob(index, (current) => ({ ...current, observaciones: event.target.value }))} /></label>
                                         </div>
-                                        <div className={cn('grid min-w-0 gap-3 rounded-lg border border-dashed border-[#94a3b8] bg-[#f8fafc] p-3', !showIntakeStep('extras') && 'hidden')}>
+                                        <div className={cn('grid min-w-0 gap-2.5 rounded-md border border-dashed border-[#94a3b8] bg-[#fbfdff] p-2.5 md:col-span-2 xl:col-span-2', !showIntakeStep('extras') && 'hidden')}>
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <strong className="text-sm text-[#0f172a]">Imagenes ({imagePreviews[index]?.length ?? 0}/2)</strong>
                                                 <span className="rounded-md bg-white px-2 py-0.5 text-xs font-bold text-slate-600">{imagePreviews[index]?.length ?? 0}/2</span>
                                             </div>
-                                            <div className="grid gap-2 sm:grid-cols-3">
-                                                <label className={buttonClass('primary', 'sm')}><FaCamera aria-hidden="true" /> Sacar foto<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => setJobImages(index, event.target.files)} /></label>
-                                                <WebcamCaptureButton className={buttonClass('soft', 'sm')} onCapture={(file) => setJobImageFiles(index, [file])} />
-                                                <label className={buttonClass('soft', 'sm')}><FaImages aria-hidden="true" /> Elegir de galeria<input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => setJobImages(index, event.target.files)} /></label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <label className={buttonClass('primary', 'sm', 'px-2')}><FaCamera aria-hidden="true" /> Foto<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => setJobImages(index, event.target.files)} /></label>
+                                                <WebcamCaptureButton className={buttonClass('soft', 'sm', 'px-2')} label="Webcam" onCapture={(file) => setJobImageFiles(index, [file])} />
+                                                <label className={buttonClass('soft', 'sm', 'px-2')}><FaImages aria-hidden="true" /> Galeria<input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => setJobImages(index, event.target.files)} /></label>
                                             </div>
                                             <span className="text-[0.75rem] font-semibold text-slate-500">Estas imagenes se guardan como fotos iniciales del trabajo. Maximo 2.</span>
                                             {imagePreviews[index]?.length ? (
@@ -2621,18 +2647,26 @@ export default function WorkbenchPage({
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <span className="rounded-lg border border-dashed border-[#bfdbfe] bg-white px-3 py-4 text-center text-sm font-semibold text-slate-500">No hay imagenes seleccionadas.</span>
+                                                <span className="rounded-md border border-dashed border-[#bfdbfe] bg-white px-3 py-3 text-center text-sm font-semibold text-slate-500">No hay imagenes seleccionadas.</span>
                                             )}
                                         </div>
-                                        <div className={cn(fieldPanelAmber, 'md:col-span-2', !showIntakeStep('extras') && 'hidden')}>
-                                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                                <span className="text-sm font-black text-[#334155]">Repuesto a pedir</span>
-                                                <label className="inline-flex items-center gap-2 rounded-md border border-[#f59e0b33] bg-white px-3 py-1 text-xs font-bold text-[#92400e]">
+                                        <details
+                                            className={cn(fieldPanelAmber, 'md:col-span-2 xl:col-span-2', !showIntakeStep('extras') && 'hidden')}
+                                            open={Boolean(expandedPartPanels[index] || job.pedir_repuesto || job.repuesto.trim() !== '' || job.inventory_part_id !== '')}
+                                            onToggle={(event) => {
+                                                const isOpen = event.currentTarget.open;
+
+                                                setExpandedPartPanels((current) => ({ ...current, [index]: isOpen }));
+                                            }}
+                                        >
+                                            <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+                                                <span className="text-sm font-black text-[#334155]">Repuesto / caja</span>
+                                                <label className="inline-flex items-center gap-2 rounded-md border border-[#f59e0b33] bg-white px-3 py-1 text-xs font-bold text-[#92400e]" onClick={(event) => event.stopPropagation()}>
                                                     <input type="checkbox" checked={job.pedir_repuesto} onChange={(event) => togglePartRequest(index, event.target.checked)} />
                                                     Mandar a pedidos
                                                 </label>
-                                            </div>
-                                            <label className={repairLabelClass}>
+                                            </summary>
+                                            <label className={cn(repairLabelClass, 'mt-2')}>
                                                 Buscar en cajas
                                                 <div className="relative">
                                                     <FaSearch className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#92400e]" aria-hidden="true" />
@@ -2688,17 +2722,17 @@ export default function WorkbenchPage({
                                                 onChange={(event) => updateJob(index, (current) => ({ ...current, repuesto: event.target.value, inventory_part_id: '' }))}
                                             />
                                             <span className="mt-1 block text-xs font-semibold text-[#92400e]">Si elegis un repuesto disponible no hace falta mandarlo a pedidos. Si no hay stock, marca Mandar a pedidos.</span>
-                                        </div>
+                                        </details>
                                     </div>
                                 </article>
                                 );
                             })}
                         </div>
 
-                        <section className={cn('grid gap-3 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4', !showIntakeStep('summary') && 'hidden')}>
+                        <section className={cn('grid gap-3 rounded-md border border-[#cbd5e1] bg-[#fbfdff] p-3 md:p-4', !showIntakeStep('summary') && 'hidden')}>
                             <div className="grid gap-2">
                                 <strong className="text-sm font-black text-[#0f172a]">Resumen de trabajos</strong>
-                                <div className="overflow-hidden rounded-lg border border-[#cbd5e1] bg-white">
+                                <div className="overflow-hidden rounded-md border border-[#cbd5e1] bg-white">
                                     {jobSubtotalRows.map((row) => (
                                         <div key={`subtotal-${row.index}`} className="grid gap-1 border-b border-[#e2e8f0] px-3 py-2 text-sm last:border-b-0 md:grid-cols-[3rem_minmax(0,1fr)_8rem_8rem] md:items-center">
                                             <span className="font-black text-[#475569]">#{row.index + 1}</span>
@@ -2712,7 +2746,7 @@ export default function WorkbenchPage({
                                     ))}
                                 </div>
                             </div>
-                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                            <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)]">
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong><span className={cn('block text-xs font-semibold text-[#64748b]', regularTotal > totals.monto && 'font-black text-[#92400e]')}>Regular sin descuento: {regularTotal > 0 ? formatMoney(regularTotal) : 'sin monto'}</span></div>
                             <div className="rounded-lg border border-[#cbd5e1] bg-white p-3"><span className="text-xs font-semibold text-[#64748b]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
