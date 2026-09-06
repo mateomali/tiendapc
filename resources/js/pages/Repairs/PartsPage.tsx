@@ -437,7 +437,7 @@ export default function PartsPage({ period, rows, filters, pendingCellphoneParts
                             required
                         />
                     </label>
-                    <button type="submit" className={cn(buttonClass('primary', 'md'), 'min-h-10')} disabled={createForm.processing}>
+                    <button type="submit" className={cn(buttonClass('primary', 'default'), 'min-h-10')} disabled={createForm.processing}>
                         <FaPlus aria-hidden="true" />
                         {createForm.data.box.trim() === '' ? 'Agregar' : `Agregar en ${createForm.data.box.trim().toUpperCase()}`}
                     </button>

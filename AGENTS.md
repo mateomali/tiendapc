@@ -1,5 +1,12 @@
 charset = utf-8
 
+# Encoding rules (mandatory)
+
+- All source files in this repo MUST stay **UTF-8 without BOM** with **LF** line endings (`* text=auto eol=lf` in `.gitattributes`).
+- Never rewrite an existing file with Windows PowerShell `Get-Content` / `Set-Content` / `WriteAllLines` **without explicitly passing `-Encoding UTF8`**: on this machine the default is ANSI/Windows-1252 and it silently corrupts every accented character (mojibake like `Ã¡`, `Ã±`, `Ã©`). This already happened once on `WorkbenchPage.tsx`.
+- Preferred file writes: the `write` / `edit` tools, or Node.js scripts using `fs.writeFileSync(file, text, 'utf8')`. When PowerShell is unavoidable, always use `[System.IO.File]::WriteAllText($f, $text, (New-Object System.Text.UTF8Encoding($false)))` (no BOM) and read with `Get-Content -Raw -Encoding UTF8`.
+- After touching any file with accents, verify with a strict UTF-8 scan (e.g. Node `new TextDecoder('utf-8', { fatal: true })`) that there are no invalid sequences and no mojibake artifacts (`Ã`, `Â`, `â€`, `ï¿½`, replacement char).
+
 # Local server
 
 When the user asks to start the local page/server, use:

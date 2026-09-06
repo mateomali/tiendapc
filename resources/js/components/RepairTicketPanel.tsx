@@ -22,11 +22,22 @@ import {
     FaWhatsapp,
 } from 'react-icons/fa';
 import type { ChangeEvent, FormEvent, ReactNode } from 'react';
+import { RepairColorCombobox, normalizeRepairKey as normalizeRepairText, phoneBrandOptions, repairColorSwatchClass } from './RepairColorCombobox';
 import { PhoneUnlockFields, phoneUnlockLabel } from './PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, partAccessoriesLabel, type RepairPartAccessory } from './RepairPartAccessoriesFields';
 import { WebcamCaptureButton } from './WebcamCaptureButton';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
+import {
+    compactStatus,
+    compactStatusLabel,
+    repairStatusBadgeClass,
+    repairStatusDotClass,
+    repairStatusHeaderClass,
+    repairStatusRailFillClass,
+    repairStatusSelectClass,
+    repairStatusTextClass,
+} from '../repairStatus';
 import { cn, formatAmountInput, formatCurrency } from '../utils';
 
 interface ServiceCategoryOption {
@@ -53,7 +64,6 @@ export const repairDesktopTableGridClass =
 
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
-    states: string[];
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates?: ServiceTemplateOption[];
     partInventory?: RepairPartInventoryOption[];
@@ -134,131 +144,12 @@ interface IncrementFormData {
 
 type DeliveryVia = 'dni' | 'ticket' | 'persona' | 'otra';
 
-const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
-const repairColorOptions = [
-    { value: '', label: 'Sin color', swatchClass: 'bg-[#f8fafc]' },
-    { value: 'NEGRO', label: 'Negro', swatchClass: 'bg-[#111827]' },
-    { value: 'BLANCO', label: 'Blanco', swatchClass: 'bg-white' },
-    { value: 'GRIS', label: 'Gris', swatchClass: 'bg-[#6b7280]' },
-    { value: 'PLATA', label: 'Plata', swatchClass: 'bg-[#c0c0c0]' },
-    { value: 'AZUL', label: 'Azul', swatchClass: 'bg-[#2563eb]' },
-    { value: 'CELESTE', label: 'Celeste', swatchClass: 'bg-[#38bdf8]' },
-    { value: 'ROJO', label: 'Rojo', swatchClass: 'bg-[#dc2626]' },
-    { value: 'VERDE', label: 'Verde', swatchClass: 'bg-[#16a34a]' },
-    { value: 'AMARILLO', label: 'Amarillo', swatchClass: 'bg-[#facc15]' },
-    { value: 'DORADO', label: 'Dorado', swatchClass: 'bg-[#d97706]' },
-    { value: 'ROSA', label: 'Rosa', swatchClass: 'bg-[#f472b6]' },
-    { value: 'VIOLETA', label: 'Violeta', swatchClass: 'bg-[#7c3aed]' },
-    { value: 'NARANJA', label: 'Naranja', swatchClass: 'bg-[#f97316]' },
-    { value: 'MARRON', label: 'Marron', swatchClass: 'bg-[#7c2d12]' },
-    { value: 'BEIGE', label: 'Beige', swatchClass: 'bg-[#d6b48c]' },
-] as const;
-
 function isPhoneCategoryValue(serviceCategories: ServiceCategoryOption[], value: string | number | null | undefined): boolean {
     const category = serviceCategories.find((item) => String(item.value) === String(value));
 
     return category?.label.toLowerCase().includes('celular') ?? false;
 }
 
-function normalizeStatus(status: string): string {
-    return status.toUpperCase();
-}
-
-function compactStatus(status: string): string {
-    return status === 'EN REPARACION / ESPERA REPUESTO' ? 'EN REPARACION' : status;
-}
-
-function repairStatusHeaderClass(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'LISTA') return 'border-l-4 border-l-[#198754] bg-[#f8fafc] text-[#0f172a]';
-    if (normalized === 'CANCELADA') return 'border-l-4 border-l-[#dc3545] bg-[#f8fafc] text-[#0f172a]';
-    if (normalized === 'GARANTIA') return 'border-l-4 border-l-[#0f766e] bg-[#f8fafc] text-[#0f172a]';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-4 border-l-[#6d28d9] bg-[#f8fafc] text-[#0f172a]';
-    if (normalized === 'PENDIENTE') return 'border-l-4 border-l-[#d97706] bg-[#f8fafc] text-[#0f172a]';
-
-    return 'border-l-4 border-l-[#64748b] bg-[#f8fafc] text-[#0f172a]';
-}
-
-function repairStatusBadgeClass(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'LISTA') return 'rounded-full border border-[#86efac] bg-[#dcfce7] text-[#166534]';
-    if (normalized === 'CANCELADA') return 'rounded-full border border-[#fecdd3] bg-[#fff1f2] text-[#be123c]';
-    if (normalized === 'GARANTIA') return 'rounded-full border border-[#5eead4] bg-[#ccfbf1] text-[#115e59]';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'rounded-full border border-[#c4b5fd] bg-[#f5f3ff] text-[#5b21b6]';
-    if (normalized === 'PENDIENTE') return 'rounded-full border border-[#fde68a] bg-[#fef3c7] text-[#92400e]';
-
-    return 'rounded-full border border-[#cbd5e1] bg-[#f1f5f9] text-[#475569]';
-}
-
-function repairStatusDotClass(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'LISTA') return 'bg-[#16a34a]';
-    if (normalized === 'CANCELADA') return 'bg-[#dc2626]';
-    if (normalized === 'GARANTIA') return 'bg-[#0f766e]';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'bg-[#7c3aed]';
-    if (normalized === 'PENDIENTE') return 'bg-[#f59e0b]';
-
-    return 'bg-[#64748b]';
-}
-
-function repairStatusRailClass(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'LISTA') return 'border-l-[#16a34a]';
-    if (normalized === 'CANCELADA') return 'border-l-[#dc2626]';
-    if (normalized === 'GARANTIA') return 'border-l-[#0f766e]';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-l-[#7c3aed]';
-    if (normalized === 'PENDIENTE') return 'border-l-[#f59e0b]';
-
-    return 'border-l-[#64748b]';
-}
-
-function repairStatusRailFillClass(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'LISTA') return 'before:bg-[#16a34a]';
-    if (normalized === 'CANCELADA') return 'before:bg-[#dc2626]';
-    if (normalized === 'GARANTIA') return 'before:bg-[#0f766e]';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'before:bg-[#7c3aed]';
-    if (normalized === 'PENDIENTE') return 'before:bg-[#f59e0b]';
-
-    return 'before:bg-[#64748b]';
-}
-
-function compactStatusLabel(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'REPARACIÓN';
-
-    return compactStatus(status);
-}
-
-function repairStatusSelectClass(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'LISTA') return 'border-[#198754] bg-[#eaf7ef] text-[#0f5132]';
-    if (normalized === 'CANCELADA') return 'border-[#dc3545] bg-[#fdecef] text-[#842029]';
-    if (normalized === 'GARANTIA') return 'border-[#0f766e] bg-[#ccfbf1] text-[#115e59]';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'border-[#6d28d9] bg-[#f0eaff] text-[#4c1d95]';
-    if (normalized === 'PENDIENTE') return 'border-[#ffc107] bg-[#fff8db] text-[#664d03]';
-
-    return 'border-[#6c757d] bg-slate-100 text-slate-800';
-}
-
-function repairStatusTextClass(status: string): string {
-    const normalized = normalizeStatus(status);
-
-    if (normalized === 'LISTA') return 'text-[#198754]';
-    if (normalized === 'CANCELADA') return 'text-[#dc3545]';
-    if (normalized === 'GARANTIA') return 'text-[#0f766e]';
-    if (normalized === 'EN REPARACION' || normalized === 'EN REPARACION / ESPERA REPUESTO') return 'text-[#6d28d9]';
-    if (normalized === 'PENDIENTE') return 'text-[#b45309]';
-
-    return 'text-[#64748b]';
-}
 
 function desktopGroupedRepairClass(index: number): string {
     const tones = [
@@ -409,16 +300,6 @@ function overdueLabel(repair: RepairOrderView): string | null {
     return `Vencida hace ${days} ${days === 1 ? 'dia' : 'dias'}`;
 }
 
-function normalizeRepairText(value?: string | null): string {
-    return (value ?? '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toUpperCase()
-        .replace(/[^A-Z0-9]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
 const knownDeviceBrands = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG'];
 
 function inferredRepairBrand(repair: RepairOrderView): string {
@@ -505,13 +386,6 @@ function desktopSameModelAccentClass(modelKey: string): string {
     return tones[hash % tones.length];
 }
 
-function repairColorSwatchClass(color?: string | null): string {
-    const normalized = normalizeRepairText(color);
-    const option = repairColorOptions.find((item) => item.value === normalized);
-
-    return option?.swatchClass ?? 'bg-[#94a3b8]';
-}
-
 function RepairColorSwatch({ color }: { color?: string | null }): JSX.Element | null {
     const label = (color ?? '').trim();
 
@@ -537,123 +411,6 @@ function RepairModelLabel({ repair, term }: { repair: RepairOrderView; term?: st
             {(repair.color ?? '').trim() !== '' ? <span className="shrink-0 text-[#64748b]">-</span> : null}
             <RepairColorSwatch color={repair.color} />
         </span>
-    );
-}
-
-function repairColorLabel(color?: string | null): string {
-    const normalized = normalizeRepairText(color);
-    const option = repairColorOptions.find((item) => item.value === normalized);
-
-    return option?.label ?? (color ?? '');
-}
-
-function RepairColorCombobox({
-    className,
-    value,
-    onChange,
-    disabled,
-}: {
-    className: string;
-    value: string;
-    onChange: (value: string) => void;
-    disabled?: boolean;
-}): JSX.Element {
-    const [open, setOpen] = useState(false);
-    const [showAllColors, setShowAllColors] = useState(false);
-    const [query, setQuery] = useState(repairColorLabel(value));
-    const normalizedQuery = normalizeRepairText(query);
-    const filteredOptions = showAllColors || normalizedQuery === ''
-        ? repairColorOptions
-        : repairColorOptions.filter((option) => normalizeRepairText(option.label).includes(normalizedQuery) || option.value.includes(normalizedQuery));
-
-    const selectColor = (nextValue: string): void => {
-        onChange(nextValue);
-        setQuery(repairColorLabel(nextValue));
-        setShowAllColors(false);
-        setOpen(false);
-    };
-
-    return (
-        <div className="relative">
-            <span
-                className={cn('pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]', repairColorSwatchClass(value))}
-                aria-hidden="true"
-            />
-            <input
-                className={cn(className, 'pl-9 pr-9')}
-                value={open ? query : repairColorLabel(value)}
-                placeholder="Color"
-                disabled={disabled}
-                onFocus={() => {
-                    setQuery(repairColorLabel(value));
-                    setShowAllColors(false);
-                }}
-                onChange={(event) => {
-                    setQuery(event.target.value);
-                    setShowAllColors(false);
-                    setOpen(true);
-                }}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter' && filteredOptions[0]) {
-                        event.preventDefault();
-                        selectColor(filteredOptions[0].value);
-                    }
-                    if (event.key === 'Escape') {
-                        setOpen(false);
-                        setShowAllColors(false);
-                        setQuery(repairColorLabel(value));
-                    }
-                }}
-                onBlur={() => {
-                    window.setTimeout(() => {
-                        setOpen(false);
-                        setShowAllColors(false);
-                        setQuery(repairColorLabel(value));
-                    }, 120);
-                }}
-            />
-            <button
-                type="button"
-                className="absolute right-2 top-1/2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[#475569] hover:bg-[#e2e8f0] disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={disabled}
-                aria-label="Mostrar colores"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                    if (open && showAllColors) {
-                        setOpen(false);
-                        setShowAllColors(false);
-                        return;
-                    }
-
-                    setQuery(repairColorLabel(value));
-                    setShowAllColors(true);
-                    setOpen(true);
-                }}
-            >
-                <FaChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} aria-hidden="true" />
-            </button>
-            {open && !disabled ? (
-                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto rounded-md border border-[#cbd5e1] bg-white py-1 shadow-[0_8px_18px_rgba(15,23,42,0.14)]">
-                    {filteredOptions.length > 0 ? filteredOptions.map((option) => (
-                        <button
-                            key={option.value || 'empty'}
-                            type="button"
-                            className={cn(
-                                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-[#0f172a] hover:bg-[#eff6ff]',
-                                normalizeRepairText(value) === option.value && 'bg-[#dbeafe]',
-                            )}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => selectColor(option.value)}
-                        >
-                            <span className={cn('h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]', option.swatchClass)} aria-hidden="true" />
-                            <span>{option.label}</span>
-                        </button>
-                    )) : (
-                        <div className="px-3 py-2 text-sm font-semibold text-[#64748b]">Sin coincidencias</div>
-                    )}
-                </div>
-            ) : null}
-        </div>
     );
 }
 
@@ -2932,7 +2689,7 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('group/repair-row grid min-h-[64px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.74rem] leading-tight transition hover:bg-[#f8fbff] focus-within:bg-[#f8fbff] [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), hasRepeatedModelInTicket && desktopSameModelAccentClass(repairDisplayModelKey), showSameModelContinuity && sameModelAdjacency.next && 'border-b-transparent', showSameModelContinuity && sameModelAdjacency.previous && 'shadow-[inset_0_1px_0_#f8fafc]', isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
+                <div className={cn('group/repair-row grid min-h-[72px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.78rem] leading-snug transition hover:bg-[#f4f8fe] focus-within:bg-[#f4f8fe] [&>*]:min-w-0 [&>*]:px-2.5 [&>*]:py-2.5', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), hasRepeatedModelInTicket && desktopSameModelAccentClass(repairDisplayModelKey), showSameModelContinuity && sameModelAdjacency.next && 'border-b-transparent', showSameModelContinuity && sameModelAdjacency.previous && 'shadow-[inset_0_1px_0_#f8fafc]', isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
                     <div className="sticky left-0 z-[2] grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 bg-inherit text-center shadow-[1px_0_0_#cbd5e1]">
                         {showDesktopTicketData ? (
                             <button type="button" className="text-base font-black leading-none text-[#0f172a]" onClick={openQuickView}>#<HighlightText value={repair.id} term={highlightTerm} /></button>
@@ -3224,7 +2981,6 @@ export function RepairDesktopRow({
 
 export function RepairTicketPanel({
     ticket,
-    states,
     serviceCategories,
     serviceTemplates = [],
     partInventory = [],
@@ -3252,7 +3008,7 @@ export function RepairTicketPanel({
     return (
         <section className={cn(ui.repairTicketPanel, 'max-xl:rounded-lg max-xl:border max-xl:border-[#64748b] max-xl:bg-white max-xl:p-2 max-xl:shadow-[0_2px_6px_rgba(15,23,42,0.10)]')}>
             <header className="flex flex-col gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-3 md:flex-row md:items-start md:justify-between max-xl:border-0 max-xl:border-b max-xl:border-[#e2e8f0] max-xl:bg-white max-xl:p-0 max-xl:pb-2">
-                <div className="min-w-0 max-xl:grid max-xl:gap-2">
+                <div className="min-w-0 max-xl:grid max-xl:grid-cols-[minmax(0,1fr)] max-xl:gap-2">
                     <div className="max-xl:rounded-lg max-xl:border max-xl:border-[#111827] max-xl:bg-[#111827] max-xl:px-3 max-xl:py-2">
                         <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs max-xl:text-[0.68rem] max-xl:font-black max-xl:uppercase max-xl:text-[#cbd5e1]">Ticket #{ticket.id}</p>
                         <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl max-xl:text-[1.22rem] max-xl:font-black max-xl:uppercase max-xl:leading-tight max-xl:text-white">{ticket.nombre_cliente}</h3>
@@ -3366,7 +3122,6 @@ export function RepairTicketPanel({
             </div>
 
             {addOpen ? <AddRepairModal ticket={ticket} baseRepair={addBaseRepair} serviceCategories={serviceCategories} serviceTemplates={serviceTemplates} partInventory={partInventory} onClose={closeAddRepair} /> : null}
-            <span className="hidden">{states.length}</span>
         </section>
     );
 }

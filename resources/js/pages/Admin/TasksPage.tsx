@@ -28,7 +28,6 @@ interface TasksPageProps {
     todayLabel: string;
     items: RepairTicketView[];
     completedItems?: RepairTicketView[];
-    states: string[];
     serviceCategories: ServiceCategoryOption[];
     serviceTemplates: ServiceTemplateOption[];
     partInventory: RepairPartInventoryOption[];
@@ -55,7 +54,6 @@ export default function TasksPage({
     todayLabel,
     items,
     completedItems = [],
-    states,
     serviceCategories,
     serviceTemplates,
     partInventory,
@@ -84,7 +82,6 @@ export default function TasksPage({
         <RepairTicketPanel
             key={`task-mobile-${ticket.id}`}
             ticket={ticket}
-            states={states}
             serviceCategories={serviceCategories}
             serviceTemplates={serviceTemplates}
             partInventory={partInventory}

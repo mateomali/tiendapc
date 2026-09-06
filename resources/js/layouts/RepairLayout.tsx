@@ -1,5 +1,5 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { FaArchive, FaChartBar, FaClipboardCheck, FaCog, FaDatabase, FaExternalLinkAlt, FaHistory, FaHome, FaInbox, FaList, FaPowerOff, FaSearch, FaStickyNote, FaTools } from 'react-icons/fa';
 import { FlashMessages } from '../components/FlashMessages';
@@ -46,6 +46,31 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     const currentUrl = page.url;
     const { auth } = page.props;
     const [openNavGroup, setOpenNavGroup] = useState<string | null>(null);
+    const headerRef = useRef<HTMLElement | null>(null);
+    const [headerOffset, setHeaderOffset] = useState('5.6rem');
+
+    useEffect(() => {
+        const header = headerRef.current;
+        if (!header || typeof ResizeObserver === 'undefined') {
+            return undefined;
+        }
+
+        const sync = (): void => {
+            const height = header.getBoundingClientRect().height;
+            const topOffset = window.matchMedia('(min-width: 1280px)').matches ? 8 : 4;
+
+            setHeaderOffset(`${Math.ceil(height + topOffset + 6)}px`);
+        };
+
+        sync();
+        const observer = new ResizeObserver(sync);
+
+        observer.observe(header);
+
+        return () => observer.disconnect();
+    }, []);
+
+    const headerCssVars = { '--repair-header-offset': headerOffset } as CSSProperties;
 
     const directNavItems: NavItem[] = [
         { href: route('repairs.workbench'), label: 'Consultas', shortLabel: 'Cons.', match: '/consulta', icon: <FaSearch aria-hidden="true" /> },
@@ -84,22 +109,23 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
     ];
 
     const navLinkClasses =
-        'inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 text-[0.68rem] font-bold text-[#eaf2ff] no-underline transition duration-150 hover:border-[#7fb4ff] hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#bfdbfe] xl:min-h-9 xl:px-3 xl:py-2 xl:text-[0.82rem]';
+        'inline-flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-md border border-transparent px-2 text-[0.72rem] font-bold text-[#eaf2ff] no-underline transition duration-150 hover:border-[#7fb4ff] hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#bfdbfe] xl:min-h-9 xl:px-3 xl:py-2 xl:text-[0.82rem]';
     const navLinkActiveClasses = 'border-[#bfdbfe] bg-white !text-[#0b3a83] shadow-sm';
     const newOrderLinkClasses = 'border-[#7dd3fc] bg-[#38bdf8] text-[#082f49] shadow-sm hover:border-[#bae6fd] hover:bg-[#0ea5e9] hover:text-white';
     const newOrderActiveClasses = 'border-[#bae6fd] bg-[#0ea5e9] text-white shadow-sm';
     const navMenuClasses = 'relative shrink-0';
-    const navMenuButtonClasses = 'flex min-h-8 cursor-pointer items-center justify-between gap-2 rounded-md border border-white/15 bg-white/10 px-2.5 py-1.5 text-[0.72rem] font-black text-[#eaf2ff] transition hover:border-[#7fb4ff] hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#bfdbfe] xl:min-h-9 xl:px-3 xl:text-[0.82rem]';
-    const navMenuPanelClasses = 'fixed left-3 right-3 top-[5.9rem] z-50 grid max-h-[60vh] gap-1 overflow-y-auto rounded-md border border-white/20 bg-[#123f91] p-1.5 shadow-[0_12px_24px_rgba(8,24,60,0.24)] xl:absolute xl:left-0 xl:right-auto xl:top-auto xl:mt-1 xl:min-w-[12rem] xl:overflow-visible';
+    const navMenuButtonClasses = 'flex min-h-9 cursor-pointer items-center justify-between gap-2 rounded-md border border-white/15 bg-white/10 px-2.5 py-1.5 text-[0.74rem] font-black text-[#eaf2ff] transition hover:border-[#7fb4ff] hover:bg-[#1d4ed8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#bfdbfe] xl:min-h-9 xl:px-3 xl:text-[0.82rem]';
+    const navMenuPanelClasses = 'fixed left-3 right-3 z-50 grid max-h-[60vh] gap-1 overflow-y-auto rounded-md border border-white/20 bg-[#123f91] p-1.5 shadow-[0_12px_24px_rgba(8,24,60,0.24)] xl:absolute xl:left-0 xl:right-auto xl:top-auto xl:mt-1 xl:min-w-[12rem] xl:overflow-visible';
+    const navMenuPanelStyle = { top: 'var(--repair-header-offset, 5.6rem)' } as CSSProperties;
 
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen bg-[#eaf2fb] px-2 py-2 text-[#0f172a] md:px-4 md:py-3">
-                <header className="sticky top-1 z-30 mx-auto mb-3 w-[min(100%,1920px)] rounded-lg border border-[#123f91] bg-[#174ea6] px-2 py-1.5 text-white shadow-[0_6px_18px_rgba(15,61,145,0.22)] xl:top-2 xl:mb-4 xl:px-3 xl:py-2">
+            <div className="min-h-screen bg-[#eaf2fb] px-2 py-2 text-[#0f172a] md:px-4 md:py-3" style={headerCssVars}>
+                <header ref={headerRef} className="sticky top-1 z-30 mx-auto mb-3 w-[min(100%,1920px)] rounded-lg border border-[#123f91] bg-[#174ea6] px-2 py-1.5 text-white shadow-[0_6px_18px_rgba(15,61,145,0.22)] xl:top-2 xl:mb-4 xl:px-3 xl:py-2">
                     <nav className="grid gap-1 xl:flex xl:flex-wrap xl:items-center xl:gap-2">
                         <div className="flex min-w-0 items-center gap-1.5 xl:contents">
-                            <Link href={route('repairs.workbench')} className="mr-auto inline-flex min-h-7 min-w-0 items-center gap-1.5 rounded-md px-1 text-[0.8rem] font-bold text-white no-underline transition hover:text-[#dbeafe] xl:mr-3 xl:min-h-9 xl:px-2 xl:text-[0.95rem]">
+                            <Link href={route('repairs.workbench')} className="mr-auto inline-flex min-h-9 min-w-0 items-center gap-1.5 rounded-md px-1 text-[0.8rem] font-bold text-white no-underline transition hover:text-[#dbeafe] xl:mr-3 xl:min-h-9 xl:px-2 xl:text-[0.95rem]">
                                 <FaTools className="shrink-0" aria-hidden="true" />
                                 <span className="truncate xl:hidden">{title}</span>
                                 <span className="hidden xl:inline">Gestión de Órdenes</span>
@@ -165,7 +191,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                                             <span aria-hidden="true" className="text-[0.62rem]">{isOpen ? '^' : 'v'}</span>
                                         </button>
                                         {isOpen ? (
-                                            <div className={navMenuPanelClasses}>
+                                            <div className={navMenuPanelClasses} style={navMenuPanelStyle}>
                                                 {group.items.map((item) => {
                                                     const isActive = isNavMatch(currentUrl, item.match);
                                                     const isNewOrder = item.match === '/ingreso';
@@ -214,7 +240,7 @@ export function RepairLayout({ children, title }: RepairLayoutProps): JSX.Elemen
                         )}
                     </nav>
                 </header>
-                <main className="mx-auto grid w-[min(100%,1920px)] gap-4 pb-6">
+                <main className="mx-auto grid w-[min(100%,1920px)] gap-4 pb-6 [&>*]:min-w-0">
                     <FlashMessages />
                     {children}
                 </main>

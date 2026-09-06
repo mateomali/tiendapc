@@ -1,11 +1,13 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronDown, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from '../../components/RepairPartAccessoriesFields';
+import { normalizeRepairKey as normalizeDeviceSearch, phoneBrandOptions, RepairColorCombobox } from '../../components/RepairColorCombobox';
 import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
 import { WebcamCaptureButton } from '../../components/WebcamCaptureButton';
 import { RepairLayout } from '../../layouts/RepairLayout';
+import { groupTicketsByDate, type TicketDateGroup } from '../../repairDateGroups';
 import type { RepairTicketView } from '../../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
 import { cn } from '../../utils';
@@ -207,36 +209,6 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
     };
 }
 
-const phoneBrandOptions = ['SAMSUNG', 'MOTOROLA', 'XIAOMI', 'ALCATEL', 'TCL', 'LG', 'OTRAS'] as const;
-const repairColorOptions = [
-    { value: '', label: 'Sin color', swatchClass: 'bg-[#f8fafc]' },
-    { value: 'NEGRO', label: 'Negro', swatchClass: 'bg-[#111827]' },
-    { value: 'BLANCO', label: 'Blanco', swatchClass: 'bg-white' },
-    { value: 'GRIS', label: 'Gris', swatchClass: 'bg-[#6b7280]' },
-    { value: 'PLATA', label: 'Plata', swatchClass: 'bg-[#c0c0c0]' },
-    { value: 'AZUL', label: 'Azul', swatchClass: 'bg-[#2563eb]' },
-    { value: 'CELESTE', label: 'Celeste', swatchClass: 'bg-[#38bdf8]' },
-    { value: 'ROJO', label: 'Rojo', swatchClass: 'bg-[#dc2626]' },
-    { value: 'VERDE', label: 'Verde', swatchClass: 'bg-[#16a34a]' },
-    { value: 'AMARILLO', label: 'Amarillo', swatchClass: 'bg-[#facc15]' },
-    { value: 'DORADO', label: 'Dorado', swatchClass: 'bg-[#d97706]' },
-    { value: 'ROSA', label: 'Rosa', swatchClass: 'bg-[#f472b6]' },
-    { value: 'VIOLETA', label: 'Violeta', swatchClass: 'bg-[#7c3aed]' },
-    { value: 'NARANJA', label: 'Naranja', swatchClass: 'bg-[#f97316]' },
-    { value: 'MARRON', label: 'Marron', swatchClass: 'bg-[#7c2d12]' },
-    { value: 'BEIGE', label: 'Beige', swatchClass: 'bg-[#d6b48c]' },
-] as const;
-
-function normalizeDeviceSearch(value: string): string {
-    return value
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toUpperCase()
-        .replace(/[^A-Z0-9]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
 function removeBrandPrefix(value: string, brand: string): string {
     const normalizedValue = normalizeDeviceSearch(value);
     const normalizedBrand = normalizeDeviceSearch(brand);
@@ -271,166 +243,9 @@ function normalizeSuggestedRepairType(value: string): string {
     return normalizeDeviceSearch(firstLine);
 }
 
-function repairColorLabel(color?: string | null): string {
-    const normalized = normalizeDeviceSearch(color ?? '');
-    const option = repairColorOptions.find((item) => item.value === normalized);
-
-    return option?.label ?? (color ?? '');
-}
-
-function repairColorSwatchClass(color?: string | null): string {
-    const normalized = normalizeDeviceSearch(color ?? '');
-    const option = repairColorOptions.find((item) => item.value === normalized);
-
-    return option?.swatchClass ?? 'bg-[#94a3b8]';
-}
-
-function RepairColorCombobox({
-    className,
-    value,
-    onChange,
-}: {
-    className: string;
-    value: string;
-    onChange: (value: string) => void;
-}): JSX.Element {
-    const [open, setOpen] = useState(false);
-    const [showAllColors, setShowAllColors] = useState(false);
-    const [query, setQuery] = useState(repairColorLabel(value));
-    const normalizedQuery = normalizeDeviceSearch(query);
-    const filteredOptions = showAllColors || normalizedQuery === ''
-        ? repairColorOptions
-        : repairColorOptions.filter((option) => normalizeDeviceSearch(option.label).includes(normalizedQuery) || option.value.includes(normalizedQuery));
-
-    const selectColor = (nextValue: string): void => {
-        onChange(nextValue);
-        setQuery(repairColorLabel(nextValue));
-        setShowAllColors(false);
-        setOpen(false);
-    };
-
-    return (
-        <div className="relative">
-            <span
-                className={cn('pointer-events-none absolute left-3 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 rounded-sm border border-[#64748b]', repairColorSwatchClass(value))}
-                aria-hidden="true"
-            />
-            <input
-                className={cn(className, 'pl-9 pr-9')}
-                value={open ? query : repairColorLabel(value)}
-                placeholder="Color"
-                onFocus={() => {
-                    setQuery(repairColorLabel(value));
-                    setShowAllColors(false);
-                }}
-                onChange={(event) => {
-                    setQuery(event.target.value);
-                    setShowAllColors(false);
-                    setOpen(true);
-                }}
-                onKeyDown={(event) => {
-                    if (event.key === 'Enter' && filteredOptions[0]) {
-                        event.preventDefault();
-                        selectColor(filteredOptions[0].value);
-                    }
-                    if (event.key === 'Escape') {
-                        setOpen(false);
-                        setShowAllColors(false);
-                        setQuery(repairColorLabel(value));
-                    }
-                }}
-                onBlur={() => {
-                    window.setTimeout(() => {
-                        setOpen(false);
-                        setShowAllColors(false);
-                        setQuery(repairColorLabel(value));
-                    }, 120);
-                }}
-            />
-            <button
-                type="button"
-                className="absolute right-2 top-1/2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-md text-[#475569] hover:bg-[#e2e8f0]"
-                aria-label="Mostrar colores"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                    if (open && showAllColors) {
-                        setOpen(false);
-                        setShowAllColors(false);
-                        return;
-                    }
-
-                    setQuery(repairColorLabel(value));
-                    setShowAllColors(true);
-                    setOpen(true);
-                }}
-            >
-                <FaChevronDown className={cn('h-3 w-3 transition-transform', open && 'rotate-180')} aria-hidden="true" />
-            </button>
-            {open ? (
-                <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 max-h-56 overflow-y-auto rounded-md border border-[#cbd5e1] bg-white py-1 shadow-[0_8px_18px_rgba(15,23,42,0.14)]">
-                    {filteredOptions.length > 0 ? filteredOptions.map((option) => (
-                        <button
-                            key={option.value || 'empty'}
-                            type="button"
-                            className={cn(
-                                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-[#0f172a] hover:bg-[#eff6ff]',
-                                normalizeDeviceSearch(value) === option.value && 'bg-[#dbeafe]',
-                            )}
-                            onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => selectColor(option.value)}
-                        >
-                            <span className={cn('h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]', option.swatchClass)} aria-hidden="true" />
-                            <span>{option.label}</span>
-                        </button>
-                    )) : (
-                        <div className="px-3 py-2 text-sm font-semibold text-[#64748b]">Sin coincidencias</div>
-                    )}
-                </div>
-            ) : null}
-        </div>
-    );
-}
-
-function SummaryCard({
-    label,
-    value,
-    trend,
-    tone,
-}: {
-    label: string;
-    value: number;
-    trend: string;
-    tone: 'blue' | 'orange' | 'amber' | 'green' | 'red' | 'cyan';
-}): JSX.Element {
-    const iconTone = {
-        blue: 'from-[#2563eb] to-[#22d3ee]',
-        orange: 'from-[#f97316] to-[#fb923c]',
-        amber: 'from-[#f59e0b] to-[#d97706]',
-        green: 'from-[#22c55e] to-[#16a34a]',
-        red: 'from-[#ef4444] to-[#b91c1c]',
-        cyan: 'from-[#0ea5e9] to-[#0284c7]',
-    }[tone];
-
-    return (
-        <article className="flex min-h-[86px] min-w-0 flex-col justify-between gap-2 rounded-lg border border-[#b8d3f7] bg-[#f8fbff] px-3 py-2.5 text-left shadow-sm">
-            <div className="text-[0.78rem] font-semibold text-[#1d4ed8]">{label}</div>
-            <div className="flex items-center justify-between gap-2.5">
-                <div className="text-[1.45rem] font-extrabold leading-none text-[#0f172a]">{value}</div>
-                <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md text-[0.72rem] text-transparent', iconTone)}>
-                    ●
-                </div>
-            </div>
-            <div className={cn('text-[0.82rem] font-semibold', tone === 'green' ? 'text-[#15803d]' : tone === 'red' ? 'text-[#b91c1c]' : tone === 'cyan' ? 'text-[#0ea5e9]' : 'text-[#d97706]')}>
-                {trend}
-            </div>
-        </article>
-    );
-}
-
 function SummaryFilterCard({
     label,
     value,
-    trend,
     tone,
     href,
     active = false,
@@ -438,13 +253,12 @@ function SummaryFilterCard({
 }: {
     label: string;
     value: number;
-    trend: string;
     tone: 'blue' | 'orange' | 'purple' | 'green' | 'red' | 'cyan' | 'yellow' | 'brown';
     href: string;
     active?: boolean;
     icon: JSX.Element;
 }): JSX.Element {
-    const trendTone = {
+    const toneText = {
         blue: 'text-[#1d4ed8]',
         orange: 'text-[#d97706]',
         purple: 'text-[#6d28d9]',
@@ -455,9 +269,9 @@ function SummaryFilterCard({
         brown: 'text-[#854d0e]',
     }[tone];
     const iconShellTone = {
-        blue: 'border-[#bfdbfe] bg-white',
+        blue: 'border-[#bfdbfe] bg-[#eff6ff]',
         orange: 'border-[#fed7aa] bg-[#fff7ed]',
-        purple: 'border-[#ddd6fe] bg-[#faf5ff]',
+        purple: 'border-[#ddd6fe] bg-[#f5f3ff]',
         green: 'border-[#bbf7d0] bg-[#f0fdf4]',
         red: 'border-[#fecaca] bg-[#fef2f2]',
         cyan: 'border-[#bae6fd] bg-[#f0f9ff]',
@@ -470,18 +284,17 @@ function SummaryFilterCard({
             href={href}
             preserveScroll
             className={cn(
-                'grid min-h-[62px] min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 gap-y-0.5 rounded-md border bg-white px-2.5 py-2 text-left no-underline transition hover:border-[#2563eb] hover:bg-[#f8fbff]',
+                'grid min-h-[56px] min-w-0 grid-cols-[1fr_auto] items-center gap-x-2 rounded-md border bg-white px-2.5 py-1.5 text-left no-underline transition hover:border-[#2563eb] hover:bg-[#f8fbff]',
                 active ? 'border-[#2563eb] bg-[#eff6ff] shadow-[inset_0_0_0_1px_rgba(37,99,235,0.18)]' : 'border-[#cbd5e1]',
             )}
         >
             <div className="min-w-0">
-                <div className="truncate text-[0.72rem] font-bold text-[#475569]">{label}</div>
-                <div className="mt-0.5 text-[1.22rem] font-black leading-none text-[#0f172a]">{value}</div>
+                <div className={cn('truncate text-[0.72rem] font-bold', active ? 'text-[#1d4ed8]' : 'text-[#475569]')}>{label}</div>
+                <div className="mt-0.5 text-[1.3rem] font-black leading-none text-[#0f172a]">{value}</div>
             </div>
-            <div className={cn('grid h-[28px] w-[28px] place-items-center rounded-md border text-[0.8rem]', iconShellTone, trendTone)}>
+            <div className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg border text-[0.85rem]', iconShellTone, toneText)}>
                 {icon}
             </div>
-            <div className={cn('col-span-2 truncate text-[0.68rem] font-bold', trendTone)}>{trend}</div>
         </Link>
     );
 }
@@ -492,9 +305,9 @@ function FilterPill({ label, href, active }: { label: string; href: string; acti
             href={href}
             preserveScroll
             className={cn(
-                'min-h-8 rounded-md border px-3 py-1.5 text-center text-[0.76rem] font-bold no-underline transition',
+                'inline-flex min-h-9 items-center justify-center rounded-md border px-3 py-1.5 text-[0.78rem] font-bold no-underline transition',
                 active
-                    ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                    ? 'border-[#2563eb] bg-[#2563eb] text-white shadow-[0_1px_2px_rgba(37,99,235,0.2)]'
                     : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
             )}
         >
@@ -577,113 +390,6 @@ type SearchFieldKey = (typeof searchFieldOptions)[number]['key'];
 const defaultSearchFields = searchFieldOptions.map((option) => option.key);
 
 type SortableRepairColumn = 'ticket' | 'cliente' | 'dni' | 'contacto' | 'ingreso' | 'trabajo' | 'modelo' | 'falla' | 'estimada' | 'saldo' | 'estado';
-
-interface TicketDateGroup {
-    key: string;
-    label: string;
-    count: number;
-    repairCount: number;
-    tickets: RepairTicketView[];
-}
-
-function localDateKey(date = new Date()): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
-}
-
-const weekdayLabels = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'] as const;
-const monthLabels = [
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-] as const;
-
-function dateGroupLabel(value?: string | null): string {
-    if (!value) {
-        return 'Sin fecha';
-    }
-
-    const key = value.slice(0, 10);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-
-    if (key === localDateKey(today)) {
-        return 'Hoy';
-    }
-
-    if (key === localDateKey(yesterday)) {
-        return 'Ayer';
-    }
-
-    const [year, month, day] = key.split('-');
-
-    if (!year || !month || !day) {
-        return 'Sin fecha';
-    }
-
-    const parsedYear = Number(year);
-    const parsedMonth = Number(month);
-    const parsedDay = Number(day);
-
-    if (
-        !Number.isInteger(parsedYear) ||
-        !Number.isInteger(parsedMonth) ||
-        !Number.isInteger(parsedDay) ||
-        parsedMonth < 1 ||
-        parsedMonth > 12 ||
-        parsedDay < 1 ||
-        parsedDay > 31
-    ) {
-        return 'Sin fecha';
-    }
-
-    const date = new Date(parsedYear, parsedMonth - 1, parsedDay);
-
-    if (date.getFullYear() !== parsedYear || date.getMonth() !== parsedMonth - 1 || date.getDate() !== parsedDay) {
-        return 'Sin fecha';
-    }
-
-    return `${weekdayLabels[date.getDay()]} ${parsedDay} de ${monthLabels[parsedMonth - 1]} del ${parsedYear}`;
-}
-
-function groupTicketsByEntryDate(tickets: RepairTicketView[]): TicketDateGroup[] {
-    const groups = new Map<string, TicketDateGroup>();
-
-    tickets.forEach((ticket) => {
-        const key = ticket.fecha?.slice(0, 10) || 'sin-fecha';
-        const group = groups.get(key);
-
-        if (group) {
-            group.tickets.push(ticket);
-            group.count += 1;
-            group.repairCount += ticket.repairs.length;
-            return;
-        }
-
-        groups.set(key, {
-            key,
-            label: dateGroupLabel(ticket.fecha),
-            count: 1,
-            repairCount: ticket.repairs.length,
-            tickets: [ticket],
-        });
-    });
-
-    return Array.from(groups.values());
-}
 
 function splitTaskTickets(tickets: RepairTicketView[]): { pending: RepairTicketView[]; completed: RepairTicketView[] } {
     const pending: RepairTicketView[] = [];
@@ -812,7 +518,7 @@ export default function WorkbenchPage({
     const gridFilterSubmitTimeout = useRef<number | null>(null);
     const dniLookupTimeout = useRef<number | null>(null);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
-    const ticketDateGroups = groupTicketsByEntryDate(tickets);
+    const ticketDateGroups = groupTicketsByDate(tickets, (ticket) => ticket.fecha);
     const isTaskQueueView = filters.prioridad === 'tareas';
     const taskTickets = splitTaskTickets(tickets);
     const isWizardIntake = configuredWizardIntake || (isIngreso && mobileWizardIntake);
@@ -955,7 +661,7 @@ export default function WorkbenchPage({
             applySingleGridFilter(key, value);
         }, 450);
     };
-    const gridFilterInputClass = 'h-8 w-full min-w-0 rounded-sm border border-[#cbd5e1] bg-white px-1.5 text-[0.72rem] font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb33]';
+    const gridFilterInputClass = 'h-9 w-full min-w-0 rounded-md border border-[#cbd5e1] bg-white px-2 text-[0.74rem] font-semibold text-[#0f172a] outline-none transition hover:border-[#93c5fd] focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb20]';
     const clearGridFilterHref = route(
         'repairs.workbench',
         filterQuery(Object.fromEntries(columnFilterKeys.map((key) => [key, undefined])) as Record<string, undefined>),
@@ -969,7 +675,7 @@ export default function WorkbenchPage({
     };
     const sortHeaderClass = (column: SortableRepairColumn): string =>
         cn(
-            'inline-flex items-center gap-1 text-left text-[0.62rem] font-black uppercase text-[#475569] no-underline hover:text-[#1d4ed8]',
+            'inline-flex items-center gap-1 text-left text-[0.66rem] font-black uppercase text-[#475569] no-underline hover:text-[#1d4ed8]',
             (filters.ordenar_por ?? 'ticket') === column && 'text-[#1d4ed8]',
         );
     const sortIndicator = (column: SortableRepairColumn): string => {
@@ -1849,25 +1555,7 @@ export default function WorkbenchPage({
         );
     };
 
-    const renderClientPreview = (className = ''): JSX.Element | null => clientPreview ? (
-        <div className={cn('rounded-md border border-[#bbf7d0] bg-[#f0fdf4] p-3 text-sm text-[#14532d]', className)}>
-            <div className="grid gap-1 font-semibold">
-                <span>Cliente encontrado en orden #{clientPreview.ultima_orden ?? '-'}</span>
-                <span>{clientPreview.nombre_cliente ?? 'Sin nombre'} - DNI {clientPreview.dni ?? '-'}</span>
-                <span>Contacto: {clientPreview.contacto && clientPreview.contacto.trim() !== '' ? clientPreview.contacto : 'Sin contacto'}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-                <button className={buttonClass('success', 'sm')} type="button" onClick={importClientPreview}>
-                    <FaCheckCircle aria-hidden="true" /> Importar datos
-                </button>
-                <button className={buttonClass('soft', 'sm')} type="button" onClick={() => setClientPreview(null)}>
-                    Ignorar
-                </button>
-            </div>
-        </div>
-    ) : null;
-
-    const renderDesktopDateGroups = (groups: TicketDateGroup[]): JSX.Element[] =>
+    const renderDesktopDateGroups = (groups: TicketDateGroup<RepairTicketView>[]): JSX.Element[] =>
         groups.flatMap((group) => [
             <div key={`desktop-date-group-${group.key}`} className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
                 <span>{group.label}</span>
@@ -1895,7 +1583,7 @@ export default function WorkbenchPage({
             }),
         ]);
 
-    const renderMobileDateGroups = (groups: TicketDateGroup[]): JSX.Element[] =>
+    const renderMobileDateGroups = (groups: TicketDateGroup<RepairTicketView>[]): JSX.Element[] =>
         groups.map((group) => (
             <section key={`mobile-date-group-${group.key}`} className="grid gap-2">
                 <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
@@ -1906,7 +1594,6 @@ export default function WorkbenchPage({
                     <RepairTicketPanel
                         key={ticket.id}
                         ticket={ticket}
-                        states={states}
                         serviceCategories={serviceCategories}
                         serviceTemplates={serviceTemplates}
                         partInventory={partInventory}
@@ -1944,7 +1631,6 @@ export default function WorkbenchPage({
             <RepairTicketPanel
                 key={`mobile-task-${ticket.id}`}
                 ticket={ticket}
-                states={states}
                 serviceCategories={serviceCategories}
                 serviceTemplates={serviceTemplates}
                 partInventory={partInventory}
@@ -1978,7 +1664,6 @@ export default function WorkbenchPage({
             <RepairTicketPanel
                 key={`mobile-delivered-search-${ticket.id}`}
                 ticket={ticket}
-                states={states}
                 serviceCategories={serviceCategories}
                 serviceTemplates={serviceTemplates}
                 partInventory={partInventory}
@@ -1994,29 +1679,29 @@ export default function WorkbenchPage({
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
             {isConsultas ? (
-            <section className="sticky top-2 z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.10)] xl:hidden">
+            <section className="sticky z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.10)] xl:hidden" style={{ top: 'var(--repair-header-offset, 5.6rem)' }}>
                 <form
-                    className="grid grid-cols-[minmax(0,1fr)_42px_42px] gap-2"
+                    className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
                         submitCleanSearch(true);
                     }}
                 >
                     <input
-                        className="min-h-10 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-sm font-semibold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="h-11 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-[1rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         placeholder="Buscar orden"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
-                    <button type="submit" className="grid min-h-10 place-items-center rounded-md bg-[#2563eb] text-white" aria-label="Buscar">
+                    <button type="submit" className="grid h-11 place-items-center rounded-md bg-[#2563eb] text-white" aria-label="Buscar">
                         <FaSearch aria-hidden="true" />
                     </button>
-                    <button type="button" className="relative grid min-h-10 min-w-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
+                    <button type="button" className="relative grid h-11 min-w-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
                         <FaFilter aria-hidden="true" />
                         {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-md bg-[#ef4444] px-1 text-[0.65rem] font-bold text-white">{activeMobileFilters}</span> : null}
                     </button>
                 </form>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5">
                     {searchFieldOptions.map((option) => {
                         const active = activeSearchFields.includes(option.key);
 
@@ -2025,7 +1710,7 @@ export default function WorkbenchPage({
                                 key={option.key}
                                 type="button"
                                 className={cn(
-                                    'min-h-8 rounded-md border px-2 text-[0.68rem] font-bold transition',
+                                    'inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md border px-2.5 text-[0.72rem] font-bold transition',
                                     active
                                         ? 'border-[#2563eb] bg-[#2563eb] text-white'
                                         : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
@@ -2038,54 +1723,113 @@ export default function WorkbenchPage({
                         );
                     })}
                 </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-0.5 text-[0.68rem] font-bold text-[#334155]">
+                <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 text-[0.72rem] font-bold text-[#334155]">
                     <Link
                         href={route('repairs.workbench')}
                         preserveScroll
-                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', !filters.estado && !filters.prioridad ? 'bg-white text-[#1d4ed8] ring-2 ring-[#bfdbfe]' : 'bg-[#eff6ff] text-[#334155]')}
+                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', !filters.estado && !filters.prioridad ? 'bg-white text-[#1d4ed8] ring-2 ring-[#bfdbfe]' : 'bg-[#eff6ff] text-[#334155]')}
                     >
                         Todas {summary.active}
                     </Link>
                     <Link
                         href={route('repairs.workbench', { estado: 'PENDIENTE' })}
                         preserveScroll
-                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'PENDIENTE' ? 'bg-white text-[#d97706] ring-2 ring-[#fed7aa]' : 'bg-[#fff7ed] text-[#334155]')}
+                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.estado === 'PENDIENTE' ? 'bg-white text-[#d97706] ring-2 ring-[#fed7aa]' : 'bg-[#fff7ed] text-[#334155]')}
                     >
                         Pend. {summary.pending}
                     </Link>
                     <Link
                         href={route('repairs.workbench', { estado: 'LISTA' })}
                         preserveScroll
-                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.estado === 'LISTA' ? 'bg-white text-[#15803d] ring-2 ring-[#bbf7d0]' : 'bg-[#ecfdf5] text-[#334155]')}
+                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.estado === 'LISTA' ? 'bg-white text-[#15803d] ring-2 ring-[#bbf7d0]' : 'bg-[#ecfdf5] text-[#334155]')}
                     >
                         Listas {summary.ready}
                     </Link>
                     <Link
                         href={route('repairs.workbench', { prioridad: 'tareas' })}
                         preserveScroll
-                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'tareas' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
+                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'tareas' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
                         Tareas {summary.tasks}
                     </Link>
                     <Link
                         href={route('repairs.workbench', { prioridad: 'vencidas' })}
                         preserveScroll
-                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
+                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
                     >
                         Venc. {summary.overdue}
                     </Link>
                     <Link
                         href={route('repairs.workbench', { prioridad: 'hoy' })}
                         preserveScroll
-                        className={cn('whitespace-nowrap rounded-md px-2 py-1 no-underline', filters.prioridad === 'hoy' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
+                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'hoy' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
                         Hoy {summary.today}
                     </Link>
-                </div>
-                <div className="rounded-md border border-[#dbeafe] bg-[#f8fbff] px-2 py-1 text-[0.72rem] font-black text-[#334155]">
-                    Activas {summary.active} · Tareas {summary.tasks} · Entregadas {summary.delivered}
+                    <Link
+                        href={route('repairs.delivered')}
+                        preserveScroll
+                        className="inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md bg-[#e0f2fe] px-2.5 text-[#0369a1] no-underline"
+                    >
+                        Entreg. {summary.delivered}
+                    </Link>
                 </div>
             </section>
+            ) : null}
+
+            {isConsultas ? (
+            <form
+                className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 shadow-sm xl:block"
+                onSubmit={(event) => {
+                    event.preventDefault();
+                    submitCleanSearch();
+                }}
+            >
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-[320px] flex-[1_1_320px]">
+                    <input
+                        className="h-11 w-full rounded-lg border border-[#cbd5e1] bg-white pl-3 pr-12 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        placeholder="Buscar por ID, cliente, DNI, contacto o modelo"
+                        value={filtersForm.data.q}
+                        onChange={(event) => filtersForm.setData('q', event.target.value)}
+                    />
+                        <button
+                            type="submit"
+                            className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md bg-[#2563eb] text-white transition hover:bg-[#1d4ed8]"
+                            aria-label="Buscar"
+                        >
+                            <FaSearch aria-hidden="true" />
+                        </button>
+                    </div>
+                    <div className="flex min-w-[380px] flex-1 flex-wrap items-center gap-1.5">
+                        {searchFieldOptions.map((option) => {
+                            const active = activeSearchFields.includes(option.key);
+
+                            return (
+                                <button
+                                    key={option.key}
+                                    type="button"
+                                    className={cn(
+                                        'inline-flex min-h-9 items-center rounded-md border px-2.5 text-[0.74rem] font-bold transition',
+                                        active
+                                            ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                                            : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
+                                    )}
+                                    onClick={() => toggleSearchField(option.key)}
+                                    aria-pressed={active}
+                                >
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 text-[0.74rem] font-black text-[#64748b]">
+                        <span>{visibleRepairs} reparaciones</span>
+                        <span className="h-4 w-px bg-[#cbd5e1]" aria-hidden="true" />
+                        <span>{tickets.length} tickets</span>
+                    </div>
+                </div>
+            </form>
             ) : null}
 
             {isConsultas ? (
@@ -2179,81 +1923,17 @@ export default function WorkbenchPage({
             ) : null}
 
             {isConsultas ? (
-            <section className="hidden grid-cols-2 gap-2 md:grid-cols-4 xl:grid xl:grid-cols-9">
-                <SummaryFilterCard label="Total órdenes" value={summary.active} trend="En consultas" tone="blue" href={route('repairs.workbench')} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
-                <SummaryFilterCard label="Tareas" value={summary.tasks} trend="Cola FIFO" tone="brown" href={route('repairs.workbench', { prioridad: 'tareas' })} active={filters.prioridad === 'tareas'} icon={<FaClipboardCheck aria-hidden="true" />} />
-                <SummaryFilterCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" href={route('repairs.workbench', { estado: 'PENDIENTE' })} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
-                <SummaryFilterCard label="En reparación" value={summary.inRepair} trend="Espera / repuesto" tone="purple" href={route('repairs.workbench', { estado: 'EN REPARACION / ESPERA REPUESTO' })} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
-                <SummaryFilterCard label="Listas" value={summary.ready} trend="Para retirar" tone="green" href={route('repairs.workbench', { estado: 'LISTA' })} active={filters.estado === 'LISTA'} icon={<FaCheckCircle aria-hidden="true" />} />
-                <SummaryFilterCard label="Vencidas" value={summary.overdue} trend="Prioridad alta" tone="red" href={route('repairs.workbench', { prioridad: 'vencidas' })} active={filters.prioridad === 'vencidas'} icon={<FaHourglassEnd aria-hidden="true" />} />
-                <SummaryFilterCard label="Retiran hoy" value={summary.today} trend="Agendadas hoy" tone="yellow" href={route('repairs.workbench', { prioridad: 'hoy' })} active={filters.prioridad === 'hoy'} icon={<FaCalendarDay aria-hidden="true" />} />
-                <SummaryFilterCard label="Canceladas" value={summary.cancelled} trend="No continuadas" tone="red" href={route('repairs.workbench', { estado: 'CANCELADA' })} active={filters.estado === 'CANCELADA'} icon={<FaBan aria-hidden="true" />} />
-                <SummaryFilterCard label="Entregadas" value={summary.delivered} trend="Registradas" tone="cyan" href={route('repairs.delivered')} icon={<FaTruck aria-hidden="true" />} />
+            <section className="hidden grid-cols-2 gap-2 md:grid-cols-3 xl:grid xl:grid-cols-9">
+                <SummaryFilterCard label="Total órdenes" value={summary.active} tone="blue" href={route('repairs.workbench')} active={!filters.estado && !filters.prioridad} icon={<FaClipboardList aria-hidden="true" />} />
+                <SummaryFilterCard label="Tareas" value={summary.tasks} tone="brown" href={route('repairs.workbench', { prioridad: 'tareas' })} active={filters.prioridad === 'tareas'} icon={<FaClipboardCheck aria-hidden="true" />} />
+                <SummaryFilterCard label="Pendientes" value={summary.pending} tone="orange" href={route('repairs.workbench', { estado: 'PENDIENTE' })} active={filters.estado === 'PENDIENTE'} icon={<FaTools aria-hidden="true" />} />
+                <SummaryFilterCard label="En reparación" value={summary.inRepair} tone="purple" href={route('repairs.workbench', { estado: 'EN REPARACION / ESPERA REPUESTO' })} active={filters.estado === 'EN REPARACION' || filters.estado === 'EN REPARACION / ESPERA REPUESTO'} icon={<FaWrench aria-hidden="true" />} />
+                <SummaryFilterCard label="Listas" value={summary.ready} tone="green" href={route('repairs.workbench', { estado: 'LISTA' })} active={filters.estado === 'LISTA'} icon={<FaCheckCircle aria-hidden="true" />} />
+                <SummaryFilterCard label="Vencidas" value={summary.overdue} tone="red" href={route('repairs.workbench', { prioridad: 'vencidas' })} active={filters.prioridad === 'vencidas'} icon={<FaHourglassEnd aria-hidden="true" />} />
+                <SummaryFilterCard label="Retiran hoy" value={summary.today} tone="yellow" href={route('repairs.workbench', { prioridad: 'hoy' })} active={filters.prioridad === 'hoy'} icon={<FaCalendarDay aria-hidden="true" />} />
+                <SummaryFilterCard label="Canceladas" value={summary.cancelled} tone="red" href={route('repairs.workbench', { estado: 'CANCELADA' })} active={filters.estado === 'CANCELADA'} icon={<FaBan aria-hidden="true" />} />
+                <SummaryFilterCard label="Entregadas" value={summary.delivered} tone="cyan" href={route('repairs.delivered')} icon={<FaTruck aria-hidden="true" />} />
             </section>
-            ) : null}
-
-            <section className="hidden">
-                <SummaryCard label="Total órdenes" value={summary.active + summary.delivered} trend="En sistema" tone="blue" />
-                <SummaryCard label="Pendientes" value={summary.pending} trend="En trabajo" tone="orange" />
-                <SummaryCard label="En reparación" value={summary.inRepair + summary.waitingParts} trend="En espera / repuesto" tone="amber" />
-                <SummaryCard label="Listas" value={summary.ready} trend="Listas para retirar" tone="green" />
-                <SummaryCard label="Activas" value={summary.active} trend="Consultas abiertas" tone="red" />
-                <SummaryCard label="Entregadas" value={summary.delivered} trend="Registradas" tone="cyan" />
-            </section>
-
-            {isConsultas ? (
-            <form
-                className="hidden rounded-lg border border-[#cbd5e1] bg-white px-3 py-2 shadow-sm xl:block"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    submitCleanSearch();
-                }}
-            >
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative min-w-[360px] flex-[0_1_48%]">
-                    <input
-                        className="min-h-10 w-full rounded-md border border-[#cbd5e1] bg-white py-2 pl-3 pr-10 text-sm font-medium text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
-                        placeholder="Buscar por ID, cliente, DNI, contacto o modelo"
-                        value={filtersForm.data.q}
-                        onChange={(event) => filtersForm.setData('q', event.target.value)}
-                    />
-                        <button
-                            type="submit"
-                            className="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-[#2563eb] transition hover:bg-[#eff6ff]"
-                            aria-label="Buscar"
-                        >
-                            <FaSearch aria-hidden="true" />
-                        </button>
-                    </div>
-                    <div className="flex min-w-[420px] flex-1 flex-wrap items-center gap-1.5">
-                        {searchFieldOptions.map((option) => {
-                            const active = activeSearchFields.includes(option.key);
-
-                            return (
-                                <button
-                                    key={option.key}
-                                    type="button"
-                                    className={cn(
-                                        'min-h-8 rounded-md border px-2.5 text-[0.72rem] font-bold transition',
-                                        active
-                                            ? 'border-[#2563eb] bg-[#2563eb] text-white'
-                                            : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
-                                    )}
-                                    onClick={() => toggleSearchField(option.key)}
-                                    aria-pressed={active}
-                                >
-                                    {option.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-                    <div className="ml-auto flex items-center gap-2 text-[0.72rem] font-black text-[#64748b]">
-                        <span>{visibleRepairs} reparaciones</span>
-                        <span className="h-4 w-px bg-[#cbd5e1]" aria-hidden="true" />
-                        <span>{tickets.length} tickets</span>
-                    </div>
-                </div>
-            </form>
             ) : null}
 
             {isConsultas && mobileFiltersOpen ? (
@@ -2286,7 +1966,7 @@ export default function WorkbenchPage({
                         <div className="grid gap-3">
                             <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                 Estado
-                                <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.estado} onChange={(event) => { filtersForm.setData('estado', event.target.value); filtersForm.setData('prioridad', ''); }}>
+                                <select className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" value={filtersForm.data.estado} onChange={(event) => { filtersForm.setData('estado', event.target.value); filtersForm.setData('prioridad', ''); }}>
                                     <option value="">Todos menos canceladas</option>
                                     {states.map((state) => <option key={state} value={state}>{state}</option>)}
                                 </select>
@@ -2294,7 +1974,7 @@ export default function WorkbenchPage({
 
                             <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                 Prioridad
-                                <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.prioridad} onChange={(event) => { filtersForm.setData('prioridad', event.target.value); filtersForm.setData('estado', ''); }}>
+                                <select className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" value={filtersForm.data.prioridad} onChange={(event) => { filtersForm.setData('prioridad', event.target.value); filtersForm.setData('estado', ''); }}>
                                     <option value="">Todas</option>
                                     <option value="tareas">Tareas</option>
                                     <option value="vencidas">Vencidas</option>
@@ -2305,14 +1985,14 @@ export default function WorkbenchPage({
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Categoría
-                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.categoria_filter} onChange={(event) => filtersForm.setData('categoria_filter', event.target.value)}>
+                                    <select className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" value={filtersForm.data.categoria_filter} onChange={(event) => filtersForm.setData('categoria_filter', event.target.value)}>
                                         {categoryOptions.map((option) => <option key={option.value || 'all'} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </label>
 
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Periodo
-                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.summary_range} onChange={(event) => filtersForm.setData('summary_range', event.target.value)}>
+                                    <select className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" value={filtersForm.data.summary_range} onChange={(event) => filtersForm.setData('summary_range', event.target.value)}>
                                         {periodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                                     </select>
                                 </label>
@@ -2322,11 +2002,11 @@ export default function WorkbenchPage({
                                 <div className="grid grid-cols-2 gap-3">
                                     <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                         Desde
-                                        <input className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" type="date" value={filtersForm.data.summary_from} onChange={(event) => filtersForm.setData('summary_from', event.target.value)} />
+                                        <input className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" type="date" value={filtersForm.data.summary_from} onChange={(event) => filtersForm.setData('summary_from', event.target.value)} />
                                     </label>
                                     <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                         Hasta
-                                        <input className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" type="date" value={filtersForm.data.summary_to} onChange={(event) => filtersForm.setData('summary_to', event.target.value)} />
+                                        <input className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" type="date" value={filtersForm.data.summary_to} onChange={(event) => filtersForm.setData('summary_to', event.target.value)} />
                                     </label>
                                 </div>
                             ) : null}
@@ -2334,7 +2014,7 @@ export default function WorkbenchPage({
                             <div className="grid grid-cols-2 gap-3">
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Ordenar
-                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.ordenar_por} onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}>
+                                    <select className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" value={filtersForm.data.ordenar_por} onChange={(event) => filtersForm.setData('ordenar_por', event.target.value)}>
                                         <option value="ticket">Ticket</option>
                                         <option value="ingreso">Ingreso</option>
                                         <option value="estimada">Estimada</option>
@@ -2346,7 +2026,7 @@ export default function WorkbenchPage({
                                 </label>
                                 <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                     Dirección
-                                    <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.direccion} onChange={(event) => filtersForm.setData('direccion', event.target.value)}>
+                                    <select className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" value={filtersForm.data.direccion} onChange={(event) => filtersForm.setData('direccion', event.target.value)}>
                                         <option value="desc">DESCENDENTE</option>
                                         <option value="asc">ASCENDENTE</option>
                                     </select>
@@ -2355,7 +2035,7 @@ export default function WorkbenchPage({
 
                             <label className="grid gap-1 text-xs font-semibold text-[#475569]">
                                 Seña
-                                <select className="min-h-11 rounded-xl border border-[#bfdbfe] bg-white px-3 text-sm font-bold text-[#0f172a]" value={filtersForm.data.filter_saldo} onChange={(event) => filtersForm.setData('filter_saldo', event.target.value)}>
+                                <select className="min-h-12 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.95rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb25] disabled:bg-slate-100 disabled:text-slate-500" value={filtersForm.data.filter_saldo} onChange={(event) => filtersForm.setData('filter_saldo', event.target.value)}>
                                     <option value="">Todas</option>
                                     <option value="con_senia">Con seña</option>
                                     <option value="sin_senia">Sin seña</option>
@@ -2364,11 +2044,11 @@ export default function WorkbenchPage({
                             </label>
                         </div>
 
-                        <div className="sticky bottom-0 mt-4 grid grid-cols-[1fr_1.2fr] gap-2 bg-white pt-3">
-                            <Link href={route('repairs.workbench')} className="inline-flex min-h-11 items-center justify-center rounded-md border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-[#334155] no-underline">
+                        <div className="sticky bottom-0 mt-4 grid grid-cols-[1fr_1.2fr] gap-2 border-t border-[#e2e8f0] bg-white pt-3">
+                            <Link href={route('repairs.workbench')} className="inline-flex min-h-12 items-center justify-center rounded-lg border border-[#cbd5e1] bg-white px-4 text-sm font-bold text-[#334155] no-underline transition hover:bg-[#f8fafc]">
                                 Limpiar
                             </Link>
-                            <button type="submit" className="min-h-11 rounded-md bg-[#2563eb] px-4 text-sm font-bold text-white">
+                            <button type="submit" className="min-h-12 rounded-lg bg-[#2563eb] px-4 text-sm font-bold text-white transition hover:bg-[#1d4ed8]">
                                 Aplicar
                             </button>
                         </div>
@@ -2468,7 +2148,7 @@ export default function WorkbenchPage({
                                         type="button"
                                         aria-label="Buscar por DNI"
                                         title="Buscar por DNI"
-                                        className="absolute inset-y-1.5 right-1.5 grid w-9 place-items-center rounded-md bg-[#eff6ff] text-[#1d4ed8] transition hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:opacity-60"
+                                        className="absolute inset-y-1.5 right-1.5 grid w-10 place-items-center rounded-md bg-[#eff6ff] text-[#1d4ed8] transition hover:bg-[#dbeafe] disabled:cursor-not-allowed disabled:opacity-60"
                                         onClick={() => void lookupByDni()}
                                         disabled={lookupBusy}
                                     >
@@ -2872,9 +2552,13 @@ export default function WorkbenchPage({
             ) : null}
             {isConsultas ? (
             <section className="grid gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-[0.84rem] font-bold text-[#475569] xl:hidden">
+                <div className="flex items-center justify-between gap-2 rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-[0.8rem] font-bold text-[#475569] xl:hidden">
                     <span>Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}.</span>
-                    <span className="hidden sm:inline">Consulta técnica</span>
+                    {hasActiveConsultasFilters ? (
+                        <Link href={route('repairs.workbench')} preserveScroll className="shrink-0 text-[0.72rem] font-black text-[#2563eb] no-underline underline-offset-2 hover:underline">
+                            Quitar filtros
+                        </Link>
+                    ) : null}
                 </div>
                 <div className="hidden w-full overflow-x-auto rounded-lg border border-[#cbd5e1] bg-white shadow-sm xl:block">
                     <div className="w-full min-w-0">
@@ -2934,8 +2618,8 @@ export default function WorkbenchPage({
                                 <span className="grid content-start gap-1">
                                     <span className="text-center text-[0.62rem] font-bold text-[#475569]">Acciones</span>
                                     <span className="flex items-center justify-center gap-1">
-                                        <button type="submit" className="h-7 rounded-sm border border-[#2563eb] bg-[#2563eb] px-2 text-[0.66rem] font-bold text-white">Aplicar</button>
-                                        <Link href={clearGridFilterHref} preserveScroll className="grid h-7 place-items-center rounded-sm border border-[#cbd5e1] bg-white px-2 text-[0.66rem] font-bold text-[#475569] no-underline">Limpiar</Link>
+                                        <button type="submit" className="h-9 rounded-md border border-[#2563eb] bg-[#2563eb] px-2.5 text-[0.72rem] font-bold text-white transition hover:bg-[#1d4ed8]">Aplicar</button>
+                                        <Link href={clearGridFilterHref} preserveScroll className="grid h-9 place-items-center rounded-md border border-[#cbd5e1] bg-white px-2.5 text-[0.72rem] font-bold text-[#475569] no-underline transition hover:bg-[#f8fafc]">Limpiar</Link>
                                     </span>
                                 </span>
                             </div>
@@ -2952,7 +2636,7 @@ export default function WorkbenchPage({
                                             <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">No quedan tareas pendientes.</div>
                                         )}
                                         <div className="bg-[#f1f5f9] py-3">
-                                            <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-xs font-black text-white">
+                                            <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#123f91] px-4 py-3 text-xs font-black text-white">
                                                 <span>Completadas</span>
                                                 <span className="text-[#cbd5e1]">{taskTickets.completed.reduce((total, ticket) => total + ticket.repairs.length, 0)} terminada{taskTickets.completed.length === 1 ? '' : 's'}</span>
                                             </div>
@@ -2970,7 +2654,7 @@ export default function WorkbenchPage({
                             {isConsultas && deliveredSearchTickets.length > 0 ? (
                                 <>
                                     <div className="bg-[#f1f5f9] py-3">
-                                        <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-xs font-black text-white">
+                                        <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#123f91] px-4 py-3 text-xs font-black text-white">
                                             <span>Encontrado en entregados</span>
                                             <span className="text-[#cbd5e1]">{deliveredSearchMatches} {deliveredSearchMatches === 1 ? 'coincidencia' : 'coincidencias'}</span>
                                         </div>
@@ -2995,7 +2679,7 @@ export default function WorkbenchPage({
                                 )}
                             </section>
                             <div className="bg-[#f1f5f9] py-3">
-                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-sm font-black text-white">
+                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#123f91] px-4 py-3 text-sm font-black text-white">
                                     <span>Completadas</span>
                                     <span className="text-xs text-[#cbd5e1]">{taskTickets.completed.reduce((total, ticket) => total + ticket.repairs.length, 0)}</span>
                                 </div>
@@ -3011,7 +2695,7 @@ export default function WorkbenchPage({
                     {isConsultas && deliveredSearchTickets.length > 0 ? (
                         <>
                             <div className="bg-[#f1f5f9] py-3">
-                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#0f172a] px-4 py-3 text-sm font-black text-white">
+                                <div className="flex min-h-12 items-center justify-between gap-3 rounded-md bg-[#123f91] px-4 py-3 text-sm font-black text-white">
                                     <span>Encontrado en entregados</span>
                                     <span className="text-xs text-[#cbd5e1]">{deliveredSearchMatches}</span>
                                 </div>
