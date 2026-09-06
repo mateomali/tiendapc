@@ -1956,6 +1956,13 @@ function RepairEditCard({
 
         if (!mobile) {
             const secondaryItems: ReactNode[] = [];
+            if (!hasInfo) {
+                secondaryItems.push(
+                    <button key="add-info" type="button" className={menuItem} onClick={() => setInfoOpen(true)}>
+                        <FaInfoCircle aria-hidden="true" /> Agregar info
+                    </button>,
+                );
+            }
             if (showOrderActions) {
                 secondaryItems.push(
                     <button key="add-repair" type="button" className={cn(menuItem, 'text-[#6d28d9]')} onClick={() => onAddRepair(repair)}>
@@ -2022,19 +2029,16 @@ function RepairEditCard({
                         </span>
                     ) : null}
                     <span className={groupClass}>
-                        <button
-                            type="button"
-                            className={cn(
-                                base,
-                                hasInfo
-                                    ? 'border border-[#0f766e] bg-[#0f766e] text-white'
-                                    : 'border border-[#cbd5e1] bg-white text-[#334155]',
-                            )}
-                            onClick={() => setInfoOpen(true)}
-                            title={hasInfo ? 'Ver info interna' : 'Agregar info'}
-                        >
-                            <FaInfoCircle aria-hidden="true" />
-                        </button>
+                        {hasInfo ? (
+                            <button
+                                type="button"
+                                className={cn(base, 'border border-[#0f766e] bg-[#0f766e] text-white')}
+                                onClick={() => setInfoOpen(true)}
+                                title="Ver info interna"
+                            >
+                                <FaInfoCircle aria-hidden="true" />
+                            </button>
+                        ) : null}
                         <button type="button" className={cn(base, 'border border-[#2563eb] bg-[#2563eb] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                             <FaEdit aria-hidden="true" />
                         </button>

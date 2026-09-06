@@ -921,58 +921,192 @@ class RepairService
     /**
      * @return array<string, mixed>
      */
-    public function metrics(): array
+    public function metrics(string $period = 'year', ?string $desde = null, ?string $hasta = null): array
     {
         $now = CarbonImmutable::now();
-        $yearStart = $now->startOfYear();
-        $quarterStart = $now->startOfQuarter();
-        $monthStart = $now->startOfMonth();
-
-        $orders = RepairOrder::query()->get();
-        $payments = RepairPayment::query()->get();
-        $paymentGroups = $this->metricPaymentGroups($payments);
-        $revenueOrders = $orders->filter(fn (RepairOrder $order): bool => $this->metricOrderRevenue($order, $paymentGroups) > 0);
-        $totalRevenue = $this->metricRevenueTotal($orders, $payments);
-        $totalPaid = $totalRevenue;
+        [$start, $end] = $this->metricWindow($now, $period, $desde, $hasta);
         $profitPercentage = $this->metricProfitPercentage();
-        $yearRevenue = $this->metricRevenueTotal($orders, $payments, $yearStart);
-        $quarterRevenue = $this->metricRevenueTotal($orders, $payments, $quarterStart);
-        $monthRevenue = $this->metricRevenueTotal($orders, $payments, $monthStart);
+
+        $payload = $this->metricPayload($period, $start, $end, $profitPercentage);
+        $previous = $this->metricPrevious($period, $start, $end, $profitPercentage);
 
         return [
-            'totals' => [
-                'yearBilled' => $yearRevenue,
-                'quarterBilled' => $quarterRevenue,
-                'monthBilled' => $monthRevenue,
-                'yearPaid' => $yearRevenue,
-                'quarterPaid' => $quarterRevenue,
-                'monthPaid' => $monthRevenue,
-                'profitPercentage' => $profitPercentage,
-                'yearRealProfit' => $this->metricRealProfit($yearRevenue, $profitPercentage),
-                'quarterRealProfit' => $this->metricRealProfit($quarterRevenue, $profitPercentage),
-                'monthRealProfit' => $this->metricRealProfit($monthRevenue, $profitPercentage),
-                'openBalance' => (float) $orders
-                    ->filter(fn (RepairOrder $order): bool => $order->entregado !== 'si' && $order->estado === 'LISTA' && $order->estado !== 'CANCELADA')
-                    ->sum(fn (RepairOrder $order): float => max(0, (float) $order->monto - (float) $order->senia)),
-                'averageTicket' => $revenueOrders->count() > 0 ? round($totalRevenue / $revenueOrders->count(), 2) : 0,
-                'collectionRate' => $totalRevenue > 0 ? round(($totalPaid / $totalRevenue) * 100, 1) : 0,
+            'period' => $period,
+            'window' => [
+                'start' => $start?->toDateString(),
+                'end' => $end?->toDateString(),
             ],
-            'counts' => [
-                'active' => $orders->where('entregado', 'no')->count(),
-                'delivered' => $orders->where('entregado', 'si')->count(),
-                'cancelled' => $orders->where('estado', 'CANCELADA')->count(),
-                'ready' => $orders->where('estado', 'LISTA')->where('entregado', 'no')->count(),
-            ],
-            'topModels' => $this->topTextMetric($revenueOrders, 'modelo', $paymentGroups),
-            'topWorkTypes' => $this->topWorkTypes($revenueOrders, $paymentGroups),
-            'statusBreakdown' => $orders
-                ->groupBy(fn (RepairOrder $order): string => (string) ($order->estado ?: 'SIN ESTADO'))
-                ->map(fn (Collection $items, string $label): array => ['label' => $label, 'count' => $items->count()])
-                ->sortByDesc('count')
-                ->values()
-                ->all(),
-            'monthlyBilled' => $this->monthlyBilled($yearStart, $orders, $payments),
+            'totals' => array_merge($payload['totals'], [
+                'openBalance' => $this->metricOpenBalance(),
+                'previous' => $previous,
+            ]),
+            'counts' => $this->metricCounts(),
+            'topModels' => $payload['topModels'],
+            'topWorkTypes' => $payload['topWorkTypes'],
+            'statusBreakdown' => $payload['statusBreakdown'],
+            'monthlyBilled' => $payload['monthlyBilled'],
+            'monthlyCollected' => $payload['monthlyCollected'],
         ];
+    }
+
+    /**
+     * Agrega métricas para una ventana; el resultado se cachea para no recalcular en cada request.
+     *
+     * @return array<string, mixed>
+     */
+    private function metricPayload(string $period, ?CarbonImmutable $start, ?CarbonImmutable $end, float $profitPercentage): array
+    {
+        $key = 'repairs.metrics:'.md5($period.'|'.($start?->toDateString() ?? '*').'|'.($end?->toDateString() ?? '*').'|'.$profitPercentage);
+
+        return cache()->remember($key, 60, function () use ($start, $end, $profitPercentage): array {
+            $orders = RepairOrder::query()->get();
+            $payments = RepairPayment::query()
+                ->when($start !== null, fn ($query) => $query->whereDate('paid_at', '>=', $start))
+                ->when($end !== null, fn ($query) => $query->whereDate('paid_at', '<=', $end))
+                ->get();
+
+            $billed = (float) $this->metricRevenueAttribution($orders, $payments, $start, $end)->sum();
+            $collected = (float) $this->metricCollectedAttribution($payments, $start, $end)->sum();
+            $realProfit = $this->metricRealProfit($billed, $profitPercentage);
+
+            $revenueOrders = $orders
+                ->filter(fn (RepairOrder $order): bool => $this->metricOrderRevenueInWindow($order, $payments, $start, $end) > 0)
+                ->values();
+
+            return [
+                'totals' => [
+                    'billed' => $billed,
+                    'collected' => $collected,
+                    'collectionRate' => $billed > 0 ? round(($collected / $billed) * 100, 1) : 0,
+                    'realProfit' => $realProfit,
+                    'margin' => $billed > 0 ? round(($realProfit / $billed) * 100, 1) : 0,
+                    'profitPercentage' => $profitPercentage,
+                    'averageTicket' => $revenueOrders->count() > 0 ? round($billed / $revenueOrders->count(), 2) : 0,
+                    'orderCount' => $revenueOrders->count(),
+                ],
+                'topModels' => $this->topTextMetric($revenueOrders, 'modelo', $payments, $start, $end),
+                'topWorkTypes' => $this->topWorkTypes($revenueOrders, $payments, $start, $end),
+                'statusBreakdown' => $revenueOrders
+                    ->groupBy(fn (RepairOrder $order): string => (string) ($order->estado ?: 'SIN ESTADO'))
+                    ->map(fn (Collection $items, string $label): array => ['label' => $label, 'count' => $items->count()])
+                    ->sortByDesc('count')
+                    ->values()
+                    ->all(),
+                'monthlyBilled' => $this->monthlyBilled($start, $end, $orders, $payments),
+                'monthlyCollected' => $this->monthlyCollected($start, $end, $payments),
+            ];
+        });
+    }
+
+    private function metricPrevious(string $period, ?CarbonImmutable $start, ?CarbonImmutable $end, float $profitPercentage): ?array
+    {
+        if ($start === null || $end === null) {
+            return null;
+        }
+
+        [$prevStart, $prevEnd] = $this->metricPreviousWindow($period, $start, $end);
+
+        if ($prevStart === null || $prevEnd === null) {
+            return null;
+        }
+
+        return $this->metricPayload($period, $prevStart, $prevEnd, $profitPercentage)['totals'];
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function metricPreviousWindow(string $period, CarbonImmutable $start, CarbonImmutable $end): array
+    {
+        return match ($period) {
+            'year' => [$start->subYear(), $end->subYear()],
+            'quarter' => [$start->subQuarter(), $end->subQuarter()],
+            'month' => [$start->subMonth(), $end->subMonth()],
+            default => $this->metricPreviousCustomWindow($start, $end),
+        };
+    }
+
+    /**
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    private function metricPreviousCustomWindow(CarbonImmutable $start, CarbonImmutable $end): array
+    {
+        $days = $start->diffInDays($end);
+        $prevEnd = $start->copy()->subDay();
+        $prevStart = $prevEnd->copy()->subDays($days);
+
+        return [$prevStart, $prevEnd];
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function metricCounts(): array
+    {
+        return [
+            'active' => RepairOrder::query()->where('entregado', 'no')->count(),
+            'delivered' => RepairOrder::query()->where('entregado', 'si')->count(),
+            'cancelled' => RepairOrder::query()->where('estado', 'CANCELADA')->count(),
+            'ready' => RepairOrder::query()->where('estado', 'LISTA')->where('entregado', 'no')->count(),
+        ];
+    }
+
+    private function metricOpenBalance(): float
+    {
+        return (float) RepairOrder::query()
+            ->where('entregado', '!=', 'si')
+            ->where('estado', 'LISTA')
+            ->get()
+            ->sum(fn (RepairOrder $order): float => max(0, (float) $order->monto - (float) $order->senia));
+    }
+
+    /**
+     * Suma lo realmente cobrado (pagos) agrupado por mes dentro de la ventana.
+     *
+     * @param Collection<int, RepairPayment> $payments
+     * @return Collection<string, float>
+     */
+    private function metricCollectedAttribution(Collection $payments, ?CarbonImmutable $start, ?CarbonImmutable $end): Collection
+    {
+        $byMonth = collect();
+
+        foreach ($payments as $payment) {
+            $date = $this->metricDate($payment->paid_at);
+
+            if ($date === null || ! $this->metricDateInWindow($date, $start, $end)) {
+                continue;
+            }
+
+            $amount = max(0, (float) $payment->amount);
+
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $month = $date->format('Y-m');
+            $byMonth->put($month, (float) $byMonth->get($month, 0.0) + $amount);
+        }
+
+        return $byMonth;
+    }
+
+    /**
+     * @param Collection<int, RepairPayment> $payments
+     * @return array<int, array{label:string,total:float}>
+     */
+    private function monthlyCollected(?CarbonImmutable $start, ?CarbonImmutable $end, Collection $payments): array
+    {
+        $attribution = $this->metricCollectedAttribution($payments, $start, $end);
+        $keys = $this->metricMonthKeys($start, $end);
+
+        if ($keys === []) {
+            $keys = $attribution->keys()->sort()->values()->all();
+        }
+
+        return collect($keys)->map(fn (string $key): array => [
+            'label' => $this->monthLabel($key),
+            'total' => (float) ($attribution->get($key, 0.0)),
+        ])->all();
     }
 
     private function metricProfitPercentage(): float
@@ -991,78 +1125,208 @@ class RepairService
         return round(max(0, $revenue) * ($profitPercentage / (100 + $profitPercentage)), 2);
     }
 
-    private function metricRevenueTotal(Collection $orders, Collection $payments, ?CarbonImmutable $since = null): float
+    /**
+     * @return array{0: ?CarbonImmutable, 1: ?CarbonImmutable}
+     */
+    private function metricWindow(CarbonImmutable $now, string $period, ?string $desde = null, ?string $hasta = null): array
     {
-        $paymentGroups = $this->metricPaymentGroups($payments, $since);
+        if ($period === 'custom') {
+            $start = $desde !== null ? ($this->metricDate($desde)?->startOfDay()) : null;
+            $end = $hasta !== null ? ($this->metricDate($hasta)?->endOfDay()) : null;
 
-        return (float) $orders->sum(function (RepairOrder $order) use ($paymentGroups, $since): float {
+            return [$start, $end];
+        }
+
+        return match ($period) {
+            'quarter' => [$now->startOfQuarter(), $now->copy()->endOfQuarter()],
+            'month' => [$now->startOfMonth(), $now->copy()->endOfMonth()],
+            'all' => [null, null],
+            default => [$now->startOfYear(), $now->copy()->endOfYear()],
+        };
+    }
+
+    private function metricDate(mixed $value): ?CarbonImmutable
+    {
+        if ($value instanceof CarbonImmutable) {
+            return $value;
+        }
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse((string) $value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function metricDateInWindow(?CarbonImmutable $date, ?CarbonImmutable $start, ?CarbonImmutable $end): bool
+    {
+        if ($date === null) {
+            return false;
+        }
+
+        if ($start !== null && $date->lessThan($start)) {
+            return false;
+        }
+
+        if ($end !== null && $date->greaterThan($end)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function metricMonthKeys(?CarbonImmutable $start, ?CarbonImmutable $end): array
+    {
+        if ($start === null || $end === null) {
+            return [];
+        }
+
+        $keys = [];
+        $cursor = $start->copy()->startOfMonth();
+        $last = $end->copy()->startOfMonth();
+
+        while ($cursor->lessThanOrEqualTo($last)) {
+            $keys[] = $cursor->format('Y-m');
+            $cursor = $cursor->addMonth();
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Distribuye los ingresos reconocidos por mes dentro de la ventana.
+     *
+     * @param Collection<int, RepairOrder> $orders
+     * @param Collection<int, RepairPayment> $payments
+     * @return Collection<string, float>
+     */
+    private function metricRevenueAttribution(Collection $orders, Collection $payments, ?CarbonImmutable $start, ?CarbonImmutable $end): Collection
+    {
+        $byMonth = collect();
+        $add = function (string $month, float $amount) use (&$byMonth): void {
+            if ($amount <= 0) {
+                return;
+            }
+
+            $byMonth->put($month, (float) $byMonth->get($month, 0.0) + $amount);
+        };
+
+        $paymentGroups = $this->metricPaymentGroups($payments, $start, $end);
+
+        foreach ($orders as $order) {
             if ($order->entregado === 'si') {
-                $deliveredDate = $order->fecha_entregado ?? $order->fecha;
+                $date = $this->metricDate($order->fecha_entregado ?? $order->fecha);
 
-                if ($since !== null && optional($deliveredDate)->format('Y-m-d') < $since->toDateString()) {
-                    return 0;
+                if ($this->metricDateInWindow($date, $start, $end)) {
+                    $add($date->format('Y-m'), max(0, (float) $order->monto));
                 }
 
-                return (float) $order->monto;
+                continue;
             }
 
             if ($order->estado === 'CANCELADA') {
-                return 0;
+                continue;
             }
 
             $key = $order->id . ':' . $order->reparacion;
-            $paymentsTotal = (float) ($paymentGroups->get($key, collect())->sum(fn (RepairPayment $payment): float => (float) $payment->amount));
+            $orderPayments = $paymentGroups->get($key, collect());
 
-            if ($since === null) {
-                return max($paymentsTotal, (float) $order->senia);
+            if ($orderPayments->isNotEmpty()) {
+                foreach ($orderPayments as $payment) {
+                    $date = $this->metricDate($payment->paid_at);
+
+                    if ($date !== null) {
+                        $add($date->format('Y-m'), max(0, (float) $payment->amount));
+                    }
+                }
+
+                continue;
             }
 
-            if ($paymentsTotal > 0) {
-                return $paymentsTotal;
-            }
+            if ((float) $order->senia > 0) {
+                $date = $this->metricDate($order->fecha);
 
-            return optional($order->fecha)->format('Y-m-d') >= $since->toDateString() ? (float) $order->senia : 0;
-        });
+                if ($this->metricDateInWindow($date, $start, $end)) {
+                    $add($date->format('Y-m'), max(0, (float) $order->senia));
+                }
+            }
+        }
+
+        return $byMonth;
+    }
+
+    /**
+     * @param Collection<int, RepairPayment> $payments
+     */
+    private function metricOrderRevenueInWindow(RepairOrder $order, Collection $payments, ?CarbonImmutable $start, ?CarbonImmutable $end): float
+    {
+        if ($order->entregado === 'si') {
+            $date = $this->metricDate($order->fecha_entregado ?? $order->fecha);
+
+            return $this->metricDateInWindow($date, $start, $end) ? max(0, (float) $order->monto) : 0.0;
+        }
+
+        if ($order->estado === 'CANCELADA') {
+            return 0.0;
+        }
+
+        $paymentGroups = $this->metricPaymentGroups($payments, $start, $end);
+        $key = $order->id . ':' . $order->reparacion;
+        $paymentsTotal = (float) ($paymentGroups->get($key, collect())->sum(fn (RepairPayment $payment): float => (float) $payment->amount));
+
+        if ($paymentsTotal > 0) {
+            return $paymentsTotal;
+        }
+
+        if ((float) $order->senia > 0) {
+            $date = $this->metricDate($order->fecha);
+
+            return $this->metricDateInWindow($date, $start, $end) ? max(0, (float) $order->senia) : 0.0;
+        }
+
+        return 0.0;
     }
 
     /**
      * @param Collection<int, RepairPayment> $payments
      * @return Collection<string, Collection<int, RepairPayment>>
      */
-    private function metricPaymentGroups(Collection $payments, ?CarbonImmutable $since = null): Collection
+    private function metricPaymentGroups(Collection $payments, ?CarbonImmutable $start = null, ?CarbonImmutable $end = null): Collection
     {
         return $payments
-            ->filter(function (RepairPayment $payment) use ($since): bool {
+            ->filter(function (RepairPayment $payment) use ($start, $end): bool {
                 if ($payment->payment_type !== 'senia') {
                     return false;
                 }
 
-                if ($since === null) {
+                if ($start === null && $end === null) {
                     return true;
                 }
 
-                return optional($payment->paid_at)->format('Y-m-d') >= $since->toDateString();
+                $date = $this->metricDate($payment->paid_at);
+
+                if ($date === null) {
+                    return false;
+                }
+
+                if ($start !== null && $date->lessThan($start)) {
+                    return false;
+                }
+
+                if ($end !== null && $date->greaterThan($end)) {
+                    return false;
+                }
+
+                return true;
             })
             ->groupBy(fn (RepairPayment $payment): string => $payment->orden_id . ':' . $payment->reparacion);
-    }
-
-    /**
-     * @param Collection<string, Collection<int, RepairPayment>> $paymentGroups
-     */
-    private function metricOrderRevenue(RepairOrder $order, Collection $paymentGroups): float
-    {
-        if ($order->entregado === 'si') {
-            return max(0, (float) $order->monto);
-        }
-
-        if ($order->estado === 'CANCELADA') {
-            return 0;
-        }
-
-        $key = $order->id . ':' . $order->reparacion;
-        $paymentsTotal = (float) ($paymentGroups->get($key, collect())->sum(fn (RepairPayment $payment): float => (float) $payment->amount));
-
-        return max($paymentsTotal, (float) $order->senia, 0);
     }
 
     private function setState(RepairOrder $order, string $state, string $event, ?string $cancellationReason = null): RepairOrder
@@ -1836,17 +2100,18 @@ class RepairService
 
     /**
      * @param Collection<int, RepairOrder> $orders
+     * @param Collection<int, RepairPayment> $payments
      * @return array<int, array{label:string,count:int,total:float}>
      */
-    private function topTextMetric(Collection $orders, string $field, Collection $paymentGroups): array
+    private function topTextMetric(Collection $orders, string $field, Collection $payments, ?CarbonImmutable $start, ?CarbonImmutable $end): array
     {
         return $orders
-            ->map(function (RepairOrder $order) use ($field, $paymentGroups): array {
+            ->map(function (RepairOrder $order) use ($field, $payments, $start, $end): array {
                 $label = trim((string) ($order->{$field} ?? ''));
 
                 return [
                     'label' => $label !== '' ? Str::upper($label) : 'SIN DATO',
-                    'total' => $this->metricOrderRevenue($order, $paymentGroups),
+                    'total' => $this->metricOrderRevenueInWindow($order, $payments, $start, $end),
                 ];
             })
             ->groupBy('label')
@@ -1863,12 +2128,13 @@ class RepairService
 
     /**
      * @param Collection<int, RepairOrder> $orders
+     * @param Collection<int, RepairPayment> $payments
      * @return array<int, array{label:string,count:int,total:float}>
      */
-    private function topWorkTypes(Collection $orders, Collection $paymentGroups): array
+    private function topWorkTypes(Collection $orders, Collection $payments, ?CarbonImmutable $start, ?CarbonImmutable $end): array
     {
         return $orders
-            ->map(function (RepairOrder $order) use ($paymentGroups): array {
+            ->map(function (RepairOrder $order) use ($payments, $start, $end): array {
                 $text = Str::lower((string) $order->descripcion . ' ' . (string) $order->repuesto);
                 $label = match (true) {
                     str_contains($text, 'modulo'), str_contains($text, 'pantalla'), str_contains($text, 'display') => 'Cambio de modulo/pantalla',
@@ -1881,7 +2147,7 @@ class RepairService
                     default => 'Otros trabajos',
                 };
 
-                return ['label' => $label, 'total' => $this->metricOrderRevenue($order, $paymentGroups)];
+                return ['label' => $label, 'total' => $this->metricOrderRevenueInWindow($order, $payments, $start, $end)];
             })
             ->groupBy('label')
             ->map(fn (Collection $items, string $label): array => [
@@ -1895,57 +2161,32 @@ class RepairService
     }
 
     /**
+     * @param Collection<int, RepairOrder> $orders
+     * @param Collection<int, RepairPayment> $payments
      * @return array<int, array{label:string,total:float}>
      */
-    private function monthlyBilled(CarbonImmutable $yearStart, Collection $orders, Collection $payments): array
+    private function monthlyBilled(?CarbonImmutable $start, ?CarbonImmutable $end, Collection $orders, Collection $payments): array
     {
-        $paymentGroups = $this->metricPaymentGroups($payments);
-        $rows = collect(range(1, 12))->mapWithKeys(fn (int $month): array => [str_pad((string) $month, 2, '0', STR_PAD_LEFT) => 0.0]);
+        $attribution = $this->metricRevenueAttribution($orders, $payments, $start, $end);
+        $keys = $this->metricMonthKeys($start, $end);
 
-        foreach ($orders as $order) {
-            if ($order->entregado === 'si') {
-                $date = $order->fecha_entregado ?? $order->fecha;
-
-                if (optional($date)->format('Y') === (string) $yearStart->year) {
-                    $month = optional($date)->format('m') ?: '00';
-                    $rows[$month] = (float) $rows[$month] + max(0, (float) $order->monto);
-                }
-
-                continue;
-            }
-
-            if ($order->estado === 'CANCELADA') {
-                continue;
-            }
-
-            $key = $order->id . ':' . $order->reparacion;
-            $orderPayments = $paymentGroups->get($key, collect());
-
-            if ($orderPayments->isNotEmpty()) {
-                foreach ($orderPayments as $payment) {
-                    if (optional($payment->paid_at)->format('Y') !== (string) $yearStart->year) {
-                        continue;
-                    }
-
-                    $month = optional($payment->paid_at)->format('m') ?: '00';
-                    $rows[$month] = (float) $rows[$month] + max(0, (float) $payment->amount);
-                }
-
-                continue;
-            }
-
-            if ((float) $order->senia > 0 && optional($order->fecha)->format('Y') === (string) $yearStart->year) {
-                $month = optional($order->fecha)->format('m') ?: '00';
-                $rows[$month] = (float) $rows[$month] + max(0, (float) $order->senia);
-            }
+        if ($keys === []) {
+            $keys = $attribution->keys()->sort()->values()->all();
         }
 
-        return collect(range(1, 12))
-            ->map(fn (int $month): array => [
-                'label' => CarbonImmutable::create($yearStart->year, $month, 1)->locale('es')->isoFormat('MMM'),
-                'total' => (float) ($rows->get(str_pad((string) $month, 2, '0', STR_PAD_LEFT), 0)),
-            ])
-            ->all();
+        return collect($keys)->map(fn (string $key): array => [
+            'label' => $this->monthLabel($key),
+            'total' => (float) ($attribution->get($key, 0.0)),
+        ])->all();
+    }
+
+    private function monthLabel(string $key): string
+    {
+        try {
+            return CarbonImmutable::createFromFormat('Y-m', $key)->locale('es')->isoFormat('MMM');
+        } catch (\Throwable) {
+            return $key;
+        }
     }
 
     /**

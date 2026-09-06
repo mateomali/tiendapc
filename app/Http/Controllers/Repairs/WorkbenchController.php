@@ -908,10 +908,25 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Nueva reparacion agregada al ticket.');
     }
 
-    public function metrics(RepairService $repairService): Response
+    public function metrics(RepairService $repairService, Request $request): Response
     {
+        $period = (string) $request->query('periodo', 'year');
+
+        if (! in_array($period, ['year', 'quarter', 'month', 'all', 'custom'], true)) {
+            $period = 'year';
+        }
+
+        $desde = $period === 'custom' ? (string) $request->query('desde', '') : null;
+        $hasta = $period === 'custom' ? (string) $request->query('hasta', '') : null;
+
+        if ($period === 'custom' && ($desde === '' || $hasta === '')) {
+            $period = 'year';
+            $desde = null;
+            $hasta = null;
+        }
+
         return Inertia::render('Repairs/MetricsPage', [
-            'metrics' => $repairService->metrics(),
+            'metrics' => $repairService->metrics($period, $desde, $hasta),
             'actions' => [
                 'saveSettings' => route('repairs.metrics.settings.save'),
             ],
