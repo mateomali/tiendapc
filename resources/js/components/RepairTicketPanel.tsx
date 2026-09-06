@@ -408,7 +408,7 @@ function RepairModelLabel({ repair, term }: { repair: RepairOrderView; term?: st
     return (
         <span className="inline-flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate"><HighlightText value={model || '-'} term={term} /></span>
-            {(repair.color ?? '').trim() !== '' ? <span className="shrink-0 text-[#64748b]">-</span> : null}
+            {(repair.color ?? '').trim() !== '' ? <span className="shrink-0 text-[#475569]">-</span> : null}
             <RepairColorSwatch color={repair.color} />
         </span>
     );
@@ -469,8 +469,8 @@ function ModalShell({
                 <header
                     className={cn(
                         'flex items-center justify-between gap-3 border-b px-4 py-3',
-                        tone === 'primary' && 'border-[#0b5ed7] bg-[#0d6efd] text-white',
-                        tone === 'warning' && 'border-[#e0a800] bg-[#ffc107] text-[#111827]',
+                        tone === 'primary' && 'border-[#1d4ed8] bg-[#2563eb] text-white',
+                        tone === 'warning' && 'border-[#d97706] bg-[#f59e0b] text-[#111827]',
                         tone === 'default' && 'border-slate-200 bg-[#f8fafc] text-[#0f172a]',
                     )}
                 >
@@ -479,7 +479,7 @@ function ModalShell({
                         {tone === 'warning' ? <FaDollyFlatbed aria-hidden="true" /> : null}
                         {title}
                     </h3>
-                    <button type="button" className={cn('grid h-9 w-9 place-items-center rounded-lg border bg-white', tone === 'primary' ? 'border-white/40 text-[#0d6efd]' : 'border-slate-300 text-slate-700')} onClick={onClose} title="Cerrar">
+                    <button type="button" className={cn('grid h-9 w-9 place-items-center rounded-lg border bg-white', tone === 'primary' ? 'border-white/40 text-[#2563eb]' : 'border-slate-300 text-slate-700')} onClick={onClose} title="Cerrar">
                         <FaTimes aria-hidden="true" />
                     </button>
                 </header>
@@ -519,7 +519,7 @@ function FieldSummary({
             )}
             onClick={onClick}
         >
-            <span className={cn('text-[0.72rem] font-semibold', labelClassName ?? 'text-slate-500')}>{label}</span>
+            <span className={cn('text-[0.72rem] font-semibold', labelClassName ?? 'text-slate-600')}>{label}</span>
             <span className={cn('text-sm', valueClassName ?? 'text-[#0f172a]', strong && 'font-black')}>{value}</span>
         </Wrapper>
     );
@@ -558,7 +558,7 @@ function EditField({
         <label className="grid min-w-0 content-start gap-1.5">
             <span className="text-[0.83rem] font-black leading-tight text-[#0f172a]">{label}</span>
             {children}
-            {note ? <span className="text-[0.75rem] font-semibold text-slate-500">{note}</span> : null}
+            {note ? <span className="text-[0.75rem] font-semibold text-slate-600">{note}</span> : null}
         </label>
     );
 }
@@ -566,7 +566,7 @@ function EditField({
 function EditSection({ title, children }: { title: string; children: ReactNode }): JSX.Element {
     return (
         <section className="grid content-start gap-3">
-            <h4 className="border-b border-[#bfdbfe] pb-2 text-sm font-black text-[#0d6efd]">{title}</h4>
+            <h4 className="border-b border-[#bfdbfe] pb-2 text-sm font-black text-[#2563eb]">{title}</h4>
             {children}
         </section>
     );
@@ -682,7 +682,7 @@ function ImageUploadPicker({
                     <input className="sr-only" type="file" accept="image/*" multiple disabled={disabled} onChange={onSelect} />
                 </label>
             </div>
-            <span className="text-[0.75rem] font-semibold text-slate-500">{help}</span>
+            <span className="text-[0.75rem] font-semibold text-slate-600">{help}</span>
             {previews.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {previews.map((preview, index) => (
@@ -698,7 +698,7 @@ function ImageUploadPicker({
                     ))}
                 </div>
             ) : (
-                <span className="rounded-lg border border-dashed border-[#bfdbfe] bg-white px-3 py-4 text-center text-sm font-semibold text-slate-500">
+                <span className="rounded-lg border border-dashed border-[#bfdbfe] bg-white px-3 py-4 text-center text-sm font-semibold text-slate-600">
                     No hay imágenes seleccionadas.
                 </span>
             )}
@@ -734,7 +734,7 @@ function RepairImagesBlock({
                                 <img src={image.thumbnailUrl || image.url} alt={image.filename} className="relative h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
                             </button>
                             {!readOnly ? (
-                                <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-[#dc3545] text-xs text-white" onClick={() => onRemove(image)} title="Quitar imagen">
+                                <button type="button" className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md bg-[#dc2626] text-xs text-white" onClick={() => onRemove(image)} title="Quitar imagen">
                                     <FaTrashAlt aria-hidden="true" />
                                 </button>
                             ) : null}
@@ -742,7 +742,7 @@ function RepairImagesBlock({
                     ))}
                 </div>
             ) : (
-                <span className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-center text-sm font-semibold text-slate-500">No hay imagenes cargadas.</span>
+                <span className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-4 text-center text-sm font-semibold text-slate-600">No hay imagenes cargadas.</span>
             )}
         </div>
     );
@@ -1006,7 +1006,7 @@ function AddRepairModal({
                                 <option value="transferencia">Transferencia</option>
                             </select>
                         </EditField>
-                        <div className="min-h-5 text-xs font-semibold leading-5 text-[#64748b] sm:col-span-2 lg:col-span-full">
+                        <div className="min-h-5 text-xs font-semibold leading-5 text-[#475569] sm:col-span-2 lg:col-span-full">
                             {transferPriceLabel(form.data.monto)}
                         </div>
                     </div>
@@ -1044,7 +1044,7 @@ function AddRepairModal({
                                         onClick={() => selectInventoryPart(part)}
                                     >
                                         <span className="font-black">{part.model}</span>
-                                        <span className="text-xs font-bold text-slate-500">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
+                                        <span className="text-xs font-bold text-slate-600">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
                                     </button>
                                 ))}
                             </div>
@@ -1725,7 +1725,7 @@ function RepairEditCard({
                                 />
                             </EditField>
                         ) : null}
-                        <span className="text-xs font-semibold text-[#64748b]">{transferPriceLabel(form.data.monto)}</span>
+                        <span className="text-xs font-semibold text-[#475569]">{transferPriceLabel(form.data.monto)}</span>
                     </div>
 
                     <div className="grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2">
@@ -1764,7 +1764,7 @@ function RepairEditCard({
                             <input type="checkbox" checked={form.data.repuesto_pedido} onChange={(event) => form.setData('repuesto_pedido', event.target.checked)} disabled={form.data.inventory_part_id !== ''} />
                             Repuesto pedido
                         </label>
-                        {assignedInventoryModel ? <span className="text-xs font-semibold text-[#64748b]">Caja: {assignedInventoryBox ?? '-'} · {assignedInventoryModel}</span> : null}
+                        {assignedInventoryModel ? <span className="text-xs font-semibold text-[#475569]">Caja: {assignedInventoryBox ?? '-'} · {assignedInventoryModel}</span> : null}
                     </div>
 
                     <div className="sticky bottom-2 z-10 grid grid-cols-2 gap-2 rounded-md border border-[#cbd5e1] bg-white p-2 shadow-sm">
@@ -1843,7 +1843,7 @@ function RepairEditCard({
                         {(repair.availableStates ?? []).map((state) => <option key={state} value={state}>{state}</option>)}
                     </select>
                 </EditField>
-                <div className="grid content-end gap-1 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-xs font-semibold text-[#64748b]">
+                <div className="grid content-end gap-1 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-xs font-semibold text-[#475569]">
                     <span>{transferPriceLabel(form.data.monto)}</span>
                     <strong className="text-sm text-[#0f172a]">Saldo {formatCurrency(Math.max(0, Number(form.data.monto || 0) - Number(form.data.senia || 0)))}</strong>
                 </div>
@@ -1955,6 +1955,41 @@ function RepairEditCard({
         );
 
         if (!mobile) {
+            const secondaryItems: ReactNode[] = [];
+            if (showOrderActions) {
+                secondaryItems.push(
+                    <button key="add-repair" type="button" className={cn(menuItem, 'text-[#6d28d9]')} onClick={() => onAddRepair(repair)}>
+                        <FaPlus aria-hidden="true" /> Agregar reparación
+                    </button>,
+                );
+                secondaryItems.push(
+                    <a key="tracking" href={ticket.trackingUrl} className={menuItem}>
+                        <FaArrowRight aria-hidden="true" /> Seguimiento
+                    </a>,
+                );
+            }
+            if (canCancel) {
+                secondaryItems.push(
+                    <button key="cancel" type="button" className={cn(menuItem, 'border-[#fed7aa] bg-[#fff7ed] text-[#92400e]')} onClick={cancelRepair}>
+                        <FaTimes aria-hidden="true" /> Cancelar
+                    </button>,
+                );
+            }
+            if (!readOnly && repair.actions?.archive && !repair.archivado_at) {
+                secondaryItems.push(
+                    <button key="archive" type="button" className={cn(menuItem, 'text-[#475569]')} onClick={() => router.post(repair.actions?.archive ?? '', {}, { preserveScroll: true })}>
+                        <FaArchive aria-hidden="true" /> Archivar
+                    </button>,
+                );
+            }
+            if (repair.actions?.delete) {
+                secondaryItems.push(
+                    <button key="delete" type="button" className={cn(menuItem, 'border-[#fecdd3] bg-[#fff1f2] text-[#be123c]')} onClick={deleteRepair}>
+                        <FaTrashAlt aria-hidden="true" /> Eliminar
+                    </button>,
+                );
+            }
+
             return (
                 <div className="flex flex-wrap items-center justify-end gap-1">
                     {showWorkflowActions ? (
@@ -1975,79 +2010,62 @@ function RepairEditCard({
                                 </button>
                             ) : null}
                             {canMarkReady ? (
-                                <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
+                                <button type="button" className={cn(base, 'border border-[#16a34a] bg-[#16a34a] text-white')} onClick={markReady} title="Listo">
                                     <FaCheckCircle aria-hidden="true" />
                                 </button>
                             ) : null}
                             {canDeliver ? (
-                                <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
+                                <button type="button" className={cn(base, 'border border-[#f59e0b] bg-[#f59e0b] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
                                     <FaDollyFlatbed aria-hidden="true" />
                                 </button>
                             ) : null}
                         </span>
                     ) : null}
                     <span className={groupClass}>
-                        {showGeneralTicketActions ? (
-                            <button
-                                type="button"
-                                className={cn(base, hasInfo ? 'border border-[#0f766e] bg-[#0f766e] text-white' : 'border border-[#cbd5e1] bg-white text-[#334155]')}
-                                onClick={() => setInfoOpen(true)}
-                                title={hasInfo ? 'Info cargada' : 'Agregar info'}
-                            >
-                                <FaInfoCircle aria-hidden="true" />
-                            </button>
-                        ) : null}
-                        <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
+                        <button
+                            type="button"
+                            className={cn(
+                                base,
+                                hasInfo
+                                    ? 'border border-[#0f766e] bg-[#0f766e] text-white'
+                                    : 'border border-[#cbd5e1] bg-white text-[#334155]',
+                            )}
+                            onClick={() => setInfoOpen(true)}
+                            title={hasInfo ? 'Ver info interna' : 'Agregar info'}
+                        >
+                            <FaInfoCircle aria-hidden="true" />
+                        </button>
+                        <button type="button" className={cn(base, 'border border-[#2563eb] bg-[#2563eb] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                             <FaEdit aria-hidden="true" />
                         </button>
                         {showOrderActions ? (
-                            <>
-                                <button type="button" className={cn(base, 'border border-[#8b5cf6] bg-[#8b5cf6] text-white')} onClick={() => onAddRepair(repair)} title="Agregar reparación">
-                                    <FaPlus aria-hidden="true" />
-                                </button>
-                                <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
-                                    <FaReceipt aria-hidden="true" />
-                                </Link>
-                                {ticket.whatsappUrl ? (
-                                    <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')} title="WhatsApp">
-                                        <FaWhatsapp aria-hidden="true" />
-                                    </a>
-                                ) : (
-                                    <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
-                                        <FaWhatsapp aria-hidden="true" />
-                                    </span>
-                                )}
-                            </>
+                            <Link
+                                href={ticket.ticketUrl}
+                                className={cn(base, 'border border-[#0f172a] bg-[#0f172a] text-white')}
+                                title="Ticket"
+                            >
+                                <FaReceipt aria-hidden="true" />
+                            </Link>
+                        ) : null}
+                        {showOrderActions && ticket.whatsappUrl ? (
+                            <a
+                                href={ticket.whatsappUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={cn(base, 'border border-[#25D366] bg-[#25D366] text-white')}
+                                title="WhatsApp"
+                            >
+                                <FaWhatsapp aria-hidden="true" />
+                            </a>
                         ) : null}
                     </span>
-                    {hasSecondaryDesktopActions ? (
+                    {secondaryItems.length > 0 ? (
                         <details className="relative">
                             <summary className={cn(base, 'cursor-pointer list-none border border-[#cbd5e1] bg-white text-[#334155] [&::-webkit-details-marker]:hidden')} title="Mas acciones">
                                 <FaEllipsisH aria-hidden="true" />
                             </summary>
-                            <div className="absolute right-0 top-8 z-40 grid w-[11.5rem] gap-1 rounded-md border border-[#cbd5e1] bg-white p-1.5 shadow-lg">
-                                {showOrderActions ? (
-                                    <>
-                                        <a href={ticket.trackingUrl} className={menuItem}>
-                                            <FaArrowRight aria-hidden="true" /> Seguimiento
-                                        </a>
-                                    </>
-                                ) : null}
-                                {canCancel ? (
-                                    <button type="button" className={cn(menuItem, 'border-[#fed7aa] bg-[#fff7ed] text-[#92400e]')} onClick={cancelRepair}>
-                                        <FaTimes aria-hidden="true" /> Cancelar
-                                    </button>
-                                ) : null}
-                                {!readOnly && repair.actions?.archive && !repair.archivado_at ? (
-                                    <button type="button" className={cn(menuItem, 'border-[#cbd5e1] bg-[#f8fafc] text-[#475569]')} onClick={() => router.post(repair.actions?.archive ?? '', {}, { preserveScroll: true })}>
-                                        <FaArchive aria-hidden="true" /> Archivar
-                                    </button>
-                                ) : null}
-                                {repair.actions?.delete ? (
-                                    <button type="button" className={cn(menuItem, 'border-[#fecdd3] bg-[#fff1f2] text-[#be123c]')} onClick={deleteRepair}>
-                                        <FaTrashAlt aria-hidden="true" /> Eliminar
-                                    </button>
-                                ) : null}
+                            <div className="absolute right-0 top-8 z-40 grid w-52 gap-1 rounded-md border border-[#cbd5e1] bg-white p-1.5 shadow-lg">
+                                {secondaryItems}
                             </div>
                         </details>
                     ) : null}
@@ -2075,12 +2093,12 @@ function RepairEditCard({
                             </button>
                         ) : null}
                         {canMarkReady ? (
-                            <button type="button" className={cn(base, 'border border-[#198754] bg-[#198754] text-white')} onClick={markReady} title="Listo">
+                            <button type="button" className={cn(base, 'border border-[#16a34a] bg-[#16a34a] text-white')} onClick={markReady} title="Listo">
                                 <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
                             </button>
                         ) : null}
                         {canDeliver ? (
-                            <button type="button" className={cn(base, 'border border-[#ffc107] bg-[#ffc107] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
+                            <button type="button" className={cn(base, 'border border-[#f59e0b] bg-[#f59e0b] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
                                 <FaDollyFlatbed aria-hidden="true" />{iconOnly ? null : 'Entregar'}
                             </button>
                         ) : null}
@@ -2097,7 +2115,7 @@ function RepairEditCard({
                             <FaInfoCircle aria-hidden="true" />{iconOnly ? null : 'Info'}
                         </button>
                     ) : null}
-                    <button type="button" className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} onClick={() => setEditOpen(true)} title="Editar">
+                    <button type="button" className={cn(base, 'border border-[#2563eb] bg-[#2563eb] text-white')} onClick={() => setEditOpen(true)} title="Editar">
                         <FaEdit aria-hidden="true" />{iconOnly ? null : 'Editar'}
                     </button>
                     {showOrderActions ? (
@@ -2111,7 +2129,7 @@ function RepairEditCard({
                         <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
                             <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
                         </Link>
-                        <a href={ticket.trackingUrl} className={cn(base, 'border border-[#0d6efd] bg-[#0d6efd] text-white')} title="Seguimiento">
+                        <a href={ticket.trackingUrl} className={cn(base, 'border border-[#2563eb] bg-[#2563eb] text-white')} title="Seguimiento">
                             <FaArrowRight aria-hidden="true" />{iconOnly ? null : 'Seguimiento'}
                         </a>
                         {ticket.whatsappUrl ? (
@@ -2119,7 +2137,7 @@ function RepairEditCard({
                                 <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
                             </a>
                         ) : (
-                            <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-500')} title="Sin WhatsApp">
+                            <span className={cn(base, 'cursor-not-allowed border border-slate-300 bg-slate-200 text-slate-600')} title="Sin WhatsApp">
                                 <FaWhatsapp aria-hidden="true" />{iconOnly ? null : 'WhatsApp'}
                             </span>
                         )}
@@ -2137,7 +2155,7 @@ function RepairEditCard({
                                 <FaArchive aria-hidden="true" />{iconOnly ? null : 'Archivar'}
                             </button>
                         ) : null}
-                        <button type="button" className={cn(base, 'border border-[#dc3545] bg-[#dc3545] text-white')} onClick={deleteRepair} title="Eliminar">
+                        <button type="button" className={cn(base, 'border border-[#dc2626] bg-[#dc2626] text-white')} onClick={deleteRepair} title="Eliminar">
                             <FaTrashAlt aria-hidden="true" />{iconOnly ? null : 'Eliminar'}
                         </button>
                     </span>
@@ -2323,7 +2341,7 @@ function RepairEditCard({
                                     <EditField label="Pagado ($)">
                                         <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
                                     </EditField>
-                                    <div className="min-h-5 text-xs font-semibold leading-5 text-[#64748b] sm:col-span-2">
+                                    <div className="min-h-5 text-xs font-semibold leading-5 text-[#475569] sm:col-span-2">
                                         {transferPriceLabel(form.data.monto)}
                                     </div>
                                 </div>
@@ -2331,7 +2349,7 @@ function RepairEditCard({
                                     <div className="grid gap-3 rounded-md border border-[#ddd6fe] bg-[#faf5ff] px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                                         <div className="min-w-0">
                                             <div className="text-sm font-black text-[#0f172a]">Agregar trabajo al mismo modelo</div>
-                                            <div className="truncate text-xs font-semibold text-[#64748b]">{repairDisplayModel || 'Modelo sin cargar'}</div>
+                                            <div className="truncate text-xs font-semibold text-[#475569]">{repairDisplayModel || 'Modelo sin cargar'}</div>
                                         </div>
                                         <button type="button" className={buttonClass('primary', 'sm', 'w-full whitespace-nowrap sm:w-auto')} onClick={openAddRepairForSameModel}>
                                             <FaPlus aria-hidden="true" /> Nuevo trabajo
@@ -2384,7 +2402,7 @@ function RepairEditCard({
                                         <span className="font-black text-[#0f172a]">Historial de pagos e incrementos ({payments.length})</span>
                                         <span className="flex items-center gap-2 font-black text-[#0f172a]">
                                             {formatCurrency(senia)}
-                                            <FaChevronDown className="text-xs text-[#64748b]" aria-hidden="true" />
+                                            <FaChevronDown className="text-xs text-[#475569]" aria-hidden="true" />
                                         </span>
                                     </summary>
                                     <div className="grid gap-3 border-t border-[#e2e8f0] p-3">
@@ -2398,7 +2416,7 @@ function RepairEditCard({
                                                         <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
                                                         <div className="min-w-0">
                                                             <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - {isIncrement ? 'incremento' : 'seña'}</strong>
-                                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{detail}</span>
+                                                            <span className="block truncate text-xs font-semibold text-[#475569]">{detail}</span>
                                                         </div>
                                                         <span className={cn('font-black', isIncrement ? 'text-[#b45309]' : 'text-[#0f172a]')}>{isIncrement ? '+' : ''}{formatCurrency(payment.amount)}</span>
                                                         {!readOnly ? (
@@ -2417,7 +2435,7 @@ function RepairEditCard({
                                                 })}
                                             </div>
                                         ) : (
-                                            <span className="rounded-md border border-dashed border-[#cbd5e1] bg-white px-3 py-3 text-center text-sm font-semibold text-[#64748b]">Sin pagos registrados.</span>
+                                            <span className="rounded-md border border-dashed border-[#cbd5e1] bg-white px-3 py-3 text-center text-sm font-semibold text-[#475569]">Sin pagos registrados.</span>
                                         )}
                                     </div>
                                 </details>
@@ -2508,7 +2526,7 @@ function RepairEditCard({
                                                         disabled={readOnly}
                                                     >
                                                         <span className="font-black">{part.model}</span>
-                                                        <span className="text-xs font-bold text-slate-500">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
+                                                        <span className="text-xs font-bold text-slate-600">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
                                                     </button>
                                                 ))}
                                             </div>
@@ -2529,7 +2547,7 @@ function RepairEditCard({
                                     />
                                     Mandar a pedidos
                                 </label>
-                                <h4 className="mt-2 border-b border-[#bfdbfe] pb-2 text-sm font-black text-[#0d6efd]">Imágenes Actuales</h4>
+                                <h4 className="mt-2 border-b border-[#bfdbfe] pb-2 text-sm font-black text-[#2563eb]">Imágenes Actuales</h4>
                                 <RepairImagesBlock title="Imágenes iniciales" images={repair.imagenes} onOpen={setGalleryIndex} onRemove={(image) => removeImage(image, false)} readOnly={readOnly} />
                                 {!readOnly ? (
                                     <ImageUploadPicker
@@ -2541,7 +2559,7 @@ function RepairEditCard({
                                         onRemove={(index) => removeSelectedImage('images', index)}
                                     />
                                 ) : null}
-                                <h4 className="mt-2 border-b border-[#86efac] pb-2 text-sm font-black text-[#198754]">Imágenes del resultado final</h4>
+                                <h4 className="mt-2 border-b border-[#86efac] pb-2 text-sm font-black text-[#16a34a]">Imágenes del resultado final</h4>
                                 <RepairImagesBlock title="Imágenes finales" images={repair.imagenes_finales} onOpen={(index) => setGalleryIndex(repair.imagenes.length + index)} onRemove={(image) => removeImage(image, true)} readOnly={readOnly} />
                                 {!readOnly ? (
                                     <ImageUploadPicker
@@ -2711,7 +2729,7 @@ function RepairEditCard({
                             </button>
                         ) : <span className="block h-6 w-[2.35rem]" aria-hidden="true" />}
                     </div>
-                    <button type="button" className="sticky left-[6.8rem] z-[2] flex items-center bg-inherit text-left font-black uppercase text-[#0f172a] shadow-[1px_0_0_#cbd5e1]" onClick={openQuickView} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : <span className="text-[0.68rem] text-[#64748b]">Mismo ticket</span>}</button>
+                    <button type="button" className="sticky left-[6.8rem] z-[2] flex items-center bg-inherit text-left font-black uppercase text-[#0f172a] shadow-[1px_0_0_#cbd5e1]" onClick={openQuickView} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : <span className="text-[0.68rem] text-[#475569]">Mismo ticket</span>}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} /> : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView} title={repair.contacto || '-'}>{showDesktopTicketData ? <HighlightText value={repair.contacto || '-'} term={highlightTerm} /> : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} /> : ''}</button>
@@ -2761,7 +2779,7 @@ function RepairEditCard({
                         {readOnly ? (
                             <div className="grid justify-items-end gap-1 text-right">
                                 <span className="text-[0.7rem] font-black text-[#0f172a]">{deliveredDetailLabel(repair.fecha_entregado)}</span>
-                                <span className="text-[0.66rem] font-bold text-[#64748b]">{formatLegacyDate(repair.fecha_entregado)}</span>
+                                <span className="text-[0.66rem] font-bold text-[#475569]">{formatLegacyDate(repair.fecha_entregado)}</span>
                                 {repair.actions?.deliver ? (
                                     <button type="button" className="rounded-md border border-[#bfdbfe] bg-white px-2 py-1 text-[0.66rem] font-black uppercase text-[#1d4ed8] transition hover:bg-[#eff6ff]" onClick={openDeliveryModal}>
                                         {archived ? 'Entregar' : 'Cambiar'}
@@ -2806,7 +2824,7 @@ function RepairEditCard({
                         <div className="min-w-0">
                             <div className="mb-1 flex items-center gap-1.5">
                                 <span className="text-[0.68rem] font-bold text-[#0f172a]">#{repair.id}</span>
-                                <span className="text-[0.68rem] font-bold text-[#64748b]">{rowIndex + 1}/{rowTotal}</span>
+                                <span className="text-[0.68rem] font-bold text-[#475569]">{rowIndex + 1}/{rowTotal}</span>
                                 <span className={cn('rounded-full border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
                             <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
@@ -3025,7 +3043,7 @@ export function RepairTicketPanel({
                     <Link href={ticket.ticketUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#111827] bg-[#111827] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
                         Ticket tecnico
                     </Link>
-                    <a href={ticket.trackingUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#0d6efd] bg-[#0d6efd] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b5ed7] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
+                    <a href={ticket.trackingUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#2563eb] bg-[#2563eb] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#1d4ed8] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
                         Seguimiento
                     </a>
                     {ticket.whatsappUrl ? (
@@ -3106,7 +3124,7 @@ export function RepairTicketPanel({
                 <Link href={ticket.ticketUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#111827] bg-[#111827] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220]">
                     Ticket tecnico
                 </Link>
-                <a href={ticket.trackingUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#0d6efd] bg-[#0d6efd] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b5ed7]">
+                <a href={ticket.trackingUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#2563eb] bg-[#2563eb] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#1d4ed8]">
                     Seguimiento
                 </a>
                 {ticket.whatsappUrl ? (

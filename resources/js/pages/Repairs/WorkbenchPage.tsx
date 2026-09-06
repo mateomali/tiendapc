@@ -1,6 +1,6 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaSpinner, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from '../../components/RepairPartAccessoriesFields';
 import { normalizeRepairKey as normalizeDeviceSearch, phoneBrandOptions, RepairColorCombobox } from '../../components/RepairColorCombobox';
@@ -304,6 +304,7 @@ function FilterPill({ label, href, active }: { label: string; href: string; acti
         <Link
             href={href}
             preserveScroll
+            aria-current={active ? 'true' : undefined}
             className={cn(
                 'inline-flex min-h-9 items-center justify-center rounded-md border px-3 py-1.5 text-[0.78rem] font-bold no-underline transition',
                 active
@@ -331,10 +332,13 @@ function ConsultasEmptyState({
             : 'No hay tickets activos en consultas. Podés crear una nueva orden o revisar entregados.';
 
     return (
-        <div className="grid justify-items-center gap-3 rounded-lg border border-[#cbd5e1] bg-white px-4 py-8 text-center shadow-sm">
-            <div className="grid gap-1">
+        <div className="grid justify-items-center gap-4 rounded-lg border border-[#cbd5e1] bg-white px-4 py-10 text-center shadow-sm">
+            <span className="grid h-14 w-14 place-items-center rounded-2xl border border-[#bfdbfe] bg-[#eff6ff] text-[1.3rem] text-[#2563eb]">
+                {isTaskQueueView ? <FaClipboardCheck aria-hidden="true" /> : <FaSearch aria-hidden="true" />}
+            </span>
+            <div className="grid gap-1.5">
                 <h3 className="text-base font-black text-[#0f172a]">{title}</h3>
-                <p className="max-w-xl text-sm font-semibold leading-6 text-[#475569]">{message}</p>
+                <p className="mx-auto max-w-xl text-sm font-semibold leading-6 text-[#475569]">{message}</p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
                 {hasFilters ? (
@@ -535,6 +539,30 @@ export default function WorkbenchPage({
         query.addEventListener('change', sync);
 
         return () => query.removeEventListener('change', sync);
+    }, []);
+
+    // Muestra un indicador discreto mientras Inertia navega (búsquedas, filtros, paginación).
+    const [pendingVisit, setPendingVisit] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        const unsubscribeCallbacks: Array<() => void> = [];
+        const register = (eventName: 'start' | 'finish' | 'error' | 'cancel', fn: () => void): void => {
+            const off = router.on(eventName, fn);
+            if (typeof off === 'function') {
+                unsubscribeCallbacks.push(off);
+            }
+        };
+
+        register('start', () => setPendingVisit(true));
+        register('finish', () => setPendingVisit(false));
+        register('error', () => setPendingVisit(false));
+        register('cancel', () => setPendingVisit(false));
+
+        return () => unsubscribeCallbacks.forEach((off) => off());
     }, []);
 
     useEffect(() => () => {
@@ -891,7 +919,7 @@ export default function WorkbenchPage({
 
         if (suggestions.length === 0) {
             return typedModel.length >= 2 && !hasExactDeviceModel(index)
-                ? <span className="text-xs font-semibold text-[#64748b]">Se guardará como nuevo modelo.</span>
+                ? <span className="text-xs font-semibold text-[#475569]">Se guardará como nuevo modelo.</span>
                 : null;
         }
 
@@ -905,7 +933,7 @@ export default function WorkbenchPage({
                         onClick={() => selectDeviceModel(index, deviceModel)}
                     >
                         <span className="truncate">{deviceModel.model}</span>
-                        <span className="shrink-0 text-xs font-semibold text-[#64748b]">{deviceModel.usage_count}</span>
+                        <span className="shrink-0 text-xs font-semibold text-[#475569]">{deviceModel.usage_count}</span>
                     </button>
                 ))}
             </div>
@@ -1126,7 +1154,7 @@ export default function WorkbenchPage({
                 compact && 'leading-4',
             )}>
                 <span>Sugerido: {formatMoney(suggestion.amount)}</span>
-                <span className="text-[#64748b]">{suggestedPriceDateLabel(suggestion.date)}</span>
+                <span className="text-[#475569]">{suggestedPriceDateLabel(suggestion.date)}</span>
             </span>
         );
     };
@@ -1161,7 +1189,7 @@ export default function WorkbenchPage({
         return (
             <span className={cn(
                 'block text-xs font-semibold leading-5',
-                compact ? 'text-[#64748b]' : 'text-[#475569]',
+                compact ? 'text-[#475569]' : 'text-[#475569]',
                 applies && 'font-black text-[#92400e]',
             )}>
                 {label}
@@ -1678,6 +1706,14 @@ export default function WorkbenchPage({
 
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
+            {pendingVisit ? (
+                <div className="pointer-events-none fixed inset-x-0 top-16 z-50 flex justify-center md:top-20" role="status" aria-live="polite">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-[#bfdbfe] bg-white px-3.5 py-1.5 text-xs font-black uppercase tracking-wide text-[#1d4ed8] shadow-[0_4px_14px_rgba(15,23,42,0.14)]">
+                        <FaSpinner className="animate-spin" aria-hidden="true" />
+                        Actualizando
+                    </span>
+                </div>
+            ) : null}
             {isConsultas ? (
             <section className="sticky z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.10)] xl:hidden" style={{ top: 'var(--repair-header-offset, 5.6rem)' }}>
                 <form
@@ -1727,6 +1763,7 @@ export default function WorkbenchPage({
                     <Link
                         href={route('repairs.workbench')}
                         preserveScroll
+                        aria-current={!filters.estado && !filters.prioridad ? 'true' : undefined}
                         className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', !filters.estado && !filters.prioridad ? 'bg-white text-[#1d4ed8] ring-2 ring-[#bfdbfe]' : 'bg-[#eff6ff] text-[#334155]')}
                     >
                         Todas {summary.active}
@@ -1734,6 +1771,7 @@ export default function WorkbenchPage({
                     <Link
                         href={route('repairs.workbench', { estado: 'PENDIENTE' })}
                         preserveScroll
+                        aria-current={filters.estado === 'PENDIENTE' ? 'true' : undefined}
                         className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.estado === 'PENDIENTE' ? 'bg-white text-[#d97706] ring-2 ring-[#fed7aa]' : 'bg-[#fff7ed] text-[#334155]')}
                     >
                         Pend. {summary.pending}
@@ -1741,6 +1779,7 @@ export default function WorkbenchPage({
                     <Link
                         href={route('repairs.workbench', { estado: 'LISTA' })}
                         preserveScroll
+                        aria-current={filters.estado === 'LISTA' ? 'true' : undefined}
                         className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.estado === 'LISTA' ? 'bg-white text-[#15803d] ring-2 ring-[#bbf7d0]' : 'bg-[#ecfdf5] text-[#334155]')}
                     >
                         Listas {summary.ready}
@@ -1748,6 +1787,7 @@ export default function WorkbenchPage({
                     <Link
                         href={route('repairs.workbench', { prioridad: 'tareas' })}
                         preserveScroll
+                        aria-current={filters.prioridad === 'tareas' ? 'true' : undefined}
                         className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'tareas' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
                         Tareas {summary.tasks}
@@ -1755,6 +1795,7 @@ export default function WorkbenchPage({
                     <Link
                         href={route('repairs.workbench', { prioridad: 'vencidas' })}
                         preserveScroll
+                        aria-current={filters.prioridad === 'vencidas' ? 'true' : undefined}
                         className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
                     >
                         Venc. {summary.overdue}
@@ -1762,6 +1803,7 @@ export default function WorkbenchPage({
                     <Link
                         href={route('repairs.workbench', { prioridad: 'hoy' })}
                         preserveScroll
+                        aria-current={filters.prioridad === 'hoy' ? 'true' : undefined}
                         className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'hoy' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
                     >
                         Hoy {summary.today}
@@ -1823,7 +1865,7 @@ export default function WorkbenchPage({
                             );
                         })}
                     </div>
-                    <div className="ml-auto flex items-center gap-2 text-[0.74rem] font-black text-[#64748b]">
+                    <div className="ml-auto flex items-center gap-2 text-[0.74rem] font-black text-[#475569]">
                         <span>{visibleRepairs} reparaciones</span>
                         <span className="h-4 w-px bg-[#cbd5e1]" aria-hidden="true" />
                         <span>{tickets.length} tickets</span>
@@ -2063,7 +2105,7 @@ export default function WorkbenchPage({
                         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#2563eb] text-white"><FaPlusCircle aria-hidden="true" /></span>
                         <div className="min-w-0">
                             <h2 className="text-lg font-black tracking-tight text-[#0f172a] md:text-xl">Nueva orden de reparación</h2>
-                            <p className="text-xs font-semibold text-[#64748b]">Cargá el cliente, el/los equipo(s) y el presupuesto de cada reparación.</p>
+                            <p className="text-xs font-semibold text-[#475569]">Cargá el cliente, el/los equipo(s) y el presupuesto de cada reparación.</p>
                         </div>
                         <span className="rounded-md bg-[#eff6ff] px-2 py-1 text-sm font-black text-[#1d4ed8]">Orden #{createForm.data.id_orden || nextOrderId}</span>
                     </div>
@@ -2128,13 +2170,13 @@ export default function WorkbenchPage({
                     <section className={cn('grid gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('client') && 'hidden')}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <h3 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#2563eb]" aria-hidden="true" />Cliente</h3>
-                            <span className="text-xs font-semibold text-[#64748b]">Campos con <span className="font-black text-[#dc2626]">*</span> obligatorios</span>
+                            <span className="text-xs font-semibold text-[#475569]">Campos con <span className="font-black text-[#dc2626]">*</span> obligatorios</span>
                         </div>
                         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[12rem_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">ID de orden <span className="text-[#dc2626]">*</span></span>
                                 <input className={intakeControl} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required />
-                                <span className="text-xs font-semibold text-[#64748b]">Editable si está libre.</span>
+                                <span className="text-xs font-semibold text-[#475569]">Editable si está libre.</span>
                             </label>
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">Nombre del cliente <span className="text-[#dc2626]">*</span></span>
@@ -2155,12 +2197,12 @@ export default function WorkbenchPage({
                                         <FaSearch aria-hidden="true" />
                                     </button>
                                 </div>
-                                <span className="text-xs font-semibold text-[#64748b]">Recupera datos previos del cliente.</span>
+                                <span className="text-xs font-semibold text-[#475569]">Recupera datos previos del cliente.</span>
                             </label>
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">Teléfono / contacto</span>
                                 <input className={intakeControl} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} placeholder="Ej: 11 5555 5555" />
-                                <span className="text-xs font-semibold text-[#64748b]">Opcional.</span>
+                                <span className="text-xs font-semibold text-[#475569]">Opcional.</span>
                             </label>
                         </div>
                         {clientPreview ? (
@@ -2193,7 +2235,7 @@ export default function WorkbenchPage({
                                 <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e6edf7] bg-[#f8fafc] px-4 py-3">
                                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
                                         <h3 className="text-base font-black tracking-tight text-[#0f172a]">Equipo #{deviceOrdinalForJob(index)}</h3>
-                                        <span className="text-xs font-bold text-[#64748b]">{groupedIndexes.length > 1 ? `Reparaciones #${groupedIndexes[0] + 1}–#${groupedIndexes[groupedIndexes.length - 1] + 1}` : `Reparación #${groupedIndexes[0] + 1}`}</span>
+                                        <span className="text-xs font-bold text-[#475569]">{groupedIndexes.length > 1 ? `Reparaciones #${groupedIndexes[0] + 1}–#${groupedIndexes[groupedIndexes.length - 1] + 1}` : `Reparación #${groupedIndexes[0] + 1}`}</span>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
                                         {jobStatusChip(job)}
@@ -2259,7 +2301,7 @@ export default function WorkbenchPage({
                                     <div className={cn('grid gap-3', !showIntakeStep('device') && 'hidden')}>
                                         <h4 className="flex items-center justify-between gap-2 text-sm font-black text-[#0f172a]">
                                             <span className="flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-[#d97706]" aria-hidden="true" />Falla y presupuesto</span>
-                                            <span className="text-xs font-semibold text-[#64748b]">Agregá fallas para el mismo equipo o <button type="button" className="font-bold text-[#2563eb] underline-offset-2 hover:underline" onClick={() => addJobForSameDevice()}>cargá otra reparación</button>.</span>
+                                            <span className="text-xs font-semibold text-[#475569]">Agregá fallas para el mismo equipo o <button type="button" className="font-bold text-[#2563eb] underline-offset-2 hover:underline" onClick={() => addJobForSameDevice()}>cargá otra reparación</button>.</span>
                                         </h4>
                                         <div className="grid gap-1.5">
                                             <select
@@ -2276,11 +2318,11 @@ export default function WorkbenchPage({
                                                 <option value="">Elegir falla o servicio frecuente...</option>
                                                 {descriptionOptions.map((option) => (<option key={option.key} value={option.key}>{option.label}</option>))}
                                             </select>
-                                            <p className="text-xs font-semibold text-[#64748b]">Elegí una falla y se agrega automáticamente a la lista de abajo.</p>
+                                            <p className="text-xs font-semibold text-[#475569]">Elegí una falla y se agrega automáticamente a la lista de abajo.</p>
                                         </div>
 
                                         <div className="grid gap-2">
-                                            <div className="hidden items-center gap-x-3 rounded-lg bg-[#f1f5f9] px-3 py-2 text-[11px] font-black uppercase tracking-wide text-[#64748b] md:grid md:grid-cols-[2rem_minmax(0,1fr)_9.5rem_8rem_8.5rem_2rem]">
+                                            <div className="hidden items-center gap-x-3 rounded-lg bg-[#f1f5f9] px-3 py-2 text-[11px] font-black uppercase tracking-wide text-[#475569] md:grid md:grid-cols-[2rem_minmax(0,1fr)_9.5rem_8rem_8.5rem_2rem]">
                                                 <span aria-hidden="true" />
                                                 <span className="pl-3">Detalle de la falla <span className="text-[#dc2626]">*</span></span>
                                                 <span className="pl-3">Monto</span>
@@ -2317,7 +2359,7 @@ export default function WorkbenchPage({
                                                             ) : (
                                                                 <>
                                                                     <div className="relative">
-                                                                        <span className="pointer-events-none absolute inset-y-0 left-2.5 grid place-items-center text-sm font-semibold text-[#64748b]" aria-hidden="true">$</span>
+                                                                        <span className="pointer-events-none absolute inset-y-0 left-2.5 grid place-items-center text-sm font-semibold text-[#475569]" aria-hidden="true">$</span>
                                                                         <input
                                                                             className={cn(intakeControl, 'pl-7')}
                                                                             style={{ paddingLeft: '1.6rem' }}
@@ -2338,7 +2380,7 @@ export default function WorkbenchPage({
                                                         <label className="grid content-start gap-1.5">
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Seña</span>
                                                             <div className="relative">
-                                                                <span className="pointer-events-none absolute inset-y-0 left-2.5 grid place-items-center text-sm font-semibold text-[#64748b]" aria-hidden="true">$</span>
+                                                                <span className="pointer-events-none absolute inset-y-0 left-2.5 grid place-items-center text-sm font-semibold text-[#475569]" aria-hidden="true">$</span>
                                                                 <input
                                                                     className={intakeControl}
                                                                     style={{ paddingLeft: '1.6rem' }}
@@ -2411,7 +2453,7 @@ export default function WorkbenchPage({
                                                     <WebcamCaptureButton className={buttonClass('soft', 'sm', 'px-2')} label="Webcam" onCapture={(file) => setJobImageFiles(index, [file])} />
                                                     <label className={buttonClass('soft', 'sm', 'px-2')}><FaImages aria-hidden="true" />Galería<input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => setJobImages(index, event.target.files)} /></label>
                                                 </div>
-                                                <p className="text-xs font-semibold text-[#64748b]">Se guardan como fotos iniciales del trabajo. Máximo 2.</p>
+                                                <p className="text-xs font-semibold text-[#475569]">Se guardan como fotos iniciales del trabajo. Máximo 2.</p>
                                                 {imagePreviews[index]?.length ? (
                                                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                                                         {imagePreviews[index].map((src, previewIndex) => (
@@ -2424,7 +2466,7 @@ export default function WorkbenchPage({
                                                         ))}
                                                     </div>
                                                 ) : (
-                                                    <span className="rounded-lg border border-dashed border-[#bfdbfe] bg-white px-3 py-3 text-center text-sm font-semibold text-[#64748b]">Sin fotos seleccionadas.</span>
+                                                    <span className="rounded-lg border border-dashed border-[#bfdbfe] bg-white px-3 py-3 text-center text-sm font-semibold text-[#475569]">Sin fotos seleccionadas.</span>
                                                 )}
                                             </div>
 
@@ -2460,7 +2502,7 @@ export default function WorkbenchPage({
                                                                 onClick={() => selectInventoryPart(index, part)}
                                                             >
                                                                 <span className="font-black">{part.model}</span>
-                                                                <span className="text-xs font-bold text-[#64748b]">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
+                                                                <span className="text-xs font-bold text-[#475569]">Caja {part.box.toUpperCase()} - {part.quantity} disponible{part.quantity === 1 ? '' : 's'}</span>
                                                             </button>
                                                         ))}
                                                     </div>
@@ -2500,7 +2542,7 @@ export default function WorkbenchPage({
                                         <span className="font-black text-[#475569]">#{row.index + 1}</span>
                                         <span className="min-w-0">
                                             <strong className="block truncate text-[#0f172a]">{row.description}</strong>
-                                            <span className="block truncate text-xs font-semibold text-[#64748b]">{row.model}</span>
+                                            <span className="block truncate text-xs font-semibold text-[#475569]">{row.model}</span>
                                         </span>
                                         <span className="font-bold text-[#334155]">Seña {formatMoney(row.deposit)}</span>
                                         <strong className="text-[#0f172a] md:text-right">{row.amount > 0 ? formatMoney(row.amount) : 'A presupuestar'}</strong>
@@ -2509,10 +2551,10 @@ export default function WorkbenchPage({
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
-                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong><span className={cn('block text-xs font-semibold text-[#64748b]', regularTotal > totals.monto && 'font-black text-[#92400e]')}>{regularTotal > 0 ? `Regular sin descuento: ${formatMoney(regularTotal)}` : ''}</span></div>
-                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
-                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#64748b]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#475569]">Reparaciones</span><strong className="block text-xl font-black text-[#0f172a]">{createForm.data.jobs.length}</strong></div>
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#475569]">Presupuesto total</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.monto)}</strong><span className={cn('block text-xs font-semibold text-[#475569]', regularTotal > totals.monto && 'font-black text-[#92400e]')}>{regularTotal > 0 ? `Regular sin descuento: ${formatMoney(regularTotal)}` : ''}</span></div>
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#475569]">Señas</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(totals.senia)}</strong></div>
+                            <div className="rounded-xl border border-[#e2e9f4] bg-white p-3"><span className="block text-xs font-semibold text-[#475569]">Saldo estimado</span><strong className="block text-xl font-black text-[#0f172a]">{formatMoney(Math.max(0, totals.monto - totals.senia))}</strong></div>
                         </div>
                     </section>
 
@@ -2633,7 +2675,7 @@ export default function WorkbenchPage({
                                             <span>{taskTickets.pending.reduce((total, ticket) => total + ticket.repairs.length, 0)} pendiente{taskTickets.pending.length === 1 ? '' : 's'}</span>
                                         </div>
                                         {taskTickets.pending.length > 0 ? renderDesktopTaskTickets(taskTickets.pending) : (
-                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">No quedan tareas pendientes.</div>
+                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#475569]">No quedan tareas pendientes.</div>
                                         )}
                                         <div className="bg-[#f1f5f9] py-3">
                                             <div className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-3 rounded-md bg-[#123f91] px-4 py-3 text-xs font-black text-white">
@@ -2642,7 +2684,7 @@ export default function WorkbenchPage({
                                             </div>
                                         </div>
                                         {taskTickets.completed.length > 0 ? renderDesktopTaskTickets(taskTickets.completed) : (
-                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#64748b]">Todavía no hay tareas listas o canceladas.</div>
+                                            <div className="px-4 py-6 text-center text-sm font-bold text-[#475569]">Todavía no hay tareas listas o canceladas.</div>
                                         )}
                                     </>
                                 ) : renderDesktopDateGroups(ticketDateGroups)
@@ -2675,7 +2717,7 @@ export default function WorkbenchPage({
                                     <span>{taskTickets.pending.reduce((total, ticket) => total + ticket.repairs.length, 0)}</span>
                                 </div>
                                 {taskTickets.pending.length > 0 ? renderMobileTaskTickets(taskTickets.pending) : (
-                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">No quedan tareas pendientes.</div>
+                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#475569]">No quedan tareas pendientes.</div>
                                 )}
                             </section>
                             <div className="bg-[#f1f5f9] py-3">
@@ -2686,7 +2728,7 @@ export default function WorkbenchPage({
                             </div>
                             <section className="grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2">
                                 {taskTickets.completed.length > 0 ? renderMobileTaskTickets(taskTickets.completed) : (
-                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#64748b]">Todavía no hay tareas listas o canceladas.</div>
+                                    <div className="rounded-lg border border-dashed border-[#94a3b8] bg-white p-4 text-center text-sm font-bold text-[#475569]">Todavía no hay tareas listas o canceladas.</div>
                                 )}
                             </section>
                         </>
