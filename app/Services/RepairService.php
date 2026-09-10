@@ -832,6 +832,7 @@ class RepairService
             'archivado_motivo' => $reason,
         ]);
 
+        $this->syncTaskQueueForState($order, (string) $order->estado);
         $this->recordEvent($order, 'ARCHIVADA_' . Str::upper($reason), $previousState, $order->estado);
 
         return $order->refresh();
@@ -1380,34 +1381,26 @@ class RepairService
 
     private function syncTaskQueueForState(RepairOrder $order, string $state): void
     {
-        if (! in_array(Str::upper($state), ['LISTA', 'CANCELADA'], true)) {
-            return;
-        }
+        $state = Str::upper($state);
+        $shouldBeInTasks = in_array($state, ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'], true)
+            && $order->entregado !== 'si'
+            && $order->archivado_at === null;
 
-        $task = RepairTaskItem::query()
+        $activeTasks = RepairTaskItem::query()
             ->where('repair_order_registro_id', $order->registro_id)
-            ->whereNull('completed_at')
-            ->oldest('task_date')
-            ->oldest('created_at')
-            ->oldest('id')
-            ->first();
+            ->whereNull('completed_at');
 
-        if ($task === null) {
+        if (! $shouldBeInTasks) {
+            $activeTasks->delete();
             return;
         }
 
-        $task->delete();
-
-        $newTask = RepairTaskItem::query()->updateOrCreate(
-            [
-                'repair_order_registro_id' => $order->registro_id,
-                'task_date' => now()->toDateString(),
-            ],
-            [
-                'completed_at' => null,
-            ],
-        );
-        $newTask->forceFill(['created_at' => now(), 'updated_at' => now()])->save();
+        $activeTasks->delete();
+        RepairTaskItem::query()->create([
+            'repair_order_registro_id' => $order->registro_id,
+            'task_date' => now()->toDateString(),
+            'completed_at' => null,
+        ]);
     }
 
     public function addOriginalImages(RepairOrder $order, array $images): RepairOrder
@@ -1983,25 +1976,25 @@ class RepairService
             ->whereHas('repairOrder', fn ($query) => $query
                 ->whereNull('archivado_at')
                 ->where('entregado', 'no')
-                ->whereNotIn('estado', ['LISTA', 'CANCELADA']))
-            ->oldest('task_date')
-            ->oldest('created_at')
-            ->oldest('id')
-            ->pluck('repair_order_registro_id')
-            ->map(fn ($id): int => (int) $id)
+                ->whereIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO']))
+            ->with('repairOrder')
+            ->get()
+            ->sortByDesc(fn (RepairTaskItem $item): int => (int) ($item->repairOrder?->id ?? 0))
+            ->map(fn (RepairTaskItem $item): int => (int) $item->repair_order_registro_id)
             ->values()
             ->all();
     }
 
     public function completePreviousTerminalTaskItems(): void
     {
-        $today = now()->toDateString();
-
         RepairTaskItem::query()
             ->whereNull('completed_at')
-            ->whereDate('task_date', '<', $today)
-            ->whereHas('repairOrder', fn ($query) => $query->whereIn('estado', ['LISTA', 'CANCELADA']))
-            ->update(['completed_at' => now()]);
+            ->whereHas('repairOrder', fn ($query) => $query
+                ->where(fn ($orderQuery) => $orderQuery
+                    ->whereNotNull('archivado_at')
+                    ->orWhere('entregado', 'si')
+                    ->orWhereNotIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'])))
+            ->delete();
     }
 
     private function summaryQuery(array $filters): \Illuminate\Database\Eloquent\Builder

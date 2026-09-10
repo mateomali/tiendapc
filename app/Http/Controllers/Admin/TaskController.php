@@ -26,22 +26,15 @@ class TaskController extends Controller
             $items = RepairTaskItem::query()
                 ->with('repairOrder')
                 ->whereNull('completed_at')
-                ->oldest('task_date')
-                ->oldest('created_at')
-                ->oldest('id')
                 ->get()
-                ->filter(fn (RepairTaskItem $item): bool => $item->repairOrder !== null)
+                ->filter(fn (RepairTaskItem $item): bool => $this->isActiveTaskItem($item))
+                ->sortByDesc(fn (RepairTaskItem $item): int => (int) ($item->repairOrder?->id ?? 0))
                 ->values();
-            $activeItems = $items
-                ->filter(fn (RepairTaskItem $item): bool => ! in_array((string) $item->repairOrder?->estado, ['LISTA', 'CANCELADA'], true))
-                ->values();
-            $completedItems = $items
-                ->filter(fn (RepairTaskItem $item): bool => in_array((string) $item->repairOrder?->estado, ['LISTA', 'CANCELADA'], true))
-                ->values();
+            $completedItems = collect();
 
             return Inertia::render('Admin/TasksPage', [
                 'todayLabel' => 'Tareas para hoy',
-                'items' => $this->serializeTaskTickets($activeItems, $workbenchController),
+                'items' => $this->serializeTaskTickets($items, $workbenchController),
                 'completedItems' => $this->serializeTaskTickets($completedItems, $workbenchController),
                 'states' => $repairService->availableStates(false),
                 'serviceCategories' => $this->serviceCategories(),
@@ -118,7 +111,7 @@ class TaskController extends Controller
             $repairService->markReady($taskItem->repairOrder);
         }
 
-        return back()->with('success', 'Trabajo marcado como listo y enviado al final de tareas.');
+        return back()->with('success', 'Trabajo marcado como listo y quitado de tareas.');
     }
 
     public function remove(RepairTaskItem $taskItem): RedirectResponse
@@ -140,6 +133,16 @@ class TaskController extends Controller
             ->values();
 
         return $workbenchController->groupTickets($orders, false);
+    }
+
+    private function isActiveTaskItem(RepairTaskItem $item): bool
+    {
+        $order = $item->repairOrder;
+
+        return $order !== null
+            && $order->archivado_at === null
+            && $order->entregado !== 'si'
+            && in_array((string) $order->estado, ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO'], true);
     }
 
     /**

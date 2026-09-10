@@ -1214,6 +1214,7 @@ function RepairEditCard({
     const accessoriesLabel = partAccessoriesLabel(repair.repuesto_agregados, repair.repuesto_agregado_otro);
     const showMore = Boolean(repair.descripcion || repair.repuesto || accessoriesLabel || repair.observaciones || repair.cancelado_motivo || repair.garantia_motivo || repair.contacto || repair.dni || unlockLabel);
     const hasInfo = (ticket.info ?? '').trim() !== '';
+    const canShowInfoAction = repair.entregado !== 'si' || hasInfo;
     const isGroupedDesktopRow = variant === 'desktop' && rowTotal > 1;
     const isFirstGroupedDesktopRow = isGroupedDesktopRow && rowIndex === 0;
     const isLastGroupedDesktopRow = isGroupedDesktopRow && (rowIndex === rowTotal - 1 || (rowIndex === 0 && !desktopGroupExpanded));
@@ -1956,7 +1957,7 @@ function RepairEditCard({
 
         if (!mobile) {
             const secondaryItems: ReactNode[] = [];
-            if (!hasInfo) {
+            if (!hasInfo && canShowInfoAction) {
                 secondaryItems.push(
                     <button key="add-info" type="button" className={menuItem} onClick={() => setInfoOpen(true)}>
                         <FaInfoCircle aria-hidden="true" /> Agregar info
@@ -2109,7 +2110,7 @@ function RepairEditCard({
                     </span>
                 ) : null}
                 <span className={groupClass}>
-                    {showGeneralTicketActions ? (
+                    {showGeneralTicketActions && canShowInfoAction ? (
                         <button
                             type="button"
                             className={cn(base, hasInfo ? 'border border-[#0f766e] bg-[#0f766e] text-white' : 'border border-[#cbd5e1] bg-white text-[#334155]')}
@@ -2784,6 +2785,11 @@ function RepairEditCard({
                             <div className="grid justify-items-end gap-1 text-right">
                                 <span className="text-[0.7rem] font-black text-[#0f172a]">{deliveredDetailLabel(repair.fecha_entregado)}</span>
                                 <span className="text-[0.66rem] font-bold text-[#475569]">{formatLegacyDate(repair.fecha_entregado)}</span>
+                                {hasInfo ? (
+                                    <button type="button" className="rounded-md border border-[#99f6e4] bg-[#f0fdfa] px-2 py-1 text-[0.66rem] font-black uppercase text-[#0f766e] transition hover:bg-[#ccfbf1]" onClick={() => setInfoOpen(true)}>
+                                        Ver info
+                                    </button>
+                                ) : null}
                                 {repair.actions?.deliver ? (
                                     <button type="button" className="rounded-md border border-[#bfdbfe] bg-white px-2 py-1 text-[0.66rem] font-black uppercase text-[#1d4ed8] transition hover:bg-[#eff6ff]" onClick={openDeliveryModal}>
                                         {archived ? 'Entregar' : 'Cambiar'}
@@ -2887,7 +2893,21 @@ function RepairEditCard({
                         />
                         {repair.estado === 'CANCELADA' && repair.cancelado_motivo ? <FieldSummary label="Motivo" value={<HighlightText value={repair.cancelado_motivo} term={highlightTerm} />} className="col-span-2 border border-slate-200 bg-white" onClick={openInlineEditor} /> : null}
                         {repair.estado === 'GARANTIA' && repair.garantia_motivo ? <FieldSummary label="Garantia" value={<HighlightText value={repair.garantia_motivo} term={highlightTerm} />} className="col-span-2 border border-teal-200 bg-teal-50" onClick={openInlineEditor} /> : null}
-                        {readOnly ? <FieldSummary label="Detalle" value={deliveredDetailLabel(repair.fecha_entregado)} /> : null}
+                        {readOnly ? (
+                            <FieldSummary
+                                label="Detalle"
+                                value={(
+                                    <span className="flex flex-wrap items-center gap-2">
+                                        <span>{deliveredDetailLabel(repair.fecha_entregado)}</span>
+                                        {hasInfo ? (
+                                            <button type="button" className="rounded-md border border-[#99f6e4] bg-[#f0fdfa] px-2 py-1 text-[0.66rem] font-black uppercase text-[#0f766e] transition hover:bg-[#ccfbf1]" onClick={() => setInfoOpen(true)}>
+                                                Ver info
+                                            </button>
+                                        ) : null}
+                                    </span>
+                                )}
+                            />
+                        ) : null}
                         {seniaLabel ? <FieldSummary label="Seña" value={formatCurrency(senia)} onClick={openInlineEditor} /> : null}
                         {unlockLabel ? <FieldSummary label="Desbloqueo" value={unlockLabel} onClick={openInlineEditor} /> : null}
                         {accessoriesLabel ? <FieldSummary label="Incluye" value={<HighlightText value={accessoriesLabel} term={highlightTerm} />} onClick={openInlineEditor} /> : null}

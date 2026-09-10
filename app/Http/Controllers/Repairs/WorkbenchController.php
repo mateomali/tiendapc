@@ -1547,12 +1547,15 @@ class WorkbenchController extends Controller
         if ($this->taskQueuePositions === null) {
             $this->taskQueuePositions = RepairTaskItem::query()
                 ->whereNull('completed_at')
-                ->oldest('task_date')
-                ->oldest('created_at')
-                ->oldest('id')
-                ->pluck('repair_order_registro_id')
+                ->whereHas('repairOrder', fn ($query) => $query
+                    ->whereNull('archivado_at')
+                    ->where('entregado', 'no')
+                    ->whereIn('estado', ['EN REPARACION', 'EN REPARACION / ESPERA REPUESTO']))
+                ->with('repairOrder')
+                ->get()
+                ->sortByDesc(fn (RepairTaskItem $item): int => (int) ($item->repairOrder?->id ?? 0))
                 ->values()
-                ->mapWithKeys(fn ($registroId, int $index): array => [(int) $registroId => $index + 1])
+                ->mapWithKeys(fn (RepairTaskItem $item, int $index): array => [(int) $item->repair_order_registro_id => $index + 1])
                 ->all();
         }
 

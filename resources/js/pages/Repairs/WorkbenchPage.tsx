@@ -510,6 +510,7 @@ export default function WorkbenchPage({
     const [activeIntakeStep, setActiveIntakeStep] = useState<IntakeStep>('client');
     const [mobileWizardIntake, setMobileWizardIntake] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+    const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const [expandedPartPanels, setExpandedPartPanels] = useState<Record<number, boolean>>({});
     const [selectedDeviceModelKeys, setSelectedDeviceModelKeys] = useState<Record<number, string>>({});
@@ -521,6 +522,7 @@ export default function WorkbenchPage({
     });
     const gridFilterSubmitTimeout = useRef<number | null>(null);
     const dniLookupTimeout = useRef<number | null>(null);
+    const overlaySearchInputRef = useRef<HTMLInputElement | null>(null);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const ticketDateGroups = groupTicketsByDate(tickets, (ticket) => ticket.fecha);
     const isTaskQueueView = filters.prioridad === 'tareas';
@@ -573,6 +575,50 @@ export default function WorkbenchPage({
             window.clearTimeout(dniLookupTimeout.current);
         }
     }, []);
+
+    useEffect(() => {
+        if (!isConsultas || typeof window === 'undefined') {
+            return undefined;
+        }
+
+        const isTypingTarget = (target: EventTarget | null): boolean => {
+            if (!(target instanceof HTMLElement)) {
+                return false;
+            }
+
+            return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
+        };
+        const focusSearch = (): void => {
+            setMobileFiltersOpen(false);
+            setSearchOverlayOpen(true);
+            window.setTimeout(() => overlaySearchInputRef.current?.focus(), 0);
+        };
+        const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
+            if (event.key === 'Escape' && searchOverlayOpen) {
+                event.preventDefault();
+                setSearchOverlayOpen(false);
+                return;
+            }
+
+            const isShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
+            const isSlash = event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey;
+
+            if (!isShortcut && !isSlash) {
+                return;
+            }
+
+            if (isSlash && isTypingTarget(event.target)) {
+                return;
+            }
+
+            event.preventDefault();
+            focusSearch();
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isConsultas, searchOverlayOpen]);
 
     const toggleDesktopTicket = (ticketId: number): void => {
         setExpandedDesktopTickets((current) => ({
@@ -639,6 +685,10 @@ export default function WorkbenchPage({
             query !== '' ? cleanQuery({ q: query, q_fields: searchFieldsQuery }) : {},
             { preserveScroll },
         );
+    };
+    const submitOverlaySearch = (): void => {
+        submitCleanSearch(true);
+        setSearchOverlayOpen(false);
     };
     const submitGridFilters = (): void => {
         router.get(
@@ -1712,6 +1762,61 @@ export default function WorkbenchPage({
                         <FaSpinner className="animate-spin" aria-hidden="true" />
                         Actualizando
                     </span>
+                </div>
+            ) : null}
+            {isConsultas && searchOverlayOpen ? (
+                <div className="fixed inset-0 z-[70] grid place-items-start bg-slate-950/45 px-3 pt-24 sm:px-6" role="dialog" aria-modal="true">
+                    <form
+                        className="mx-auto w-full max-w-2xl rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-[0_8px_24px_rgba(15,23,42,0.22)]"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            submitOverlaySearch();
+                        }}
+                    >
+                        <div className="grid grid-cols-[minmax(0,1fr)_44px_36px] gap-2">
+                            <input
+                                ref={overlaySearchInputRef}
+                                className="h-12 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-[1rem] font-semibold text-[#0f172a] outline-none transition placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                                placeholder="Buscar por ID, cliente, DNI, contacto o modelo"
+                                value={filtersForm.data.q}
+                                onChange={(event) => filtersForm.setData('q', event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Escape') {
+                                        event.preventDefault();
+                                        setSearchOverlayOpen(false);
+                                    }
+                                }}
+                            />
+                            <button type="submit" className="grid h-12 place-items-center rounded-md bg-[#2563eb] text-white transition hover:bg-[#1d4ed8]" aria-label="Buscar">
+                                <FaSearch aria-hidden="true" />
+                            </button>
+                            <button type="button" className="grid h-12 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155] transition hover:bg-[#f8fafc]" onClick={() => setSearchOverlayOpen(false)} aria-label="Cerrar búsqueda">
+                                <FaTimes aria-hidden="true" />
+                            </button>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            {searchFieldOptions.map((option) => {
+                                const active = activeSearchFields.includes(option.key);
+
+                                return (
+                                    <button
+                                        key={option.key}
+                                        type="button"
+                                        className={cn(
+                                            'inline-flex min-h-8 items-center rounded-md border px-2.5 text-[0.72rem] font-bold transition',
+                                            active
+                                                ? 'border-[#2563eb] bg-[#2563eb] text-white'
+                                                : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
+                                        )}
+                                        onClick={() => toggleSearchField(option.key)}
+                                        aria-pressed={active}
+                                    >
+                                        {option.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </form>
                 </div>
             ) : null}
             {isConsultas ? (
