@@ -593,6 +593,11 @@ export default function WorkbenchPage({
             setSearchOverlayOpen(true);
             window.setTimeout(() => overlaySearchInputRef.current?.focus(), 0);
         };
+        const openNewOrder = (): void => {
+            setMobileFiltersOpen(false);
+            setSearchOverlayOpen(false);
+            router.visit(route('repairs.ingress'));
+        };
         const handleKeyDown = (event: globalThis.KeyboardEvent): void => {
             if (event.key === 'Escape' && searchOverlayOpen) {
                 event.preventDefault();
@@ -602,16 +607,22 @@ export default function WorkbenchPage({
 
             const isShortcut = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
             const isSlash = event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey;
+            const isNewOrderShortcut = event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 'n';
 
-            if (!isShortcut && !isSlash) {
+            if (!isShortcut && !isSlash && !isNewOrderShortcut) {
                 return;
             }
 
-            if (isSlash && isTypingTarget(event.target)) {
+            if ((isSlash || isNewOrderShortcut) && isTypingTarget(event.target)) {
                 return;
             }
 
             event.preventDefault();
+            if (isNewOrderShortcut) {
+                openNewOrder();
+                return;
+            }
+
             focusSearch();
         };
 
@@ -1822,7 +1833,7 @@ export default function WorkbenchPage({
             {isConsultas ? (
             <section className="sticky z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.10)] xl:hidden" style={{ top: 'var(--repair-header-offset, 5.6rem)' }}>
                 <form
-                    className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
+                    className="grid grid-cols-[minmax(0,1fr)_44px_44px_44px] gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
                         submitCleanSearch(true);
@@ -1841,6 +1852,9 @@ export default function WorkbenchPage({
                         <FaFilter aria-hidden="true" />
                         {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-md bg-[#ef4444] px-1 text-[0.65rem] font-bold text-white">{activeMobileFilters}</span> : null}
                     </button>
+                    <Link href={route('repairs.ingress')} className="grid h-11 min-w-0 place-items-center rounded-md border border-[#0f172a] bg-[#0f172a] text-white no-underline" aria-label="Nueva orden" title="Nueva orden (Alt+N)">
+                        <FaPlusCircle aria-hidden="true" />
+                    </Link>
                 </form>
                 <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5">
                     {searchFieldOptions.map((option) => {
@@ -1970,7 +1984,10 @@ export default function WorkbenchPage({
                             );
                         })}
                     </div>
-                    <div className="ml-auto flex items-center gap-2 text-[0.74rem] font-black text-[#475569]">
+                    <Link href={route('repairs.ingress')} className={buttonClass('primary', 'sm', 'ml-auto whitespace-nowrap')} title="Alt+N">
+                        <FaPlusCircle aria-hidden="true" /> Nueva orden
+                    </Link>
+                    <div className="flex items-center gap-2 text-[0.74rem] font-black text-[#475569]">
                         <span>{visibleRepairs} reparaciones</span>
                         <span className="h-4 w-px bg-[#cbd5e1]" aria-hidden="true" />
                         <span>{tickets.length} tickets</span>
