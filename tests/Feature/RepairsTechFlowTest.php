@@ -452,6 +452,69 @@ it('stores successive repair payments as history and updates paid total', functi
     expect((float) $order->fresh()?->senia)->toBe(15000.0);
 });
 
+it('allows editing the paid total from the order edit form', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 804,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Ajuste',
+        'dni' => 33444112,
+        'modelo' => 'Notebook',
+        'descripcion' => 'Cambio de teclado',
+        'observaciones' => 'sin observaciones',
+        'monto' => 50000,
+        'senia' => 10000,
+        'estado' => 'PENDIENTE',
+        'entregado' => 'no',
+    ]);
+
+    RepairPayment::query()->create([
+        'orden_id' => 804,
+        'reparacion' => 1,
+        'amount' => 10000,
+        'payment_type' => 'senia',
+        'method' => 'efectivo',
+        'notes' => 'Sena inicial',
+        'paid_at' => now()->toDateString(),
+    ]);
+
+    $payload = [
+        'id_nuevo' => 804,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Ajuste',
+        'dni' => 33444112,
+        'contacto' => '',
+        'modelo' => 'Notebook',
+        'descripcion' => 'Cambio de teclado',
+        'observaciones' => 'sin observaciones',
+        'monto' => 50000,
+        'senia' => 15000,
+        'fecha_estimada' => null,
+        'estado' => 'PENDIENTE',
+        'repuesto' => '',
+        'repuesto_pedido' => false,
+        'inventory_part_id' => '',
+        'categorias_reparacion' => 4,
+    ];
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.update', $order), $payload)
+        ->assertRedirect();
+
+    expect((float) $order->fresh()?->senia)->toBe(15000.0);
+    expect((float) RepairPayment::query()->where('orden_id', 804)->where('reparacion', 1)->where('payment_type', 'senia')->sum('amount'))->toBe(15000.0);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.update', $order->fresh()), [
+            ...$payload,
+            'senia' => 7000,
+        ])
+        ->assertRedirect();
+
+    expect((float) $order->fresh()?->senia)->toBe(7000.0);
+    expect((float) RepairPayment::query()->where('orden_id', 804)->where('reparacion', 1)->where('payment_type', 'senia')->sum('amount'))->toBe(7000.0);
+});
+
 it('stores repair increments as ticket additions without counting them as payments', function (): void {
     SiteGlobalConfig::putValue('repair_cash_discount_enabled', '1');
     SiteGlobalConfig::putValue('repair_cash_discount_threshold', '25000');

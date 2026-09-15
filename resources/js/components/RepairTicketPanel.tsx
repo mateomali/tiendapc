@@ -2344,7 +2344,7 @@ function RepairEditCard({
                                         <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                     <EditField label="Pagado ($)">
-                                        <input className={ui.repairDenseInput} value={formatCurrency(senia)} disabled />
+                                        <input className={changedInputClass(form.data.senia, formatAmountInput(repair.senia))} value={form.data.senia} inputMode="decimal" onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                     <div className="min-h-5 text-xs font-semibold leading-5 text-[#475569] sm:col-span-2">
                                         {transferPriceLabel(form.data.monto)}

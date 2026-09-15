@@ -637,7 +637,7 @@ class RepairService
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $info !== '' ? $info : null,
                 'monto' => $payload['monto'] ?? 0,
-                'senia' => $this->paymentTotal($order),
+                'senia' => max(0, (float) ($payload['senia'] ?? $this->paymentTotal($order))),
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => $nextState,
                 'cancelado_motivo' => $nextCancellationReason,
@@ -662,6 +662,7 @@ class RepairService
                 $this->consumeInventoryReservation($order);
             }
             $this->syncTaskQueueForState($order, (string) $order->estado);
+            $this->reconcileManualPaymentTotal($order, $payload['senia'] ?? null);
 
             $this->recordEvent($order, $order->entregado === 'si' ? 'ACTUALIZADA_ENTREGADA' : 'ACTUALIZADA', $previousState, $order->estado);
 
@@ -693,25 +694,37 @@ class RepairService
         $previousState = $order->estado;
         $originalEntryDate = $order->fecha?->toDateString();
 
-        $order->update([
+        DB::table($order->getTable())
+            ->where('id', $order->id)
+            ->where('reparacion', $order->reparacion)
+            ->update([
+                'fecha' => now()->toDateString(),
+                'estado' => 'GARANTIA',
+                'entregado' => 'no',
+                'fecha_entregado' => null,
+                'garantia_motivo' => $reason,
+            ]);
+
+        $order->forceFill([
             'fecha' => now()->toDateString(),
             'estado' => 'GARANTIA',
             'entregado' => 'no',
             'fecha_entregado' => null,
-            'archivado_at' => null,
-            'archivado_motivo' => null,
-            'cancelado_motivo' => null,
             'garantia_motivo' => $reason,
         ]);
 
-        $this->syncTaskQueueForState($order, 'GARANTIA');
-        $this->recordEvent(
-            $order,
-            'GARANTIA_REINGRESO',
-            $previousState,
-            'GARANTIA',
-            $originalEntryDate !== null ? 'Ingreso original: ' . $originalEntryDate : null,
-        );
+        try {
+            $this->syncTaskQueueForState($order, 'GARANTIA');
+            $this->recordEvent(
+                $order,
+                'GARANTIA_REINGRESO',
+                $previousState,
+                'GARANTIA',
+                $originalEntryDate !== null ? 'Ingreso original: ' . $originalEntryDate : null,
+            );
+        } catch (\Throwable) {
+            // Reingreso por garantia must not fail because of optional audit/task tables.
+        }
 
         return $order->refresh();
     }
@@ -1655,7 +1668,14 @@ class RepairService
 
     public function recordEvent(RepairOrder $order, string $event, ?string $previousState, ?string $nextState, ?string $detail = null): void
     {
-        RepairEvent::query()->create([
+        $table = (new RepairEvent())->getTable();
+
+        if (! Schema::hasTable($table)) {
+            return;
+        }
+
+        $columns = array_flip(Schema::getColumnListing($table));
+        $payload = array_intersect_key([
             'orden_id' => $order->id,
             'reparacion' => $order->reparacion,
             'usuario' => auth()->check() ? (string) auth()->user()?->name : (session('repair_tech_authenticated') ? 'panel' : 'sistema'),
@@ -1663,7 +1683,12 @@ class RepairService
             'detalle' => $detail,
             'estado_anterior' => $previousState,
             'estado_nuevo' => $nextState,
-        ]);
+            'created_at' => now(),
+        ], $columns);
+
+        if ($payload !== []) {
+            DB::table($table)->insert($payload);
+        }
     }
 
     private function baseQuery(bool $delivered, array $filters): \Illuminate\Database\Eloquent\Builder
@@ -2084,6 +2109,33 @@ class RepairService
             ->where('reparacion', $order->reparacion)
             ->where('payment_type', 'senia')
             ->sum('amount');
+    }
+
+    private function reconcileManualPaymentTotal(RepairOrder $order, mixed $desiredTotal): void
+    {
+        if ($desiredTotal === null || $desiredTotal === '') {
+            $this->syncPaymentTotal($order);
+
+            return;
+        }
+
+        $desiredTotal = max(0, (float) $desiredTotal);
+        $currentTotal = $this->paymentTotal($order);
+        $difference = round($desiredTotal - $currentTotal, 2);
+
+        if (abs($difference) >= 0.01) {
+            RepairPayment::query()->create([
+                'orden_id' => $order->id,
+                'reparacion' => $order->reparacion,
+                'amount' => $difference,
+                'payment_type' => 'senia',
+                'method' => 'efectivo',
+                'notes' => 'Ajuste manual de sena',
+                'paid_at' => now()->toDateString(),
+            ]);
+        }
+
+        $order->forceFill(['senia' => $desiredTotal])->save();
     }
 
     private function syncPaymentTotal(RepairOrder $order): void

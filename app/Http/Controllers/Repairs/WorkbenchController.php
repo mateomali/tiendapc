@@ -1264,7 +1264,19 @@ class WorkbenchController extends Controller
                 'garantia_motivo' => ['required', 'string', 'max:1000'],
             ]);
 
-            $repairService->reopenWarranty($repairOrder, $validated['garantia_motivo']);
+            try {
+                $repairService->reopenWarranty($repairOrder, $validated['garantia_motivo']);
+            } catch (\Throwable $exception) {
+                $message = sprintf(
+                    'Garantia debug: %s en %s:%d - %s',
+                    class_basename($exception),
+                    basename($exception->getFile()),
+                    $exception->getLine(),
+                    $exception->getMessage(),
+                );
+
+                return back()->with('error', Str::limit($message, 900, '...'));
+            }
 
             return back()->with('success', 'Orden reingresada por garantia.');
         }
