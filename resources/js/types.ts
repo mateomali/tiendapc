@@ -309,6 +309,7 @@ export interface RepairTicketView {
     totalSenia: number;
     trackingUrl: string;
     ticketUrl: string;
+    deliveryTicketUrl?: string | null;
     whatsappUrl?: string | null;
     addRepairAction?: string | null;
     newOrderUrl?: string | null;

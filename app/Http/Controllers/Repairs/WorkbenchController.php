@@ -1148,6 +1148,16 @@ class WorkbenchController extends Controller
 
     public function showTicket(int $orderId, RepairService $repairService): Response
     {
+        return $this->ticketResponse($orderId, $repairService, 'intake');
+    }
+
+    public function showDeliveryTicket(int $orderId, RepairService $repairService): Response
+    {
+        return $this->ticketResponse($orderId, $repairService, 'delivery');
+    }
+
+    private function ticketResponse(int $orderId, RepairService $repairService, string $ticketMode): Response
+    {
         $orders = $repairService->ticketOrders($orderId);
         abort_if($orders->isEmpty(), 404);
 
@@ -1162,6 +1172,7 @@ class WorkbenchController extends Controller
             ],
             'businessHours' => $this->businessHours(),
             'ticketPricing' => $this->ticketPricingSettings(),
+            'ticketMode' => $ticketMode,
             'returnUrl' => route('repairs.workbench'),
         ]);
     }
@@ -1216,6 +1227,7 @@ class WorkbenchController extends Controller
             'fecha_entregado' => ['nullable', 'date'],
             'entrega_via' => ['nullable', 'string', 'in:dni,ticket,persona,otra'],
             'entrega_detalle' => ['nullable', 'required_if:entrega_via,otra', 'string', 'max:500'],
+            'abono_efectivo' => ['nullable', 'boolean'],
             'enviar_archivados' => ['nullable', 'boolean'],
         ]);
 
@@ -1224,6 +1236,7 @@ class WorkbenchController extends Controller
             $validated['fecha_entregado'] ?? null,
             $validated['entrega_via'] ?? null,
             $validated['entrega_detalle'] ?? null,
+            array_key_exists('abono_efectivo', $validated) ? filter_var($validated['abono_efectivo'], FILTER_VALIDATE_BOOL) : null,
             filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL),
         );
 
@@ -1330,6 +1343,7 @@ class WorkbenchController extends Controller
                         'dni_buscado' => $base->trackingVerifier(),
                     ]),
                     'ticketUrl' => route('repairs.tickets.show', ['orderId' => $base->id]),
+                    'deliveryTicketUrl' => route('repairs.tickets.delivery', ['orderId' => $base->id]),
                     'whatsappUrl' => $this->customerWhatsappUrl($base),
                     'addRepairAction' => route('repairs.orders.add_repair', $base),
                     'newOrderUrl' => route('repairs.ingress', ['from_order' => $base->id]),

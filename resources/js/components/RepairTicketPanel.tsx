@@ -14,6 +14,7 @@ import {
     FaImages,
     FaInfoCircle,
     FaPlus,
+    FaPrint,
     FaReceipt,
     FaSave,
     FaSearch,
@@ -1189,6 +1190,7 @@ function RepairEditCard({
     const [deliveryOpen, setDeliveryOpen] = useState(false);
     const [deliveryVia, setDeliveryVia] = useState<DeliveryVia>('dni');
     const [deliveryDetail, setDeliveryDetail] = useState('');
+    const [deliveryCashPayment, setDeliveryCashPayment] = useState(true);
     const [deliveryArchive, setDeliveryArchive] = useState(false);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState(repair.cancelado_motivo ?? '');
@@ -1591,6 +1593,7 @@ function RepairEditCard({
                 fecha_entregado: form.data.fecha_entregado || undefined,
                 entrega_via: deliveryVia,
                 entrega_detalle: deliveryVia === 'otra' ? deliveryDetail : undefined,
+                abono_efectivo: deliveryCashPayment,
                 enviar_archivados: deliveryArchive,
             },
             {
@@ -1599,7 +1602,11 @@ function RepairEditCard({
                     setDeliveryOpen(false);
                     setDeliveryDetail('');
                     setDeliveryVia('dni');
+                    setDeliveryCashPayment(true);
                     setDeliveryArchive(false);
+                    if (ticket.deliveryTicketUrl && window.confirm('Entrega confirmada. Queres imprimir el comprobante para el cliente?')) {
+                        router.visit(`${ticket.deliveryTicketUrl}#print`);
+                    }
                 },
             },
         );
@@ -1970,6 +1977,13 @@ function RepairEditCard({
                         <FaPlus aria-hidden="true" /> Agregar reparación
                     </button>,
                 );
+                if (ticket.newOrderUrl) {
+                    secondaryItems.push(
+                        <Link key="new-order" href={ticket.newOrderUrl} className={cn(menuItem, 'text-[#0f172a]')}>
+                            <FaReceipt aria-hidden="true" /> Agregar orden del mismo cliente
+                        </Link>,
+                    );
+                }
                 secondaryItems.push(
                     <a key="tracking" href={ticket.trackingUrl} className={menuItem}>
                         <FaArrowRight aria-hidden="true" /> Seguimiento
@@ -2052,6 +2066,15 @@ function RepairEditCard({
                                 <FaReceipt aria-hidden="true" />
                             </Link>
                         ) : null}
+                        {showOrderActions && ticket.deliveryTicketUrl && ticket.repairs.some((item) => item.entregado === 'si') ? (
+                            <Link
+                                href={ticket.deliveryTicketUrl}
+                                className={cn(base, 'border border-[#0f766e] bg-[#0f766e] text-white')}
+                                title="Imprimir comprobante"
+                            >
+                                <FaPrint aria-hidden="true" />
+                            </Link>
+                        ) : null}
                         {showOrderActions && ticket.whatsappUrl ? (
                             <a
                                 href={ticket.whatsappUrl}
@@ -2128,12 +2151,22 @@ function RepairEditCard({
                             <FaPlus aria-hidden="true" />{iconOnly ? null : 'Agregar reparacion'}
                         </button>
                     ) : null}
+                    {showOrderActions && ticket.newOrderUrl ? (
+                        <Link href={ticket.newOrderUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Agregar orden del mismo cliente">
+                            <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Agregar orden del mismo cliente'}
+                        </Link>
+                    ) : null}
                 </span>
                 {showOrderActions ? (
                     <span className={groupClass}>
                         <Link href={ticket.ticketUrl} className={cn(base, 'border border-[#111827] bg-[#111827] text-white')} title="Ticket">
                             <FaReceipt aria-hidden="true" />{iconOnly ? null : 'Ticket'}
                         </Link>
+                        {ticket.deliveryTicketUrl && ticket.repairs.some((item) => item.entregado === 'si') ? (
+                            <Link href={ticket.deliveryTicketUrl} className={cn(base, 'border border-[#0f766e] bg-[#0f766e] text-white')} title="Imprimir comprobante">
+                                <FaPrint aria-hidden="true" />{iconOnly ? null : 'Imprimir comprobante'}
+                            </Link>
+                        ) : null}
                         <a href={ticket.trackingUrl} className={cn(base, 'border border-[#2563eb] bg-[#2563eb] text-white')} title="Seguimiento">
                             <FaArrowRight aria-hidden="true" />{iconOnly ? null : 'Seguimiento'}
                         </a>
@@ -2677,6 +2710,13 @@ function RepairEditCard({
                                 />
                             </label>
                         ) : null}
+                        <label className="grid gap-1.5 text-sm font-black text-[#334155]">
+                            Se abono en efectivo?
+                            <select className={ui.input} value={deliveryCashPayment ? '1' : '0'} onChange={(event) => setDeliveryCashPayment(event.target.value === '1')}>
+                                <option value="1">SI - EFECTIVO</option>
+                                <option value="0">NO - PRECIO REGULAR</option>
+                            </select>
+                        </label>
                         {!repair.archivado_at ? (
                             <label className="flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#334155]">
                                 <input
@@ -2805,6 +2845,11 @@ function RepairEditCard({
                                         Nueva orden
                                     </Link>
                                 ) : null}
+                                {rowIndex === 0 && ticket.deliveryTicketUrl ? (
+                                    <Link href={ticket.deliveryTicketUrl} className="rounded-md border border-[#0f766e] bg-[#0f766e] px-2 py-1 text-[0.66rem] font-black uppercase text-white no-underline transition hover:bg-[#0d665f]">
+                                        Imprimir comp.
+                                    </Link>
+                                ) : null}
                                 {archived && repair.actions?.delete ? (
                                     <button type="button" className="rounded-md border border-[#fecdd3] bg-[#fff1f2] px-2 py-1 text-[0.66rem] font-black uppercase text-[#be123c] transition hover:bg-[#ffe4e6]" onClick={deleteRepair}>
                                         Eliminar
@@ -2925,6 +2970,11 @@ function RepairEditCard({
                     {readOnly && rowIndex === 0 && ticket.newOrderUrl ? (
                         <Link href={ticket.newOrderUrl} className={buttonClass('primary', 'sm', 'w-full')}>
                             <FaPlus aria-hidden="true" /> Agregar a nueva orden
+                        </Link>
+                    ) : null}
+                    {readOnly && rowIndex === 0 && ticket.deliveryTicketUrl ? (
+                        <Link href={ticket.deliveryTicketUrl} className={buttonClass('soft', 'sm', 'w-full')}>
+                            <FaPrint aria-hidden="true" /> Imprimir comprobante
                         </Link>
                     ) : null}
                     {readOnly && archived && repair.actions?.delete ? (
@@ -3067,6 +3117,11 @@ export function RepairTicketPanel({
                     <Link href={ticket.ticketUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#111827] bg-[#111827] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
                         Ticket tecnico
                     </Link>
+                    {ticket.deliveryTicketUrl && ticket.repairs.some((repair) => repair.entregado === 'si') ? (
+                        <Link href={ticket.deliveryTicketUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#0f766e] bg-[#0f766e] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0d665f] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
+                            <FaPrint aria-hidden="true" /> Imprimir comprobante
+                        </Link>
+                    ) : null}
                     <a href={ticket.trackingUrl} className="inline-flex min-h-8 items-center justify-center rounded-[9px] border border-[#2563eb] bg-[#2563eb] px-2.5 py-1 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#1d4ed8] md:min-h-[34px] md:px-3 md:py-1.5 md:text-sm">
                         Seguimiento
                     </a>
@@ -3148,6 +3203,11 @@ export function RepairTicketPanel({
                 <Link href={ticket.ticketUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#111827] bg-[#111827] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0b1220]">
                     Ticket tecnico
                 </Link>
+                {ticket.deliveryTicketUrl && ticket.repairs.some((repair) => repair.entregado === 'si') ? (
+                    <Link href={ticket.deliveryTicketUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#0f766e] bg-[#0f766e] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#0d665f]">
+                        <FaPrint aria-hidden="true" /> Imprimir comprobante
+                    </Link>
+                ) : null}
                 <a href={ticket.trackingUrl} className="inline-flex min-h-9 items-center justify-center rounded-md border border-[#2563eb] bg-[#2563eb] px-2.5 py-1.5 text-[0.78rem] font-bold text-white no-underline transition hover:bg-[#1d4ed8]">
                     Seguimiento
                 </a>

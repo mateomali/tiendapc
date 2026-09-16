@@ -15,6 +15,7 @@ interface TicketPageProps {
     };
     businessHours: string;
     ticketPricing: TicketPricingSettings;
+    ticketMode?: 'intake' | 'delivery';
     returnUrl: string;
 }
 
@@ -25,14 +26,20 @@ interface TicketPricingSettings {
     cashDiscountNote: string;
 }
 
-export default function TicketPage({ ticket, businessHours, ticketPricing, returnUrl }: TicketPageProps): JSX.Element {
+export default function TicketPage({ ticket, businessHours, ticketPricing, ticketMode = 'intake', returnUrl }: TicketPageProps): JSX.Element {
     const [qrUrl, setQrUrl] = useState<string>('');
     const now = new Date();
     const fecha = now.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const hora = now.toLocaleTimeString('es-AR', { hour: '2-digit', hour12: false, minute: '2-digit' });
+    const isDeliveryTicket = ticketMode === 'delivery';
     const trackingVerifier = ticket.trackingVerifier || String(ticket.dni);
     const hasIncrements = ticket.repairs.some((repair) => (repair.payments ?? []).some((payment) => payment.payment_type === 'incremento'));
     const generalFinancial = ticketFinancialSummary(ticket.repairs, ticketPricing);
+    const deliveryPaidInCash = deliveryPaymentIsCash(ticket);
+    const deliveryCashAmount = Math.max(0, Number(ticket.totalMonto ?? 0));
+    const deliveryRegularAmount = listAmount(deliveryCashAmount, cashDiscountApplies(deliveryCashAmount, ticketPricing), ticketPricing);
+    const deliveryPaidLabel = formatCurrency(deliveryPaidInCash ? deliveryCashAmount : deliveryRegularAmount);
+    const deliveryPaidTitle = deliveryPaidInCash ? 'ABONADO EN EFECTIVO:' : 'ABONADO PRECIO REGULAR:';
     const repairPrintItems = ticket.repairs.map((repair, index) => {
         const monto = Number(repair.monto ?? 0);
         const financial = repairFinancialSummary(repair, ticketPricing);
@@ -97,20 +104,28 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
         };
     }, [ticket.trackingUrl]);
 
+    useEffect(() => {
+        if (typeof window === 'undefined' || window.location.hash !== '#print') {
+            return;
+        }
+
+        window.requestAnimationFrame(() => window.print());
+    }, []);
+
     const printTicket = (): void => {
         window.requestAnimationFrame(() => window.print());
     };
 
     return (
         <>
-            <Head title={`Ticket #${ticket.id}`} />
+            <Head title={`${isDeliveryTicket ? 'Comprobante entrega' : 'Ticket'} #${ticket.id}`} />
             <div className="min-h-screen bg-[linear-gradient(180deg,#eef5ff,#f8fbff)] px-3 py-3 text-black print:h-auto print:min-h-0 print:w-[80mm] print:bg-white print:p-0">
                 <div className="mx-auto mb-2 flex w-[80mm] flex-wrap justify-center gap-1.5 print:hidden">
                     <Link href={returnUrl} className={buttonClass('soft', 'sm')}>
                         Volver
                     </Link>
                     <button type="button" className={buttonClass('primary', 'sm')} onClick={printTicket}>
-                        Imprimir
+                        {isDeliveryTicket ? 'Imprimir comprobante' : 'Imprimir'}
                     </button>
                     {ticket.whatsappUrl ? (
                         <a href={ticket.whatsappUrl} className={buttonClass('soft', 'sm')} target="_blank" rel="noreferrer">
@@ -135,8 +150,8 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     <div className="my-[5px] border-t border-dashed border-black" />
 
                     <section>
-                        <div className="mb-[3px] text-[12px]">{hasIncrements ? 'TICKET ACTUALIZADO' : 'COMPROBANTE DE INGRESO'}</div>
-                        <TicketLine label="ORDEN N:" value={`#${ticket.id}`} variant="highlight" />
+                        <div className="mb-[3px] text-[12px]">{isDeliveryTicket ? 'COMPROBANTE DE ENTREGA' : hasIncrements ? 'TICKET ACTUALIZADO' : 'COMPROBANTE DE INGRESO'}</div>
+                        {!isDeliveryTicket ? <TicketLine label="ORDEN N:" value={`#${ticket.id}`} variant="highlight" /> : null}
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
                         {!ticket.hasClientDni ? <TicketLine label="CODIGO:" value={trackingVerifier} /> : null}
                         <TicketLine label="FECHA:" value={fecha} />
@@ -159,12 +174,12 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                         failure: item.failureLabel,
                                         accessories: item.accessoriesLabel,
                                         showAccessoriesPrefix: item.showAccessoriesPrefix,
-                                        price: ticketRepairLinePriceLabel(item, subtotal.discountApplies, ticketPricing),
+                                        price: isDeliveryTicket ? null : ticketRepairLinePriceLabel(item, subtotal.discountApplies, ticketPricing),
                                     }))}
-                                    subtotal={group.items.length > 1 ? subtotal : null}
-                                    showRegularSubtotal={group.items.length > 1}
+                                    subtotal={!isDeliveryTicket && group.items.length > 1 ? subtotal : null}
+                                    showRegularSubtotal={!isDeliveryTicket && group.items.length > 1}
                                 />
-                                {group.items.map((item) => !ticketRepairNeedsDetail(item, subtotal.discountApplies) ? null : (
+                                {!isDeliveryTicket ? group.items.map((item) => !ticketRepairNeedsDetail(item, subtotal.discountApplies) ? null : (
                                     <div key={`${item.key}-detalle`} className="mt-[3px]">
                                         {item.increments.map((payment) => (
                                             <TicketLine
@@ -188,13 +203,13 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                                         {ticket.repairs.length > 1 && !item.canUseCompactPrice ? <TicketLine label="SUBTOTAL TRABAJO:" value={item.monto > 0 ? formatCurrency(item.financial.cashTotal) : 'A PRESUPUESTAR'} /> : null}
                                         {item.deliveredLabel !== null ? <TicketLine label="ENTREGA:" value={item.deliveredLabel} /> : null}
                                     </div>
-                                ))}
+                                )) : null}
                             </div>
                             );
                         })}
                     </section>
 
-                    {shouldShowGeneralFinancial ? (
+                    {!isDeliveryTicket && shouldShowGeneralFinancial ? (
                         <>
                             <div className="my-[5px] border-t border-dashed border-black" />
                             <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
@@ -204,7 +219,16 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                         </>
                     ) : null}
 
-                    {generalFinancial.discountApplies ? (
+                    {isDeliveryTicket ? (
+                        <>
+                            <div className="my-[5px] border-t border-dashed border-black" />
+                            <section className="grid gap-px text-[13px]">
+                                <TicketLine label={deliveryPaidTitle} value={deliveryPaidLabel} />
+                            </section>
+                        </>
+                    ) : null}
+
+                    {!isDeliveryTicket && generalFinancial.discountApplies ? (
                         <CashPromoBanner
                             note={ticketPricing.cashDiscountNote}
                             percentage={ticketPricing.cashDiscountPercentage}
@@ -213,13 +237,24 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, retur
                     ) : null}
 
                     <footer className="mt-[6px] text-center text-[10.5px] leading-[1.15]">
-                        <div>CONSULTA EL ESTADO DE TU REPARACION EN LINEA</div>
-                        <div className="mt-[6px] inline-block border border-black bg-white p-[5px]">
-                            {qrUrl !== '' ? <img src={qrUrl} alt={`QR orden ${ticket.id}`} className="mx-auto block h-[116px] w-[116px]" /> : null}
-                        </div>
-                        <div className="mt-[6px] break-all">sudokumerlo.com/reparacion</div>
-                        <div className="mt-[6px]">VERIFICAR EL EQUIPO AL MOMENTO DE RETIRARLO.</div>
-                        <div className="mt-[6px]">CONSERVAR ESTE TICKET. EN CASO DE EXTRAVIO, EL EQUIPO SOLO PODRA SER RETIRADO PRESENTANDO EL DNI FISICO DEL TITULAR.</div>
+                        {isDeliveryTicket ? (
+                            <>
+                                <div>COMPROBANTE DEL TRABAJO REALIZADO.</div>
+                                <div className="mt-[6px]">EL CLIENTE RETIRA EL EQUIPO Y DECLARA RECIBIRLO EN CONFORMIDAD.</div>
+                                <div className="mt-[6px]">VERIFICAR EL EQUIPO AL MOMENTO DE RETIRARLO.</div>
+                                <div className="mt-[6px]">CONSERVAR ESTE COMPROBANTE PARA EFECTUAR LA GARANTIA DE SER NECESARIO.</div>
+                            </>
+                        ) : (
+                            <>
+                                <div>CONSULTA EL ESTADO DE TU REPARACION EN LINEA</div>
+                                <div className="mt-[6px] inline-block border border-black bg-white p-[5px]">
+                                    {qrUrl !== '' ? <img src={qrUrl} alt={`QR orden ${ticket.id}`} className="mx-auto block h-[116px] w-[116px]" /> : null}
+                                </div>
+                                <div className="mt-[6px] break-all">sudokumerlo.com/reparacion</div>
+                                <div className="mt-[6px]">VERIFICAR EL EQUIPO AL MOMENTO DE RETIRARLO.</div>
+                                <div className="mt-[6px]">CONSERVAR ESTE TICKET. EN CASO DE EXTRAVIO, EL EQUIPO SOLO PODRA SER RETIRADO PRESENTANDO EL DNI FISICO DEL TITULAR.</div>
+                            </>
+                        )}
                     </footer>
 
                 </main>
@@ -240,6 +275,18 @@ function normalizeTicketText(value?: string | null): string {
 
 function cashDiscountApplies(cashAmount: number, pricing: TicketPricingSettings): boolean {
     return pricing.cashDiscountEnabled && pricing.cashDiscountPercentage > 0 && cashAmount > pricing.cashDiscountThreshold;
+}
+
+function deliveryPaymentIsCash(ticket: RepairTicketView): boolean {
+    const observations = ticket.repairs
+        .map((repair) => normalizeTicketText(repair.observaciones))
+        .join(' ');
+
+    if (observations.includes('PAGO DE ENTREGA PRECIO REGULAR')) {
+        return false;
+    }
+
+    return observations.includes('PAGO DE ENTREGA EFECTIVO');
 }
 
 function listAmount(cashAmount: number, discountApplies: boolean, pricing: TicketPricingSettings): number {

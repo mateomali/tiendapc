@@ -749,7 +749,7 @@ class RepairService
         return $order->refresh();
     }
 
-    public function deliver(RepairOrder $order, ?string $date = null, ?string $via = null, ?string $detail = null, bool $archive = false): RepairOrder
+    public function deliver(RepairOrder $order, ?string $date = null, ?string $via = null, ?string $detail = null, ?bool $cashPayment = null, bool $archive = false): RepairOrder
     {
         if ($archive) {
             return $this->archive($order, 'manual');
@@ -767,6 +767,11 @@ class RepairService
         $deliveryNote = $this->deliveryObservation($via, $detail);
         if ($deliveryNote !== null) {
             $updates['observaciones'] = $this->replaceDeliveryObservation($order->observaciones, $deliveryNote);
+        }
+
+        $paymentNote = $this->deliveryPaymentObservation($cashPayment);
+        if ($paymentNote !== null) {
+            $updates['observaciones'] = $this->replaceDeliveryPaymentObservation($updates['observaciones'] ?? $order->observaciones, $paymentNote);
         }
 
         $order->update($updates);
@@ -802,6 +807,15 @@ class RepairService
         return 'Validacion de entrega: ' . $detail;
     }
 
+    private function deliveryPaymentObservation(?bool $cashPayment): ?string
+    {
+        if ($cashPayment === null) {
+            return null;
+        }
+
+        return 'Pago de entrega: ' . ($cashPayment ? 'EFECTIVO' : 'PRECIO REGULAR');
+    }
+
     private function replaceDeliveryObservation(?string $current, string $addition): string
     {
         $current = trim((string) $current);
@@ -812,6 +826,21 @@ class RepairService
 
         $lines = preg_split('/\R+/', $current) ?: [];
         $kept = array_filter($lines, static fn (string $line): bool => ! str_starts_with(trim($line), 'Validacion de entrega:'));
+        $base = trim(implode("\n", $kept));
+
+        return $base === '' ? $addition : $base . "\n\n" . $addition;
+    }
+
+    private function replaceDeliveryPaymentObservation(?string $current, string $addition): string
+    {
+        $current = trim((string) $current);
+
+        if ($current === '' || in_array(mb_strtolower($current, 'UTF-8'), ['sin observaciones', 'sin observacion'], true)) {
+            return $addition;
+        }
+
+        $lines = preg_split('/\R+/', $current) ?: [];
+        $kept = array_filter($lines, static fn (string $line): bool => ! str_starts_with(trim($line), 'Pago de entrega:'));
         $base = trim(implode("\n", $kept));
 
         return $base === '' ? $addition : $base . "\n\n" . $addition;

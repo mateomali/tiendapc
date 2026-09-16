@@ -30,6 +30,8 @@ const statLabels: Record<string, string> = {
 };
 
 export default function DashboardPage({ stats, recentSales, contact, urls }: DashboardPageProps): JSX.Element {
+    const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
     return (
         <AdminLayout title="Dashboard">
             <section className={ui.heroCard}>
@@ -113,6 +115,13 @@ export default function DashboardPage({ stats, recentSales, contact, urls }: Das
                             <strong>Backups</strong>
                             <span className={ui.inlineCaption}>Crear, subir y restaurar ZIP.</span>
                         </Link>
+                        <form action={urls.repairBackupDownload} method="post">
+                            <input type="hidden" name="_token" value={csrfToken} />
+                            <button type="submit" className={`${ui.shortcut} w-full text-left`}>
+                                <strong>Backup reparaciones</strong>
+                                <span className={ui.inlineCaption}>Descargar base de reparaciones.</span>
+                            </button>
+                        </form>
                     </div>
                 </article>
 

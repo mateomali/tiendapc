@@ -136,6 +136,36 @@ it('shows delivered repairs in the dedicated technical view', function (): void 
             ->has('tickets', 1));
 });
 
+it('renders a delivery receipt for repaired phones', function (): void {
+    RepairOrder::query()->create([
+        'id' => 407,
+        'reparacion' => 1,
+        'fecha' => now()->subDays(4)->toDateString(),
+        'nombre_cliente' => 'Entrega Cliente',
+        'dni' => 30111222,
+        'contacto' => '1122334455',
+        'marca' => 'SAMSUNG',
+        'modelo' => 'A12',
+        'descripcion' => 'CAMBIO MODULO',
+        'monto' => 45000,
+        'senia' => 45000,
+        'estado' => 'ENTREGADA',
+        'entregado' => 'si',
+        'fecha_entregado' => '2026-09-16',
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.tickets.delivery', ['orderId' => 407]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Repairs/TicketPage')
+            ->where('ticketMode', 'delivery')
+            ->where('ticket.deliveryTicketUrl', route('repairs.tickets.delivery', ['orderId' => 407]))
+            ->where('ticket.repairs.0.fecha_entregado', '2026-09-16')
+            ->where('summary.totalMonto', 45000)
+            ->where('summary.totalSenia', 45000));
+});
+
 it('prefills a new repair order from a delivered search result', function (): void {
     RepairOrder::query()->create([
         'id' => 502,
@@ -816,6 +846,7 @@ it('allows delivering repairs with explicit date and delivery channel', function
         ->post(route('repairs.orders.deliver', $order), [
             'fecha_entregado' => '2026-04-23',
             'entrega_via' => 'ticket',
+            'abono_efectivo' => false,
         ])
         ->assertRedirect();
 
@@ -823,6 +854,7 @@ it('allows delivering repairs with explicit date and delivery channel', function
 
     expect($updated?->entregado)->toBe('si');
     expect(optional($updated?->fecha_entregado)->format('Y-m-d'))->toBe('2026-04-23');
+    expect($updated?->observaciones)->toContain('Pago de entrega: PRECIO REGULAR');
     expect(RepairEvent::query()->where('orden_id', 777)->where('evento', 'ENTREGA_VIA_TICKET')->exists())->toBeTrue();
 });
 

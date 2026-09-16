@@ -50,6 +50,7 @@ class DashboardController extends Controller
                 'sales' => route('admin.sales.index'),
                 'media' => route('admin.media.index'),
                 'backups' => route('admin.backups.index'),
+                'repairBackupDownload' => route('admin.backups.repairs.create_download'),
                 'announcements' => route('admin.announcements.index'),
                 'services' => route('admin.services.index'),
                 'settings' => route('admin.settings.index'),

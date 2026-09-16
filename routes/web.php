@@ -56,6 +56,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::get('/ingreso.php', [WorkbenchController::class, 'index']);
     Route::post('/ingreso.php', [WorkbenchController::class, 'store']);
     Route::get('/repairs/tickets/{orderId}', [WorkbenchController::class, 'showTicket'])->name('repairs.tickets.show');
+    Route::get('/repairs/tickets/{orderId}/entrega', [WorkbenchController::class, 'showDeliveryTicket'])->name('repairs.tickets.delivery');
     Route::get('/consulta/ticket/{orderId}', [WorkbenchController::class, 'showTicket']);
     Route::get('/entregados', [WorkbenchController::class, 'delivered'])->name('repairs.delivered');
     Route::get('/entregados.php', [WorkbenchController::class, 'delivered']);
