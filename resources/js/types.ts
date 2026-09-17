@@ -228,6 +228,7 @@ export interface RepairOrderView {
     estado: string;
     entregado: string;
     fecha_entregado?: string | null;
+    deliveryPaymentMode?: 'cash' | 'regular' | null;
     archivado_at?: string | null;
     archivado_motivo?: string | null;
     cancelado_motivo?: string | null;

@@ -785,6 +785,41 @@ class RepairService
         return $order->refresh();
     }
 
+    public function updateDeliveryPayment(RepairOrder $order, bool $cashPayment): RepairOrder
+    {
+        if ($order->entregado !== 'si') {
+            return $order;
+        }
+
+        $paymentNote = $this->deliveryPaymentObservation($cashPayment);
+        if ($paymentNote === null) {
+            return $order;
+        }
+
+        $order->update([
+            'observaciones' => $this->replaceDeliveryPaymentObservation($order->observaciones, $paymentNote),
+        ]);
+
+        $this->recordEvent($order, 'PAGO_ENTREGA_ACTUALIZADO', $order->estado, $order->estado);
+
+        return $order->refresh();
+    }
+
+    public function deliveryPaymentMode(RepairOrder $order): ?string
+    {
+        $observations = Str::upper(str_replace(':', ' ', (string) $order->observaciones));
+
+        if (str_contains($observations, 'PAGO DE ENTREGA PRECIO REGULAR')) {
+            return 'regular';
+        }
+
+        if (str_contains($observations, 'PAGO DE ENTREGA EFECTIVO')) {
+            return 'cash';
+        }
+
+        return null;
+    }
+
     private function deliveryObservation(?string $via, ?string $detail): ?string
     {
         $via = trim((string) $via);

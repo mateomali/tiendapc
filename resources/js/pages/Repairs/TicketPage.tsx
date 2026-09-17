@@ -85,7 +85,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, ticke
 
         return groups;
     }, []);
-    const shouldShowGeneralFinancial = repairPrintGroups.length > 1;
+    const hasPendingBudgets = repairPrintItems.some((item) => item.monto <= 0);
 
     useEffect(() => {
         let cancelled = false;
@@ -154,16 +154,15 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, ticke
                         {!isDeliveryTicket ? <TicketLine label="ORDEN N:" value={`#${ticket.id}`} variant="highlight" /> : null}
                         <TicketLine label="CLIENTE:" value={ticket.nombre_cliente} />
                         {!ticket.hasClientDni ? <TicketLine label="CODIGO:" value={trackingVerifier} /> : null}
-                        <TicketLine label="FECHA:" value={fecha} />
-                        <TicketLine label="HORA:" value={hora} />
+                        {!isDeliveryTicket ? <TicketLine label="FECHA DE INGRESO:" value={formatIntakeDate(ticket.fecha)} /> : null}
+                        <TicketLine label={isDeliveryTicket ? 'FECHA:' : 'IMPRESION:'} value={fecha} />
+                        {isDeliveryTicket ? <TicketLine label="HORA:" value={hora} /> : null}
                     </section>
 
                     <div className="my-[5px] border-t border-dashed border-black" />
 
                     <section>
                         {repairPrintGroups.map((group) => {
-                            const subtotal = ticketRepairGroupSubtotal(group.items, ticketPricing);
-
                             return (
                             <div key={`${group.key}-${group.items[0]?.key ?? 'grupo'}`} className="border-b border-dashed border-black py-[3px] last:border-b-0">
                                 <TicketRepairGroupSummary
@@ -174,33 +173,14 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, ticke
                                         failure: item.failureLabel,
                                         accessories: item.accessoriesLabel,
                                         showAccessoriesPrefix: item.showAccessoriesPrefix,
-                                        price: isDeliveryTicket ? null : ticketRepairLinePriceLabel(item, subtotal.discountApplies, ticketPricing),
+                                        price: !isDeliveryTicket && item.monto <= 0 ? 'A PRESUPUESTAR' : null,
                                     }))}
-                                    subtotal={!isDeliveryTicket && group.items.length > 1 ? subtotal : null}
-                                    showRegularSubtotal={!isDeliveryTicket && group.items.length > 1}
+                                    subtotal={null}
+                                    showRegularSubtotal={false}
                                 />
-                                {!isDeliveryTicket ? group.items.map((item) => !ticketRepairNeedsDetail(item, subtotal.discountApplies) ? null : (
+                                {!isDeliveryTicket ? group.items.map((item) => item.increments.length === 0 && item.deliveredLabel === null ? null : (
                                     <div key={`${item.key}-detalle`} className="mt-[3px]">
-                                        {item.increments.map((payment) => (
-                                            <TicketLine
-                                                key={payment.id}
-                                                label="INCREMENTO:"
-                                                value={`${ticketIncrementLabel(payment.notes)} + ${formatCurrency(payment.amount)}`}
-                                            />
-                                        ))}
-                                        {subtotal.discountApplies ? null : item.financial.discountApplies ? (
-                                            <RegularPriceBlock
-                                                regularLabel={item.hasDeposits ? 'PRESUP. REGULAR:' : 'PRECIO REGULAR:'}
-                                                regularAmount={item.financial.listTotal}
-                                            />
-                                        ) : (
-                                            item.canUseCompactPrice ? null : <TicketLine label={item.hasDeposits ? 'PRESUPUESTO:' : 'PRECIO:'} value={item.monto > 0 ? formatCurrency(item.financial.listTotal) : 'A PRESUPUESTAR'} />
-                                        )}
-                                        {item.deposits.map((payment) => (
-                                            <TicketLine key={payment.id} label={`SEÑA ${paymentMethodLabel(payment)}:`} value={formatCurrency(payment.amount)} />
-                                        ))}
-                                        {item.hasDeposits ? <TicketLine label="SALDO:" value={item.monto > 0 ? listDueLabel(item.financial) : 'A DEFINIR'} /> : null}
-                                        {ticket.repairs.length > 1 && !item.canUseCompactPrice ? <TicketLine label="SUBTOTAL TRABAJO:" value={item.monto > 0 ? formatCurrency(item.financial.cashTotal) : 'A PRESUPUESTAR'} /> : null}
+                                        {item.increments.map((payment) => <div key={payment.id} className="text-[11px]">ADICIONAL INCLUIDO: {ticketIncrementLabel(payment.notes)}</div>)}
                                         {item.deliveredLabel !== null ? <TicketLine label="ENTREGA:" value={item.deliveredLabel} /> : null}
                                     </div>
                                 )) : null}
@@ -209,13 +189,15 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, ticke
                         })}
                     </section>
 
-                    {!isDeliveryTicket && shouldShowGeneralFinancial ? (
+                    {!isDeliveryTicket ? (
                         <>
                             <div className="my-[5px] border-t border-dashed border-black" />
-                            <div className="mt-[4px] flex justify-between gap-[5px] text-[13px]">
-                                <span>{generalFinancial.paidActual > 0 ? (generalFinancial.discountApplies ? 'SALDO GRAL. REGULAR:' : 'SALDO GENERAL:') : (generalFinancial.discountApplies ? 'TOTAL GRAL. REGULAR:' : 'TOTAL GENERAL:')}</span>
-                                <strong>{formatCurrency(generalFinancial.listDue)}</strong>
-                            </div>
+                            <section className="mt-[4px] grid gap-px">
+                                <TicketLine label={hasPendingBudgets ? 'TOTAL PARCIAL REGULAR:' : 'PRECIO REGULAR:'} value={formatCurrency(generalFinancial.listTotal)} />
+                                {generalFinancial.paidActual > 0 ? <TicketLine label="SEÑA ABONADA:" value={formatCurrency(generalFinancial.paidActual)} /> : null}
+                                {generalFinancial.paidActual > 0 ? <TicketLine label={hasPendingBudgets ? 'SALDO PARCIAL REGULAR:' : generalFinancial.discountApplies ? 'SALDO A PAGAR REGULAR:' : 'SALDO A PAGAR:'} value={generalFinancial.listDue <= 0 ? (hasPendingBudgets ? 'A DEFINIR' : 'PAGADO') : formatCurrency(generalFinancial.listDue)} /> : null}
+                                {hasPendingBudgets ? <div className="mt-[3px] text-[11px]">HAY TRABAJOS PENDIENTES DE PRESUPUESTO. LOS IMPORTES SON PARCIALES.</div> : null}
+                            </section>
                         </>
                     ) : null}
 
@@ -233,6 +215,7 @@ export default function TicketPage({ ticket, businessHours, ticketPricing, ticke
                             note={ticketPricing.cashDiscountNote}
                             percentage={ticketPricing.cashDiscountPercentage}
                             cashDue={generalFinancial.cashDue}
+                            partial={hasPendingBudgets}
                         />
                     ) : null}
 
@@ -329,7 +312,7 @@ function repairFinancialSummary(repair: RepairOrderView, pricing: TicketPricingS
     };
 }
 
-function ticketFinancialSummary(repairs: RepairOrderView[], pricing: TicketPricingSettings): { cashDue: number; listDue: number; paidActual: number; discountApplies: boolean } {
+function ticketFinancialSummary(repairs: RepairOrderView[], pricing: TicketPricingSettings): { cashTotal: number; listTotal: number; cashDue: number; listDue: number; paidActual: number; discountApplies: boolean } {
     const cashTotal = repairs.reduce((total, repair) => total + Math.max(0, Number(repair.monto ?? 0)), 0);
     const discountApplies = cashDiscountApplies(cashTotal, pricing);
     const deposits = repairs.flatMap((repair) => repair.payments ?? []).filter((payment) => payment.payment_type === 'senia');
@@ -338,6 +321,8 @@ function ticketFinancialSummary(repairs: RepairOrderView[], pricing: TicketPrici
     const cashDue = Math.max(0, cashTotal - paidCashEquivalent);
 
     return {
+        cashTotal,
+        listTotal: listAmount(cashTotal, discountApplies, pricing),
         cashDue,
         listDue: listAmount(cashDue, discountApplies, pricing),
         paidActual,
@@ -404,6 +389,11 @@ function ticketIncrementLabel(value?: string | null): string {
     const label = (value ?? '').trim();
 
     return label !== '' ? label.toUpperCase() : 'ADICIONAL';
+}
+
+function formatIntakeDate(value?: string | null): string {
+    const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? `${match[3]}/${match[2]}/${match[1]}` : 'NO REGISTRADA';
 }
 
 function formatDeliveredTicketDate(value?: string | null): string {
@@ -489,8 +479,8 @@ function TicketLine({ label, value, strongClassName = '', variant = 'default' }:
 
     return (
         <div className="mb-px flex items-baseline justify-between gap-[5px]">
-            <span className="shrink-0">{label}</span>
-            <strong className={`break-words text-right ${strongClassName}`}>{value}</strong>
+            <span className="min-w-0">{label}</span>
+            <strong className={`min-w-0 break-words text-right ${strongClassName}`}>{value}</strong>
         </div>
     );
 }
@@ -499,10 +489,12 @@ function CashPromoBanner({
     note,
     percentage,
     cashDue,
+    partial = false,
 }: {
     note: string;
     percentage: number;
     cashDue: number;
+    partial?: boolean;
 }): JSX.Element {
     const normalizedNote = note.trim() !== ''
         ? note.trim().toUpperCase()
@@ -512,7 +504,7 @@ function CashPromoBanner({
         <div className="my-[5px] border-2 border-black bg-white px-[5px] py-[4px] text-center leading-[1.1]">
             <div className="text-[12px] font-black">{normalizedNote}</div>
             <div className="mt-[3px] border-t border-dashed border-black pt-[3px]">
-                <span className="block text-[10px]">EN EFECTIVO QUEDA</span>
+                <span className="block text-[10px]">{partial ? 'SALDO PARCIAL EN EFECTIVO' : 'SALDO PENDIENTE EN EFECTIVO'}</span>
                 <strong className="block text-[17px] leading-none">{cashDue <= 0 ? 'PAGADO' : formatCurrency(cashDue)}</strong>
             </div>
         </div>

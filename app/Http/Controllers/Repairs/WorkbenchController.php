@@ -1231,12 +1231,22 @@ class WorkbenchController extends Controller
             'enviar_archivados' => ['nullable', 'boolean'],
         ]);
 
+        $cashPayment = array_key_exists('abono_efectivo', $validated)
+            ? filter_var($validated['abono_efectivo'], FILTER_VALIDATE_BOOL)
+            : null;
+
+        if ($repairOrder->entregado === 'si' && ($validated['entrega_via'] ?? null) === null && $cashPayment !== null) {
+            $repairService->updateDeliveryPayment($repairOrder, $cashPayment);
+
+            return back()->with('success', 'Forma de pago de entrega actualizada.');
+        }
+
         $repairService->deliver(
             $repairOrder,
             $validated['fecha_entregado'] ?? null,
             $validated['entrega_via'] ?? null,
             $validated['entrega_detalle'] ?? null,
-            array_key_exists('abono_efectivo', $validated) ? filter_var($validated['abono_efectivo'], FILTER_VALIDATE_BOOL) : null,
+            $cashPayment,
             filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL),
         );
 
@@ -1395,6 +1405,7 @@ class WorkbenchController extends Controller
             'estado' => $order->estado,
             'entregado' => $order->entregado,
             'fecha_entregado' => optional($order->fecha_entregado)->format('Y-m-d'),
+            'deliveryPaymentMode' => app(RepairService::class)->deliveryPaymentMode($order),
             'archivado_at' => optional($order->archivado_at)->format('Y-m-d H:i'),
             'archivado_motivo' => $order->archivado_motivo,
             'cancelado_motivo' => $order->cancelado_motivo,

@@ -1436,7 +1436,8 @@ function RepairEditCard({
     };
 
     const openDeliveryModal = (): void => {
-        form.setData('fecha_entregado', form.data.fecha_entregado || todayInputValue());
+        form.setData('fecha_entregado', repair.fecha_entregado || form.data.fecha_entregado || todayInputValue());
+        setDeliveryCashPayment(repair.deliveryPaymentMode !== 'regular');
         setDeliveryOpen(true);
     };
 
@@ -1589,13 +1590,17 @@ function RepairEditCard({
 
         router.post(
             repair.actions.deliver,
-            {
-                fecha_entregado: form.data.fecha_entregado || undefined,
-                entrega_via: deliveryVia,
-                entrega_detalle: deliveryVia === 'otra' ? deliveryDetail : undefined,
-                abono_efectivo: deliveryCashPayment,
-                enviar_archivados: deliveryArchive,
-            },
+            repair.entregado === 'si'
+                ? {
+                    abono_efectivo: deliveryCashPayment,
+                }
+                : {
+                    fecha_entregado: form.data.fecha_entregado || undefined,
+                    entrega_via: deliveryVia,
+                    entrega_detalle: deliveryVia === 'otra' ? deliveryDetail : undefined,
+                    abono_efectivo: deliveryCashPayment,
+                    enviar_archivados: deliveryArchive,
+                },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -1604,7 +1609,7 @@ function RepairEditCard({
                     setDeliveryVia('dni');
                     setDeliveryCashPayment(true);
                     setDeliveryArchive(false);
-                    if (ticket.deliveryTicketUrl && window.confirm('Entrega confirmada. Queres imprimir el comprobante para el cliente?')) {
+                    if (repair.entregado !== 'si' && ticket.deliveryTicketUrl && window.confirm('Entrega confirmada. Queres imprimir el comprobante para el cliente?')) {
                         router.visit(`${ticket.deliveryTicketUrl}#print`);
                     }
                 },
@@ -2688,36 +2693,40 @@ function RepairEditCard({
                 </ModalShell>
             ) : null}
             {deliveryOpen ? (
-                <ModalShell title={`Entregar orden #${repair.id} trabajo #${repair.reparacion}`} onClose={() => setDeliveryOpen(false)}>
+                <ModalShell title={`${repair.entregado === 'si' ? 'Cambiar pago' : 'Entregar'} orden #${repair.id} trabajo #${repair.reparacion}`} onClose={() => setDeliveryOpen(false)}>
                     <form className="grid gap-3" onSubmit={deliverRepair}>
-                        <input className={ui.input} type="date" value={form.data.fecha_entregado} onChange={(event) => form.setData('fecha_entregado', event.target.value)} />
-                        <select className={ui.input} value={deliveryVia} onChange={(event) => setDeliveryVia(event.target.value as DeliveryVia)}>
-                            <option value="dni">ENTREGADO CON DNI</option>
-                            <option value="ticket">ENTREGADO CON TICKET</option>
-                            <option value="persona">ENTREGADO AL TITULAR EN PERSONA</option>
-                            <option value="otra">ENTREGADO DE OTRA MANERA</option>
-                        </select>
-                        {deliveryVia === 'otra' ? (
-                            <label className="grid gap-1.5 text-sm font-black text-[#334155]">
-                                Como se valido la entrega
-                                <textarea
-                                    className={ui.textarea}
-                                    value={deliveryDetail}
-                                    onChange={(event) => setDeliveryDetail(event.target.value)}
-                                    rows={3}
-                                    required
-                                    placeholder="Ej: retiro familiar, autorizacion por WhatsApp, validacion por llamada..."
-                                />
-                            </label>
+                        {repair.entregado !== 'si' ? (
+                            <>
+                                <input className={ui.input} type="date" value={form.data.fecha_entregado} onChange={(event) => form.setData('fecha_entregado', event.target.value)} />
+                                <select className={ui.input} value={deliveryVia} onChange={(event) => setDeliveryVia(event.target.value as DeliveryVia)}>
+                                    <option value="dni">ENTREGADO CON DNI</option>
+                                    <option value="ticket">ENTREGADO CON TICKET</option>
+                                    <option value="persona">ENTREGADO AL TITULAR EN PERSONA</option>
+                                    <option value="otra">ENTREGADO DE OTRA MANERA</option>
+                                </select>
+                                {deliveryVia === 'otra' ? (
+                                    <label className="grid gap-1.5 text-sm font-black text-[#334155]">
+                                        Como se valido la entrega
+                                        <textarea
+                                            className={ui.textarea}
+                                            value={deliveryDetail}
+                                            onChange={(event) => setDeliveryDetail(event.target.value)}
+                                            rows={3}
+                                            required
+                                            placeholder="Ej: retiro familiar, autorizacion por WhatsApp, validacion por llamada..."
+                                        />
+                                    </label>
+                                ) : null}
+                            </>
                         ) : null}
                         <label className="grid gap-1.5 text-sm font-black text-[#334155]">
-                            Se abono en efectivo?
+                            Forma de pago
                             <select className={ui.input} value={deliveryCashPayment ? '1' : '0'} onChange={(event) => setDeliveryCashPayment(event.target.value === '1')}>
                                 <option value="1">SI - EFECTIVO</option>
                                 <option value="0">NO - PRECIO REGULAR</option>
                             </select>
                         </label>
-                        {!repair.archivado_at ? (
+                        {repair.entregado !== 'si' && !repair.archivado_at ? (
                             <label className="flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#334155]">
                                 <input
                                     type="checkbox"
@@ -2729,7 +2738,7 @@ function RepairEditCard({
                         ) : null}
                         <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setDeliveryOpen(false)}>Cancelar</button>
-                            <button type="submit" className={buttonClass('primary', 'sm')}>{deliveryArchive ? 'Enviar a archivados' : 'Confirmar entrega'}</button>
+                            <button type="submit" className={buttonClass('primary', 'sm')}>{repair.entregado === 'si' ? 'Guardar pago' : deliveryArchive ? 'Enviar a archivados' : 'Confirmar entrega'}</button>
                         </div>
                     </form>
                 </ModalShell>

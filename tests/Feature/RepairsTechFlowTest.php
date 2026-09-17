@@ -858,6 +858,37 @@ it('allows delivering repairs with explicit date and delivery channel', function
     expect(RepairEvent::query()->where('orden_id', 777)->where('evento', 'ENTREGA_VIA_TICKET')->exists())->toBeTrue();
 });
 
+it('allows correcting delivery payment after a repair was delivered', function (): void {
+    $order = RepairOrder::query()->create([
+        'id' => 778,
+        'reparacion' => 1,
+        'fecha' => now()->toDateString(),
+        'nombre_cliente' => 'Cliente Pago',
+        'dni' => 33444556,
+        'modelo' => 'Moto G',
+        'descripcion' => 'Pin de carga',
+        'estado' => 'LISTA',
+        'entregado' => 'si',
+        'fecha_entregado' => '2026-04-23',
+        'observaciones' => "Validacion de entrega: ENTREGADO CON DNI\n\nPago de entrega: EFECTIVO",
+    ]);
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->post(route('repairs.orders.deliver', $order), [
+            'abono_efectivo' => false,
+        ])
+        ->assertRedirect();
+
+    $updated = $order->fresh();
+
+    expect($updated?->entregado)->toBe('si');
+    expect(optional($updated?->fecha_entregado)->format('Y-m-d'))->toBe('2026-04-23');
+    expect($updated?->observaciones)->toContain('Validacion de entrega: ENTREGADO CON DNI');
+    expect($updated?->observaciones)->toContain('Pago de entrega: PRECIO REGULAR');
+    expect(substr_count((string) $updated?->observaciones, 'Pago de entrega:'))->toBe(1);
+    expect(RepairEvent::query()->where('orden_id', 778)->where('evento', 'PAGO_ENTREGA_ACTUALIZADO')->exists())->toBeTrue();
+});
+
 it('reopens delivered repairs as warranty and allows delivering them again', function (): void {
     $originalEntryDate = now()->subDays(4)->toDateString();
 
