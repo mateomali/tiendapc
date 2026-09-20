@@ -224,6 +224,7 @@ export interface RepairOrderView {
     info?: string | null;
     monto: number | string;
     senia: number | string;
+    isFullyPaid?: boolean;
     fecha_estimada?: string | null;
     estado: string;
     entregado: string;

@@ -1192,8 +1192,10 @@ function RepairEditCard({
     const [deliveryDetail, setDeliveryDetail] = useState('');
     const [deliveryCashPayment, setDeliveryCashPayment] = useState(true);
     const [deliveryArchive, setDeliveryArchive] = useState(false);
+    const [deliveryAll, setDeliveryAll] = useState(false);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState(repair.cancelado_motivo ?? '');
+    const [cancelSameModel, setCancelSameModel] = useState(false);
     const [warrantyOpen, setWarrantyOpen] = useState(false);
     const [warrantyReason, setWarrantyReason] = useState(repair.garantia_motivo ?? '');
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
@@ -1203,10 +1205,14 @@ function RepairEditCard({
     const monto = Number(repair.monto ?? 0);
     const senia = Number(repair.senia ?? 0);
     const seniaLabel = seniaBadgeLabel(monto, senia);
+    const canDeliver = ['LISTA', 'CANCELADA'].includes(repair.estado) && repair.entregado !== 'si';
+    const repairIsFullyPaid = repair.isFullyPaid ?? (monto > 0 && senia >= monto);
+    const ticketIsFullyPaid = Number(ticket.totalMonto ?? 0) > 0 && Number(ticket.totalSenia ?? 0) >= Number(ticket.totalMonto ?? 0);
+    const canDeliverAll = canDeliver && ticket.repairs.filter((item) => item.entregado !== 'si').length > 1;
+    const shouldAskDeliveryPayment = repair.entregado === 'si' ? !repairIsFullyPaid : !(deliveryAll ? ticketIsFullyPaid : repairIsFullyPaid);
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA'].includes(repair.estado);
-    const canDeliver = ['LISTA', 'CANCELADA'].includes(repair.estado) && repair.entregado !== 'si';
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA', 'LISTA'].includes(repair.estado);
     const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
@@ -1229,6 +1235,12 @@ function RepairEditCard({
     const sameModelPosition = repairSameModelPosition(ticket, repair);
     const sameModelAdjacency = repairSameModelAdjacency(ticket, repair);
     const hasRepeatedModelInTicket = sameModelPosition.total > 1;
+    const canCancelSameModel = repairDisplayModelKey !== '' && repairDisplayModelKey !== '-' && repair.entregado !== 'si' && ticket.repairs.some((item) => (
+        item.registro_id !== repair.registro_id
+        && item.entregado !== 'si'
+        && item.estado !== 'CANCELADA'
+        && repairModelGroupKey(item) === repairDisplayModelKey
+    ));
     const showSameModelContinuity = desktopGroupExpanded && hasRepeatedModelInTicket;
     const sameModelLabel = `Mismo modelo ${sameModelPosition.index}/${sameModelPosition.total}`;
     const cleanDescription = descriptionWithoutRepeatedModel(repair.descripcion, repair.modelo, repairBrand);
@@ -1438,6 +1450,7 @@ function RepairEditCard({
     const openDeliveryModal = (): void => {
         form.setData('fecha_entregado', repair.fecha_entregado || form.data.fecha_entregado || todayInputValue());
         setDeliveryCashPayment(repair.deliveryPaymentMode !== 'regular');
+        setDeliveryAll(false);
         setDeliveryOpen(true);
     };
 
@@ -1505,6 +1518,7 @@ function RepairEditCard({
     const cancelRepair = (): void => {
         if (!repair.actions?.cancel) return;
         setCancelReason(repair.cancelado_motivo ?? '');
+        setCancelSameModel(false);
         setCancelOpen(true);
     };
 
@@ -1520,7 +1534,7 @@ function RepairEditCard({
 
         router.post(
             repair.actions.cancel,
-            { cancelado_motivo: reason },
+            { cancelado_motivo: reason, aplicar_mismo_modelo: cancelSameModel },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -1530,6 +1544,7 @@ function RepairEditCard({
                         cancelado_motivo: reason,
                     }));
                     setCancelOpen(false);
+                    setCancelSameModel(false);
                 },
             },
         );
@@ -1598,8 +1613,9 @@ function RepairEditCard({
                     fecha_entregado: form.data.fecha_entregado || undefined,
                     entrega_via: deliveryVia,
                     entrega_detalle: deliveryVia === 'otra' ? deliveryDetail : undefined,
-                    abono_efectivo: deliveryCashPayment,
+                    abono_efectivo: shouldAskDeliveryPayment ? deliveryCashPayment : undefined,
                     enviar_archivados: deliveryArchive,
+                    entregar_todos: deliveryAll,
                 },
             {
                 preserveScroll: true,
@@ -1609,6 +1625,7 @@ function RepairEditCard({
                     setDeliveryVia('dni');
                     setDeliveryCashPayment(true);
                     setDeliveryArchive(false);
+                    setDeliveryAll(false);
                     if (repair.entregado !== 'si' && ticket.deliveryTicketUrl && window.confirm('Entrega confirmada. Queres imprimir el comprobante para el cliente?')) {
                         router.visit(`${ticket.deliveryTicketUrl}#print`);
                     }
@@ -2311,6 +2328,17 @@ function RepairEditCard({
                                 disabled={readOnly}
                             />
                         </label>
+                        {canCancelSameModel ? (
+                            <label className="flex items-start gap-2 rounded-lg border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm font-bold text-[#92400e]">
+                                <input
+                                    type="checkbox"
+                                    className="mt-0.5 h-4 w-4 accent-[#ea580c]"
+                                    checked={cancelSameModel}
+                                    onChange={(event) => setCancelSameModel(event.target.checked)}
+                                />
+                                <span>Aplicar cancelacion a todos los trabajos pendientes del mismo modelo</span>
+                            </label>
+                        ) : null}
                         <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setInfoOpen(false)}>Cerrar</button>
                             {!readOnly ? (
@@ -2719,19 +2747,36 @@ function RepairEditCard({
                                 ) : null}
                             </>
                         ) : null}
-                        <label className="grid gap-1.5 text-sm font-black text-[#334155]">
-                            Forma de pago
-                            <select className={ui.input} value={deliveryCashPayment ? '1' : '0'} onChange={(event) => setDeliveryCashPayment(event.target.value === '1')}>
-                                <option value="1">SI - EFECTIVO</option>
-                                <option value="0">NO - PRECIO REGULAR</option>
-                            </select>
-                        </label>
+                        {canDeliverAll && !deliveryArchive ? (
+                            <label className="flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#334155]">
+                                <input
+                                    type="checkbox"
+                                    checked={deliveryAll}
+                                    onChange={(event) => setDeliveryAll(event.target.checked)}
+                                />
+                                Entregar todos los trabajos pendientes de esta orden
+                            </label>
+                        ) : null}
+                        {shouldAskDeliveryPayment ? (
+                            <label className="grid gap-1.5 text-sm font-black text-[#334155]">
+                                Forma de pago
+                                <select className={ui.input} value={deliveryCashPayment ? '1' : '0'} onChange={(event) => setDeliveryCashPayment(event.target.value === '1')}>
+                                    <option value="1">SI - EFECTIVO</option>
+                                    <option value="0">NO - PRECIO REGULAR</option>
+                                </select>
+                            </label>
+                        ) : null}
                         {repair.entregado !== 'si' && !repair.archivado_at ? (
                             <label className="flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#334155]">
                                 <input
                                     type="checkbox"
                                     checked={deliveryArchive}
-                                    onChange={(event) => setDeliveryArchive(event.target.checked)}
+                                    onChange={(event) => {
+                                        setDeliveryArchive(event.target.checked);
+                                        if (event.target.checked) {
+                                            setDeliveryAll(false);
+                                        }
+                                    }}
                                 />
                                 Enviar a archivados
                             </label>

@@ -1229,11 +1229,13 @@ class WorkbenchController extends Controller
             'entrega_detalle' => ['nullable', 'required_if:entrega_via,otra', 'string', 'max:500'],
             'abono_efectivo' => ['nullable', 'boolean'],
             'enviar_archivados' => ['nullable', 'boolean'],
+            'entregar_todos' => ['nullable', 'boolean'],
         ]);
 
         $cashPayment = array_key_exists('abono_efectivo', $validated)
             ? filter_var($validated['abono_efectivo'], FILTER_VALIDATE_BOOL)
             : null;
+        $deliverAll = filter_var($validated['entregar_todos'] ?? false, FILTER_VALIDATE_BOOL);
 
         if ($repairOrder->entregado === 'si' && ($validated['entrega_via'] ?? null) === null && $cashPayment !== null) {
             $repairService->updateDeliveryPayment($repairOrder, $cashPayment);
@@ -1241,18 +1243,34 @@ class WorkbenchController extends Controller
             return back()->with('success', 'Forma de pago de entrega actualizada.');
         }
 
-        $repairService->deliver(
-            $repairOrder,
-            $validated['fecha_entregado'] ?? null,
-            $validated['entrega_via'] ?? null,
-            $validated['entrega_detalle'] ?? null,
-            $cashPayment,
-            filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL),
-        );
+        if ($deliverAll && ! filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL)) {
+            RepairOrder::query()
+                ->where('id', $repairOrder->id)
+                ->where('entregado', 'no')
+                ->orderBy('reparacion')
+                ->get()
+                ->each(fn (RepairOrder $order) => $repairService->deliver(
+                    $order,
+                    $validated['fecha_entregado'] ?? null,
+                    $validated['entrega_via'] ?? null,
+                    $validated['entrega_detalle'] ?? null,
+                    $cashPayment,
+                    false,
+                ));
+        } else {
+            $repairService->deliver(
+                $repairOrder,
+                $validated['fecha_entregado'] ?? null,
+                $validated['entrega_via'] ?? null,
+                $validated['entrega_detalle'] ?? null,
+                $cashPayment,
+                filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL),
+            );
+        }
 
         return back()->with('success', filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL)
             ? 'Orden enviada a archivados.'
-            : 'Orden marcada como entregada.');
+            : ($deliverAll ? 'Todos los trabajos fueron marcados como entregados.' : 'Orden marcada como entregada.'));
     }
 
     public function archive(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
@@ -1273,11 +1291,31 @@ class WorkbenchController extends Controller
     {
         $validated = $request->validate([
             'cancelado_motivo' => ['required', 'string', 'max:1000'],
+            'aplicar_mismo_modelo' => ['nullable', 'boolean'],
         ]);
 
-        $repairService->cancel($repairOrder, $validated['cancelado_motivo']);
+        $reason = $validated['cancelado_motivo'];
+        $applySameModel = filter_var($validated['aplicar_mismo_modelo'] ?? false, FILTER_VALIDATE_BOOL);
 
-        return back()->with('success', 'Orden cancelada. Queda pendiente de retiro.');
+        if ($applySameModel) {
+            $modelKey = $this->canonicalDeviceModel((string) $repairOrder->modelo);
+            $orders = RepairOrder::query()
+                ->where('id', $repairOrder->id)
+                ->where('entregado', 'no')
+                ->where('estado', '!=', 'CANCELADA')
+                ->get()
+                ->filter(fn (RepairOrder $order): bool => $modelKey !== '' && $this->canonicalDeviceModel((string) $order->modelo) === $modelKey);
+
+            foreach ($orders as $order) {
+                $repairService->cancel($order, $reason);
+            }
+        } else {
+            $repairService->cancel($repairOrder, $reason);
+        }
+
+        return back()->with('success', $applySameModel
+            ? 'Trabajos del mismo modelo cancelados. Quedan pendientes de retiro.'
+            : 'Orden cancelada. Queda pendiente de retiro.');
     }
 
     public function moveBack(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
@@ -1401,6 +1439,7 @@ class WorkbenchController extends Controller
             'info' => $order->info,
             'monto' => $order->monto,
             'senia' => $order->senia,
+            'isFullyPaid' => (float) $order->monto > 0 && (float) $order->senia >= (float) $order->monto,
             'fecha_estimada' => optional($order->fecha_estimada)->format('Y-m-d'),
             'estado' => $order->estado,
             'entregado' => $order->entregado,
