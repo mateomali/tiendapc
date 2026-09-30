@@ -1,5 +1,5 @@
-import { Link, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import {
     FaArrowRight,
     FaArchive,
@@ -89,6 +89,7 @@ interface RepairUpdateFormData {
     info: string;
     monto: string;
     senia: string;
+    cash_discount_enabled: boolean;
     fecha_estimada: string;
     estado: string;
     cancelado_motivo: string;
@@ -115,6 +116,7 @@ interface AddRepairFormData {
     observaciones: string;
     monto: string;
     senia: string;
+    cash_discount_enabled: boolean;
     senia_method: string;
     fecha_estimada: string;
     repuesto: string;
@@ -178,15 +180,20 @@ function formatLegacyDate(value?: string | null): string {
     return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
-function transferPriceLabel(value: string | number | null | undefined): string {
+type RepairPricing = { cashDiscountEnabled: boolean; cashDiscountThreshold: number; cashDiscountPercentage: number };
+const defaultRepairPricing: RepairPricing = { cashDiscountEnabled: true, cashDiscountThreshold: 30000, cashDiscountPercentage: 10 };
+function discountEligible(value: string | number, enabled: boolean, pricing: RepairPricing): boolean {
+    return enabled && pricing.cashDiscountEnabled && pricing.cashDiscountPercentage > 0 && Number(value) > pricing.cashDiscountThreshold;
+}
+function transferPriceLabel(value: string | number | null | undefined, enabled = true, pricing = defaultRepairPricing): string {
     const amount = Number(value || 0);
 
     if (!Number.isFinite(amount) || amount <= 0) {
         return 'Transferencia: sin monto';
     }
 
-    return amount > 30000
-        ? `Transferencia: ${formatCurrency(Math.round(amount * 1.1))}`
+    return discountEligible(amount, enabled, pricing)
+        ? `Transferencia: ${formatCurrency(Math.round(amount * (1 + pricing.cashDiscountPercentage / 100)))}`
         : 'Transferencia: mismo importe';
 }
 
@@ -347,18 +354,43 @@ function repairModelGroupKey(repair: RepairOrderView): string {
 
 function repairSameModelPosition(ticket: RepairTicketView, repair: RepairOrderView): { index: number; total: number } {
     const modelKey = repairModelGroupKey(repair);
+    const currentIndex = ticket.repairs.findIndex((ticketRepair) => ticketRepair.registro_id === repair.registro_id);
 
-    if (modelKey === '' || modelKey === '-') {
+    if (modelKey === '' || modelKey === '-' || currentIndex < 0) {
         return { index: 1, total: 1 };
     }
 
-    const sameModelRepairs = ticket.repairs.filter((ticketRepair) => repairModelGroupKey(ticketRepair) === modelKey);
-    const currentIndex = sameModelRepairs.findIndex((ticketRepair) => ticketRepair.registro_id === repair.registro_id);
+    let start = currentIndex;
+    let end = currentIndex;
+
+    while (start > 0 && repairModelGroupKey(ticket.repairs[start - 1]) === modelKey) start -= 1;
+    while (end < ticket.repairs.length - 1 && repairModelGroupKey(ticket.repairs[end + 1]) === modelKey) end += 1;
 
     return {
-        index: currentIndex >= 0 ? currentIndex + 1 : 1,
-        total: sameModelRepairs.length,
+        index: currentIndex - start + 1,
+        total: end - start + 1,
     };
+}
+
+function repairDeviceGroupPosition(ticket: RepairTicketView, repair: RepairOrderView): { index: number; total: number } {
+    const groups: RepairOrderView[][] = [];
+
+    ticket.repairs.forEach((ticketRepair) => {
+        const modelKey = repairModelGroupKey(ticketRepair);
+        const previousGroup = groups[groups.length - 1];
+        const previousKey = previousGroup ? repairModelGroupKey(previousGroup[0]) : null;
+
+        if (!previousGroup || modelKey === '' || modelKey === '-' || modelKey !== previousKey) {
+            groups.push([ticketRepair]);
+            return;
+        }
+
+        previousGroup.push(ticketRepair);
+    });
+
+    const groupIndex = groups.findIndex((group) => group.some((ticketRepair) => ticketRepair.registro_id === repair.registro_id));
+
+    return { index: groupIndex >= 0 ? groupIndex + 1 : 1, total: groups.length || 1 };
 }
 
 function repairSameModelAdjacency(ticket: RepairTicketView, repair: RepairOrderView): { previous: boolean; next: boolean } {
@@ -451,6 +483,60 @@ function descriptionWithoutRepeatedModel(description?: string | null, model?: st
         .filter(Boolean)
         .join('\n')
         .trim();
+}
+
+function FailureDetailsEditor({
+    value,
+    onChange,
+    disabled = false,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+}): JSX.Element {
+    const items = value === '' ? [''] : value.split('\n');
+    const update = (index: number, nextValue: string): void => {
+        onChange(items.map((item, itemIndex) => itemIndex === index ? nextValue : item).join('\n'));
+    };
+    const remove = (index: number): void => {
+        onChange(items.filter((_, itemIndex) => itemIndex !== index).join('\n'));
+    };
+
+    return (
+        <div className="grid gap-2">
+            {items.map((failure, index) => (
+                <div key={`${index}-${failure}`} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                    <span className="pt-2 text-center text-sm font-black text-[#475569]">{index + 1}</span>
+                    <textarea
+                        aria-label={`Falla ${index + 1}`}
+                        className={cn(ui.repairDenseTextarea, 'min-h-[4.25rem]')}
+                        value={failure}
+                        onChange={(event) => update(index, event.target.value)}
+                        placeholder="Detalle de la falla"
+                        disabled={disabled}
+                    />
+                    <button
+                        type="button"
+                        className={buttonClass('danger', 'sm', 'mt-1 px-2')}
+                        onClick={() => remove(index)}
+                        disabled={disabled || items.length === 1}
+                        title="Quitar falla"
+                        aria-label={`Quitar falla ${index + 1}`}
+                    >
+                        <FaTimes aria-hidden="true" />
+                    </button>
+                </div>
+            ))}
+            <button
+                type="button"
+                className={buttonClass('soft', 'sm', 'justify-self-start')}
+                onClick={() => onChange([...items, ''].join('\n'))}
+                disabled={disabled}
+            >
+                <FaPlus aria-hidden="true" /> Agregar falla
+            </button>
+        </div>
+    );
 }
 
 function ModalShell({
@@ -765,6 +851,7 @@ function AddRepairModal({
     onClose: () => void;
 }): JSX.Element {
     const today = new Date().toISOString().slice(0, 10);
+    const pricing = (usePage().props.ticketPricing as RepairPricing | undefined) ?? defaultRepairPricing;
     const baseBrand = baseRepair ? inferredRepairBrand(baseRepair) : '';
     const form = useForm<AddRepairFormData>({
         marca: baseBrand,
@@ -775,6 +862,7 @@ function AddRepairModal({
         observaciones: 'sin observaciones',
         monto: '0',
         senia: '0',
+        cash_discount_enabled: true,
         senia_method: 'efectivo',
         fecha_estimada: today,
         repuesto: '',
@@ -1002,13 +1090,14 @@ function AddRepairModal({
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
                         </EditField>
                         <EditField label="Medio de seña">
-                            <select className={ui.input} value={form.data.senia_method} onChange={(event) => form.setData('senia_method', event.target.value)}>
+                            <select disabled={!discountEligible(form.data.monto, form.data.cash_discount_enabled, pricing)} className={ui.input} value={form.data.senia_method} onChange={(event) => form.setData('senia_method', event.target.value)}>
                                 <option value="efectivo">Efectivo</option>
                                 <option value="transferencia">Transferencia</option>
                             </select>
                         </EditField>
                         <div className="min-h-5 text-xs font-semibold leading-5 text-[#475569] sm:col-span-2 lg:col-span-full">
-                            {transferPriceLabel(form.data.monto)}
+                            {transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={form.data.cash_discount_enabled} onChange={(event) => form.setData('cash_discount_enabled', event.target.checked)} />Descuento en efectivo</label>
                         </div>
                     </div>
                 </EditSection>
@@ -1139,6 +1228,7 @@ function RepairEditCard({
     statusLabel?: (repair: RepairOrderView) => string;
     highlightTerm?: string;
 }): JSX.Element {
+    const pricing = (usePage().props.ticketPricing as RepairPricing | undefined) ?? defaultRepairPricing;
     const initialBrand = inferredRepairBrand(repair);
     const form = useForm<RepairUpdateFormData>({
         id_nuevo: String(repair.id),
@@ -1154,6 +1244,7 @@ function RepairEditCard({
         info: ticket.info ?? '',
         monto: formatAmountInput(repair.monto),
         senia: formatAmountInput(repair.senia),
+        cash_discount_enabled: repair.cash_discount_enabled ?? true,
         fecha_estimada: repair.fecha_estimada ?? '',
         estado: repair.estado,
         cancelado_motivo: repair.cancelado_motivo ?? '',
@@ -1170,6 +1261,8 @@ function RepairEditCard({
         images: null,
         final_images: null,
     });
+    const [editingPayment, setEditingPayment] = useState<number | null>(null);
+    const editPaymentForm = useForm({ amount: '', method: 'efectivo', paid_at: '' });
     const paymentForm = useForm<PaymentFormData>({
         amount: '',
         payment_type: 'senia',
@@ -1193,6 +1286,7 @@ function RepairEditCard({
     const [deliveryCashPayment, setDeliveryCashPayment] = useState(true);
     const [deliveryArchive, setDeliveryArchive] = useState(false);
     const [deliveryAll, setDeliveryAll] = useState(false);
+    const [printPromptOpen, setPrintPromptOpen] = useState(false);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState(repair.cancelado_motivo ?? '');
     const [cancelSameModel, setCancelSameModel] = useState(false);
@@ -1209,7 +1303,16 @@ function RepairEditCard({
     const repairIsFullyPaid = repair.isFullyPaid ?? (monto > 0 && senia >= monto);
     const ticketIsFullyPaid = Number(ticket.totalMonto ?? 0) > 0 && Number(ticket.totalSenia ?? 0) >= Number(ticket.totalMonto ?? 0);
     const canDeliverAll = canDeliver && ticket.repairs.filter((item) => item.entregado !== 'si').length > 1;
-    const shouldAskDeliveryPayment = repair.entregado === 'si' ? !repairIsFullyPaid : !(deliveryAll ? ticketIsFullyPaid : repairIsFullyPaid);
+    const deliveryRepairs = deliveryAll
+        ? ticket.repairs.filter((item) => item.entregado !== 'si')
+        : [repair];
+    const deliveryHasCashDiscount = deliveryRepairs.some((item) => discountEligible(
+        item.monto,
+        item.cash_discount_enabled ?? true,
+        pricing,
+    ));
+    const shouldAskDeliveryPayment = deliveryHasCashDiscount
+        && (repair.entregado === 'si' ? !repairIsFullyPaid : !(deliveryAll ? ticketIsFullyPaid : repairIsFullyPaid));
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA'].includes(repair.estado);
@@ -1228,13 +1331,17 @@ function RepairEditCard({
     const isLastGroupedDesktopRow = isGroupedDesktopRow && (rowIndex === rowTotal - 1 || (rowIndex === 0 && !desktopGroupExpanded));
     const showDesktopTicketData = variant !== 'desktop' || rowIndex === 0;
     const overdueText = overdueLabel(repair);
-    const desktopWorkLabel = rowTotal > 1 ? `Trabajo ${rowIndex + 1} de ${rowTotal}` : `Trabajo ${repair.reparacion}`;
     const repairBrand = inferredRepairBrand(repair);
     const repairDisplayModel = displayRepairModel(repair);
     const repairDisplayModelKey = repairModelGroupKey(repair);
     const sameModelPosition = repairSameModelPosition(ticket, repair);
+    const deviceGroupPosition = repairDeviceGroupPosition(ticket, repair);
     const sameModelAdjacency = repairSameModelAdjacency(ticket, repair);
     const hasRepeatedModelInTicket = sameModelPosition.total > 1;
+    const deviceLabel = `Equipo ${deviceGroupPosition.index} de ${deviceGroupPosition.total}`;
+    const failureLabel = sameModelPosition.total > 1 ? `Falla ${sameModelPosition.index} de ${sameModelPosition.total}` : 'Falla única';
+    const desktopWorkLabel = `${deviceLabel} · ${failureLabel}`;
+    const mobileWorkLabel = `${deviceLabel} · ${failureLabel}`;
     const canCancelSameModel = repairDisplayModelKey !== '' && repairDisplayModelKey !== '-' && repair.entregado !== 'si' && ticket.repairs.some((item) => (
         item.registro_id !== repair.registro_id
         && item.entregado !== 'si'
@@ -1242,7 +1349,6 @@ function RepairEditCard({
         && repairModelGroupKey(item) === repairDisplayModelKey
     ));
     const showSameModelContinuity = desktopGroupExpanded && hasRepeatedModelInTicket;
-    const sameModelLabel = `Mismo modelo ${sameModelPosition.index}/${sameModelPosition.total}`;
     const cleanDescription = descriptionWithoutRepeatedModel(repair.descripcion, repair.modelo, repairBrand);
     const displayDescription = (cleanDescription || repair.descripcion || '-').toUpperCase();
     const partMatches = partSearch.trim().length >= 2
@@ -1379,6 +1485,10 @@ function RepairEditCard({
             },
         });
     };
+
+    useEffect(() => {
+        form.setData('senia', formatAmountInput(repair.senia));
+    }, [repair.senia]);
 
     const deletePayment = (action?: string): void => {
         if (!action) return;
@@ -1626,8 +1736,8 @@ function RepairEditCard({
                     setDeliveryCashPayment(true);
                     setDeliveryArchive(false);
                     setDeliveryAll(false);
-                    if (repair.entregado !== 'si' && ticket.deliveryTicketUrl && window.confirm('Entrega confirmada. Queres imprimir el comprobante para el cliente?')) {
-                        router.visit(`${ticket.deliveryTicketUrl}#print`);
+                    if (repair.entregado !== 'si' && ticket.deliveryTicketUrl) {
+                        setPrintPromptOpen(true);
                     }
                 },
             },
@@ -1755,7 +1865,7 @@ function RepairEditCard({
                                 />
                             </EditField>
                         ) : null}
-                        <span className="text-xs font-semibold text-[#475569]">{transferPriceLabel(form.data.monto)}</span>
+                        <span className="text-xs font-semibold text-[#475569]">{transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}</span>
                     </div>
 
                     <div className="grid gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-2">
@@ -1874,7 +1984,7 @@ function RepairEditCard({
                     </select>
                 </EditField>
                 <div className="grid content-end gap-1 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 text-xs font-semibold text-[#475569]">
-                    <span>{transferPriceLabel(form.data.monto)}</span>
+                    <span>{transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}</span>
                     <strong className="text-sm text-[#0f172a]">Saldo {formatCurrency(Math.max(0, Number(form.data.monto || 0) - Number(form.data.senia || 0)))}</strong>
                 </div>
             </div>
@@ -1928,7 +2038,7 @@ function RepairEditCard({
                 <div className="grid gap-1 rounded-md border border-[#e2e8f0] bg-white p-2 text-xs font-semibold text-[#475569]">
                     <span>Monto actual</span>
                     <strong className="text-base text-[#0f172a]">{formatCurrency(Number(form.data.monto || 0))}</strong>
-                    <span>{transferPriceLabel(form.data.monto)}</span>
+                    <span>{transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}</span>
                 </div>
             </div>
             <textarea className={ui.repairDenseTextarea} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} placeholder="Observaciones" />
@@ -2406,6 +2516,7 @@ function RepairEditCard({
                                     </>
                                 ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={form.data.cash_discount_enabled} onChange={(event) => form.setData('cash_discount_enabled', event.target.checked)} disabled={readOnly} />Descuento en efectivo</label>
                                     <EditField label="Monto ($)">
                                         <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
                                     </EditField>
@@ -2413,7 +2524,7 @@ function RepairEditCard({
                                         <input className={changedInputClass(form.data.senia, formatAmountInput(repair.senia))} value={form.data.senia} inputMode="decimal" onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} disabled={readOnly} />
                                     </EditField>
                                     <div className="min-h-5 text-xs font-semibold leading-5 text-[#475569] sm:col-span-2">
-                                        {transferPriceLabel(form.data.monto)}
+                                        {transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}
                                     </div>
                                 </div>
                                 {!readOnly ? (
@@ -2434,7 +2545,7 @@ function RepairEditCard({
                                                 <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
                                             </EditField>
                                             <EditField label="Medio">
-                                                <select className={changedInputClass(paymentForm.data.method, 'efectivo', undefined, false)} value={paymentForm.data.method || 'efectivo'} onChange={(event) => paymentForm.setData('method', event.target.value)}>
+                                                <select disabled={!discountEligible(form.data.monto, form.data.cash_discount_enabled, pricing)} className={changedInputClass(paymentForm.data.method, 'efectivo', undefined, false)} value={paymentForm.data.method || 'efectivo'} onChange={(event) => paymentForm.setData('method', event.target.value)}>
                                                     <option value="efectivo">Efectivo</option>
                                                     <option value="transferencia">Transferencia</option>
                                                 </select>
@@ -2490,6 +2601,19 @@ function RepairEditCard({
                                                             <span className="block truncate text-xs font-semibold text-[#475569]">{detail}</span>
                                                         </div>
                                                         <span className={cn('font-black', isIncrement ? 'text-[#b45309]' : 'text-[#0f172a]')}>{isIncrement ? '+' : ''}{formatCurrency(payment.amount)}</span>
+                                                        {!readOnly && !isIncrement && payment.updateAction ? (
+                                                            <div className="col-span-2">
+                                                                {editingPayment === payment.id ? (
+                                                                    <div className="grid gap-2 sm:grid-cols-4">
+                                                                        <label>Importe<input aria-label="Importe de seña" className={ui.input} type="number" min="0.01" step="0.01" value={editPaymentForm.data.amount} onChange={(event) => editPaymentForm.setData('amount', event.target.value)} /></label>
+                                                                        <label>Medio<select disabled={!discountEligible(form.data.monto, form.data.cash_discount_enabled, pricing)} className={ui.input} value={editPaymentForm.data.method} onChange={(event) => editPaymentForm.setData('method', event.target.value)}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
+                                                                        <label>Fecha<input className={ui.input} type="date" value={editPaymentForm.data.paid_at} onChange={(event) => editPaymentForm.setData('paid_at', event.target.value)} /></label>
+                                                                        <div className="flex gap-2"><button type="button" disabled={editPaymentForm.processing} className={buttonClass('primary', 'sm')} onClick={() => editPaymentForm.post(payment.updateAction!, { preserveScroll: true, onSuccess: () => setEditingPayment(null) })}>Guardar seña</button><button type="button" onClick={() => setEditingPayment(null)}>Cancelar</button></div>
+                                                                        {Object.values(editPaymentForm.errors).map((error) => <span key={error} className="text-red-700">{error}</span>)}
+                                                                    </div>
+                                                                ) : <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setEditingPayment(payment.id); editPaymentForm.setData({ amount: String(payment.amount), method: payment.method || 'efectivo', paid_at: payment.paid_at || todayInputValue() }); }}>Modificar seña</button>}
+                                                            </div>
+                                                        ) : null}
                                                         {!readOnly ? (
                                                             <button
                                                                 type="button"
@@ -2557,8 +2681,13 @@ function RepairEditCard({
                             </EditSection>
 
                             <EditSection title="Descripción y Contexto">
-                                <EditField label="Descripción">
-                                    <textarea className={changedTextareaClass(form.data.descripcion, repair.descripcion ?? '')} value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} rows={3} disabled={readOnly} />
+                                <EditField label="Fallas detalladas">
+                                    <p className="mb-2 text-xs font-semibold text-[#475569]">Cada renglón corresponde a una falla del trabajo. Podés modificarla, quitarla o agregar otra.</p>
+                                    <FailureDetailsEditor
+                                        value={form.data.descripcion}
+                                        onChange={(value) => form.setData('descripcion', value)}
+                                        disabled={readOnly}
+                                    />
                                 </EditField>
                                 <EditField label="Observaciones del Técnico">
                                     <textarea className={changedTextareaClass(form.data.observaciones, repair.observaciones ?? '')} value={form.data.observaciones} onChange={(event) => form.setData('observaciones', event.target.value)} rows={3} disabled={readOnly} />
@@ -2748,14 +2877,11 @@ function RepairEditCard({
                             </>
                         ) : null}
                         {canDeliverAll && !deliveryArchive ? (
-                            <label className="flex items-center gap-2 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] px-3 py-2 text-sm font-bold text-[#334155]">
-                                <input
-                                    type="checkbox"
-                                    checked={deliveryAll}
-                                    onChange={(event) => setDeliveryAll(event.target.checked)}
-                                />
-                                Entregar todos los trabajos pendientes de esta orden
-                            </label>
+                            <fieldset className="grid gap-2 border border-[#cbd5e1] p-3 text-sm">
+                                <legend className="font-bold">¿Qué trabajos se entregan?</legend>
+                                <label className="flex items-center gap-2"><input type="radio" name="deliveryScope" checked={!deliveryAll} onChange={() => setDeliveryAll(false)} />Solo el trabajo actual</label>
+                                <label className="flex items-center gap-2"><input type="radio" name="deliveryScope" checked={deliveryAll} onChange={() => setDeliveryAll(true)} />Todos los trabajos pendientes de esta orden</label>
+                            </fieldset>
                         ) : null}
                         {shouldAskDeliveryPayment ? (
                             <label className="grid gap-1.5 text-sm font-black text-[#334155]">
@@ -2788,6 +2914,24 @@ function RepairEditCard({
                     </form>
                 </ModalShell>
             ) : null}
+            {printPromptOpen ? (
+                <ModalShell title="Entrega confirmada" onClose={() => setPrintPromptOpen(false)} tone="warning">
+                    <p className="text-sm font-bold text-[#334155]">¿Imprimir el comprobante para el cliente?</p>
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                        <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setPrintPromptOpen(false)}>No</button>
+                        <button
+                            type="button"
+                            className={buttonClass('primary', 'sm')}
+                            onClick={() => {
+                                setPrintPromptOpen(false);
+                                router.visit(`${ticket.deliveryTicketUrl}#print`);
+                            }}
+                        >
+                            Sí
+                        </button>
+                    </div>
+                </ModalShell>
+            ) : null}
             {galleryIndex !== null && galleryImages[galleryIndex] ? (
                 <ModalShell title={`Orden #${repair.id} - Trabajo ${repair.reparacion} - ${repairDisplayModel || ''}`} onClose={() => setGalleryIndex(null)}>
                     <div className="grid gap-3">
@@ -2809,12 +2953,9 @@ function RepairEditCard({
                 <div className={cn('group/repair-row grid min-h-[72px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.78rem] leading-snug transition hover:bg-[#f4f8fe] focus-within:bg-[#f4f8fe] [&>*]:min-w-0 [&>*]:px-2.5 [&>*]:py-2.5', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), hasRepeatedModelInTicket && desktopSameModelAccentClass(repairDisplayModelKey), showSameModelContinuity && sameModelAdjacency.next && 'border-b-transparent', showSameModelContinuity && sameModelAdjacency.previous && 'shadow-[inset_0_1px_0_#f8fafc]', isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
                     <div className="sticky left-0 z-[2] grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 bg-inherit text-center shadow-[1px_0_0_#cbd5e1]">
                         {showDesktopTicketData ? (
-                            <button type="button" className="text-base font-black leading-none text-[#0f172a]" onClick={openQuickView}>#<HighlightText value={repair.id} term={highlightTerm} /></button>
+                            <button type="button" className="text-base font-black leading-none text-[#0f172a]" onClick={() => { if (rowTotal > 1 && onToggleDesktopGroup) { if (!desktopGroupExpanded) onToggleDesktopGroup(); } else openQuickView(); }}>#<HighlightText value={repair.id} term={highlightTerm} /></button>
                         ) : (
-                            <button type="button" className="grid gap-0.5 text-left" onClick={openQuickView}>
-                                <span className="text-[0.58rem] font-black uppercase text-[#2563eb]">Trabajo</span>
-                                <span className="text-sm font-black text-[#0f172a]">{rowIndex + 1}/{rowTotal}</span>
-                            </button>
+                            <span aria-hidden="true" />
                         )}
                         {showDesktopTicketData && rowTotal > 1 && onToggleDesktopGroup ? (
                             <button
@@ -2828,15 +2969,15 @@ function RepairEditCard({
                             </button>
                         ) : <span className="block h-6 w-[2.35rem]" aria-hidden="true" />}
                     </div>
-                    <button type="button" className="sticky left-[6.8rem] z-[2] flex items-center bg-inherit text-left font-black uppercase text-[#0f172a] shadow-[1px_0_0_#cbd5e1]" onClick={openQuickView} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : <span className="text-[0.68rem] text-[#475569]">Mismo ticket</span>}</button>
+                    <button type="button" className="sticky left-[6.8rem] z-[2] flex items-center bg-inherit text-left font-black uppercase text-[#0f172a] shadow-[1px_0_0_#cbd5e1]" onClick={openQuickView} title={repair.nombre_cliente}>{showDesktopTicketData ? <HighlightText value={repair.nombre_cliente} term={highlightTerm} /> : null}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} /> : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView} title={repair.contacto || '-'}>{showDesktopTicketData ? <HighlightText value={repair.contacto || '-'} term={highlightTerm} /> : ''}</button>
                     <button type="button" className="flex items-center whitespace-nowrap text-left font-semibold text-[#334155]" onClick={openQuickView}>{showDesktopTicketData ? <HighlightText value={formatLegacyDate(repair.fecha)} term={highlightTerm} /> : ''}</button>
                     <div className="flex items-center justify-center"><Thumb large /></div>
-                    <div className={cn('grid content-center gap-1 text-left', hasRepeatedModelInTicket && 'bg-[#f8fafc]')}>
+                    <div className="grid content-center gap-1 text-left">
                         {rowTotal > 1 ? (
                             <div className="flex min-w-0 items-center gap-2">
-                                <button type="button" className="min-w-0 text-left text-[0.62rem] font-black text-[#2563eb]" onClick={openQuickView} title={desktopWorkLabel}>
+                                <button type="button" className="min-w-0 text-left text-[0.62rem] font-black uppercase tracking-wide text-[#475569]" onClick={openQuickView} title={desktopWorkLabel}>
                                     {desktopWorkLabel}
                                 </button>
                             </div>
@@ -2844,11 +2985,6 @@ function RepairEditCard({
                         <button type="button" className="min-w-0 text-left font-bold text-[#0f172a]" onClick={openQuickView} title={repairDisplayModel || '-'}>
                             <RepairModelLabel repair={repair} term={highlightTerm} />
                         </button>
-                        {hasRepeatedModelInTicket ? (
-                            <span className="w-fit rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-1.5 py-0.5 text-[0.58rem] font-black uppercase text-[#1d4ed8]">
-                                {sameModelLabel}
-                            </span>
-                        ) : null}
                     </div>
                     <button type="button" className="flex items-center text-left font-semibold text-[#334155]" onClick={openQuickView} title={displayDescription}>
                         <span className="line-clamp-2"><HighlightText value={displayDescription} term={highlightTerm} /></span>
@@ -2933,17 +3069,10 @@ function RepairEditCard({
                         <div className="min-w-0">
                             <div className="mb-1 flex items-center gap-1.5">
                                 <span className="text-[0.68rem] font-bold text-[#0f172a]">#{repair.id}</span>
-                                <span className="text-[0.68rem] font-bold text-[#475569]">{rowIndex + 1}/{rowTotal}</span>
+                                <span className="text-[0.68rem] font-bold text-[#475569]">{mobileWorkLabel}</span>
                                 <span className={cn('rounded-full border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
                             <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
-                            {hasRepeatedModelInTicket ? (
-                                <div className="mt-1">
-                                    <span className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-1.5 py-0.5 text-[0.62rem] font-black uppercase text-[#1d4ed8]">
-                                        {sameModelLabel}
-                                    </span>
-                                </div>
-                            ) : null}
                             <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>

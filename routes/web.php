@@ -90,6 +90,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::post('/repairs/orders/{repairOrder}/info', [WorkbenchController::class, 'updateInfo'])->name('repairs.orders.info');
     Route::post('/repairs/orders/{repairOrder}', [WorkbenchController::class, 'update'])->name('repairs.orders.update');
     Route::post('/repairs/orders/{repairOrder}/payments', [WorkbenchController::class, 'addPayment'])->name('repairs.orders.payments.store');
+    Route::post('/repairs/orders/{repairOrder}/payments/{repairPayment}/update', [WorkbenchController::class, 'updatePayment'])->name('repairs.orders.payments.update');
     Route::post('/repairs/orders/{repairOrder}/payments/{repairPayment}/delete', [WorkbenchController::class, 'deletePayment'])->name('repairs.orders.payments.delete');
     Route::post('/repairs/orders/{repairOrder}/state', [WorkbenchController::class, 'updateState'])->name('repairs.orders.state');
     Route::post('/repairs/orders/{repairOrder}/add-repair', [WorkbenchController::class, 'addRepair'])->name('repairs.orders.add_repair');

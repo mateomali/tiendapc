@@ -224,6 +224,7 @@ export interface RepairOrderView {
     info?: string | null;
     monto: number | string;
     senia: number | string;
+    cash_discount_enabled?: boolean;
     isFullyPaid?: boolean;
     fecha_estimada?: string | null;
     estado: string;
@@ -276,6 +277,7 @@ export interface RepairPaymentView {
     notes?: string | null;
     paid_at?: string | null;
     created_at?: string | null;
+    updateAction?: string;
     deleteAction?: string;
 }
 

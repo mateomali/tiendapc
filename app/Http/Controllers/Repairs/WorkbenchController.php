@@ -226,6 +226,7 @@ class WorkbenchController extends Controller
             'tickets' => $tickets,
             'summary' => $repairService->summary(),
             'states' => $repairService->availableStates(true),
+            'ticketPricing' => $this->ticketPricingSettings(),
             'pageKind' => 'delivered',
             'pageTitle' => 'Entregados',
             'indexRoute' => 'repairs.delivered',
@@ -891,6 +892,7 @@ class WorkbenchController extends Controller
             'monto' => ['nullable', 'numeric', 'min:0'],
             'senia' => ['nullable', 'numeric', 'min:0'],
             'senia_method' => ['nullable', 'string', 'in:efectivo,transferencia'],
+            'cash_discount_enabled' => ['sometimes', 'boolean'],
             'fecha_estimada' => ['nullable', 'date'],
             'repuesto' => ['nullable', 'string', 'max:255'],
             'repuesto_pedido' => ['nullable', 'boolean'],
@@ -1074,6 +1076,21 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Seña registrada.');
     }
 
+    public function updatePayment(Request $request, RepairOrder $repairOrder, RepairPayment $repairPayment, RepairService $repairService): RedirectResponse
+    {
+        abort_unless((int) $repairPayment->orden_id === (int) $repairOrder->id
+            && (int) $repairPayment->reparacion === (int) $repairOrder->reparacion
+            && $repairPayment->payment_type === 'senia', 404);
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'method' => ['required', 'in:efectivo,transferencia'],
+            'paid_at' => ['required', 'date'],
+        ]);
+        $repairService->updatePayment($repairOrder, $repairPayment, $validated);
+
+        return back()->with('success', 'Seña actualizada.');
+    }
+
     public function deletePayment(RepairOrder $repairOrder, RepairPayment $repairPayment, RepairService $repairService): RedirectResponse
     {
         try {
@@ -1159,6 +1176,9 @@ class WorkbenchController extends Controller
     private function ticketResponse(int $orderId, RepairService $repairService, string $ticketMode): Response
     {
         $orders = $repairService->ticketOrders($orderId);
+        if ($ticketMode === 'delivery') {
+            $orders = $orders->where('entregado', 'si')->values();
+        }
         abort_if($orders->isEmpty(), 404);
 
         $ticket = $this->groupTickets($orders, false)[0];
@@ -1438,6 +1458,7 @@ class WorkbenchController extends Controller
             'observaciones' => $order->observaciones,
             'info' => $order->info,
             'monto' => $order->monto,
+            'cash_discount_enabled' => $order->cash_discount_enabled ?? true,
             'senia' => $order->senia,
             'isFullyPaid' => (float) $order->monto > 0 && (float) $order->senia >= (float) $order->monto,
             'fecha_estimada' => optional($order->fecha_estimada)->format('Y-m-d'),
@@ -1677,6 +1698,7 @@ class WorkbenchController extends Controller
                 'notes' => $payment->notes,
                 'paid_at' => optional($payment->paid_at)->format('Y-m-d'),
                 'created_at' => optional($payment->created_at)->format('Y-m-d H:i'),
+                'updateAction' => route('repairs.orders.payments.update', [$order, $payment]),
                 'deleteAction' => route('repairs.orders.payments.delete', [$order, $payment]),
             ])
             ->all();

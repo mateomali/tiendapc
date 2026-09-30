@@ -139,6 +139,7 @@ interface RepairJobFormData {
     a_presupuestar: boolean;
     senia: string;
     senia_method: string;
+    cash_discount_enabled: boolean;
     fecha_estimada: string;
     estado: string;
     repuesto: string;
@@ -195,6 +196,7 @@ function createEmptyJob(defaultState: string): RepairJobFormData {
         a_presupuestar: false,
         senia: '0',
         senia_method: 'efectivo',
+        cash_discount_enabled: true,
         fecha_estimada: localDateWithOffset(0),
         estado: defaultState,
         repuesto: '',
@@ -1257,7 +1259,7 @@ export default function WorkbenchPage({
             </span>
         );
     };
-    const regularTotal = regularPriceForCashAmount(totals.monto);
+    const regularTotal = createForm.data.jobs.reduce((sum, job) => sum + (job.cash_discount_enabled ? regularPriceForCashAmount(Number(job.monto || 0)) : Number(job.monto || 0)), 0);
     const repairLabelClass = 'grid min-w-0 content-start gap-1 text-[0.82rem] font-bold leading-tight text-[#334155]';
     const compactInputClass = ui.repairDenseInput;
     const guidedFieldClass = 'border-[#2563eb] bg-[#eff6ff] ring-1 ring-[#2563eb33]';
@@ -2471,7 +2473,7 @@ export default function WorkbenchPage({
                                                                 placeholder="Detalle de la falla"
                                                             />
                                                         </label>
-                                                        <label className="grid content-start gap-1.5">
+                                                        <div className="grid content-start gap-1.5">
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Monto</span>
                                                             {rowJob.a_presupuestar ? (
                                                                 <div className="grid gap-1.5">
@@ -2494,11 +2496,12 @@ export default function WorkbenchPage({
                                                                         />
                                                                     </div>
                                                                     {suggestedPriceIndicator(jobIndex, true)}
-                                                                    {regularPriceIndicator(rowJob.monto, true)}
+                                                                    {rowJob.cash_discount_enabled ? regularPriceIndicator(rowJob.monto, true) : <span className="text-xs">Sin descuento en efectivo</span>}
                                                                     <button type="button" className={buttonClass('soft', 'sm', 'justify-self-start whitespace-nowrap text-[#92400e]')} onClick={() => updateJob(jobIndex, (current) => ({ ...current, a_presupuestar: true, monto: '' }))}>A presupuestar</button>
                                                                 </>
                                                             )}
-                                                        </label>
+                                                            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={rowJob.cash_discount_enabled} onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, cash_discount_enabled: event.target.checked }))} />Descuento en efectivo</label>
+                                                        </div>
                                                         <label className="grid content-start gap-1.5">
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Seña</span>
                                                             <div className="relative">
@@ -2519,6 +2522,7 @@ export default function WorkbenchPage({
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Medio</span>
                                                             <select
                                                                 className={intakeControl}
+                                                                disabled={!rowJob.cash_discount_enabled || !cashDiscountApplies(Number(rowJob.monto))}
                                                                 value={rowJob.senia_method}
                                                                 onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia_method: event.target.value }))}
                                                                 aria-label="Medio de pago de la seña"

@@ -330,6 +330,7 @@ class RepairService
                     'descripcion' => $this->uppercaseFailure((string) $job['descripcion']),
                     'observaciones' => $job['observaciones'],
                     'info' => $info !== '' ? $info : null,
+                    'cash_discount_enabled' => $job['cash_discount_enabled'] ?? true,
                     'monto' => $job['monto'],
                     'senia' => 0,
                     'fecha_estimada' => $job['fecha_estimada'],
@@ -394,6 +395,7 @@ class RepairService
                 'descripcion' => $this->uppercaseFailure((string) $payload['descripcion']),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $order->info,
+                'cash_discount_enabled' => $payload['cash_discount_enabled'] ?? true,
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => 0,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
@@ -636,6 +638,7 @@ class RepairService
                 'descripcion' => $this->uppercaseFailure((string) ($payload['descripcion'] ?? '')),
                 'observaciones' => $payload['observaciones'] ?? 'sin observaciones',
                 'info' => $info !== '' ? $info : null,
+                'cash_discount_enabled' => $payload['cash_discount_enabled'] ?? ($order->cash_discount_enabled ?? true),
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => max(0, (float) ($payload['senia'] ?? $this->paymentTotal($order))),
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
@@ -968,6 +971,19 @@ class RepairService
                 $this->recordEvent($order, 'PAGO_REGISTRADO', $order->estado, $order->estado);
             }
 
+            return $order->refresh();
+        });
+    }
+
+    public function updatePayment(RepairOrder $order, RepairPayment $payment, array $payload): RepairOrder
+    {
+        if ((int) $payment->orden_id !== (int) $order->id || (int) $payment->reparacion !== (int) $order->reparacion || $payment->payment_type !== 'senia') {
+            throw new \RuntimeException('La seña no pertenece a este trabajo.');
+        }
+
+        return DB::transaction(function () use ($order, $payment, $payload): RepairOrder {
+            $payment->update(Arr::only($payload, ['amount', 'method', 'paid_at']));
+            $this->syncPaymentTotal($order);
             return $order->refresh();
         });
     }
@@ -2144,8 +2160,12 @@ class RepairService
     private function addInitialPayment(RepairOrder $order, mixed $amount, ?string $method = null): void
     {
         $normalizedMethod = in_array($method, ['efectivo', 'transferencia'], true) ? $method : 'efectivo';
-        $maxAmount = $normalizedMethod === 'transferencia' && (float) $order->monto > 30000
-            ? round((float) $order->monto * 1.1, 2)
+        $discountApplies = ($order->cash_discount_enabled ?? true)
+            && filter_var(SiteGlobalConfig::value('repair_cash_discount_enabled', '1'), FILTER_VALIDATE_BOOL)
+            && (float) $order->monto > max(0, (float) SiteGlobalConfig::value('repair_cash_discount_threshold', '30000'));
+        $percentage = max(0, min(100, (float) SiteGlobalConfig::value('repair_cash_discount_percentage', '10')));
+        $maxAmount = $normalizedMethod === 'transferencia' && $discountApplies
+            ? round((float) $order->monto * (1 + $percentage / 100), 2)
             : (float) $order->monto;
         $amount = min((float) $amount, $maxAmount);
 
@@ -2554,6 +2574,7 @@ class RepairService
             'monto',
             'senia',
             'senia_method',
+            'cash_discount_enabled',
             'fecha_estimada',
             'estado',
             'repuesto',
@@ -2597,6 +2618,7 @@ class RepairService
                     'monto' => $job['monto'] ?? 0,
                     'senia' => $job['senia'] ?? 0,
                     'senia_method' => $job['senia_method'] ?? null,
+                    'cash_discount_enabled' => $job['cash_discount_enabled'] ?? true,
                     'fecha_estimada' => $job['fecha_estimada'] ?? null,
                     'estado' => $state,
                     'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
@@ -2636,6 +2658,7 @@ class RepairService
                 'monto' => $payload['monto'] ?? 0,
                 'senia' => $payload['senia'] ?? 0,
                 'senia_method' => $payload['senia_method'] ?? null,
+                'cash_discount_enabled' => $payload['cash_discount_enabled'] ?? true,
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => ! $shouldRequestPart && ($payload['estado'] ?? null) === 'EN REPARACION / ESPERA REPUESTO' ? 'PENDIENTE' : ($payload['estado'] ?? 'PENDIENTE'),
                 'repuesto' => ($shouldRequestPart || $inventoryPartId > 0) && $part !== '' ? $part : null,
