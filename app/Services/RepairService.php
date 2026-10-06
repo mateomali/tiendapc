@@ -157,6 +157,10 @@ class RepairService
             return $orders;
         }
 
+        if ($orders->contains(fn (RepairOrder $order): bool => (bool) $order->tracking_disabled)) {
+            return collect();
+        }
+
         /** @var RepairOrder $base */
         $base = $orders->first();
         $expected = $base->hasClientDni()
@@ -386,6 +390,7 @@ class RepairService
                 'nombre_cliente' => $order->nombre_cliente,
                 'dni' => $order->dni,
                 'tracking_token' => $order->tracking_token,
+                'tracking_disabled' => $order->tracking_disabled ?? false,
                 'contacto' => $order->contacto,
                 'marca' => $this->detectDeviceBrandFromRepairText((string) ($payload['modelo'] ?? ''), (string) ($payload['descripcion'] ?? ''), (string) ($payload['marca'] ?? $order->marca ?? '')),
                 'modelo' => $model,

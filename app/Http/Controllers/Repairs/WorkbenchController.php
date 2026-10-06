@@ -1367,6 +1367,13 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Orden devuelta a consultas.');
     }
 
+    public function removeTracking(RepairOrder $repairOrder): RedirectResponse
+    {
+        RepairOrder::query()->where('id', $repairOrder->id)->update(['tracking_disabled' => true]);
+
+        return back()->with('success', 'Seguimiento público deshabilitado para esta orden.');
+    }
+
     public function destroy(RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
         $repairService->delete($repairOrder);
@@ -1503,6 +1510,7 @@ class WorkbenchController extends Controller
                 'cancel' => route('repairs.orders.cancel', $order),
                 'moveBack' => route('repairs.orders.move_back', $order),
                 'delete' => route('repairs.orders.delete', $order),
+                'removeTracking' => $order->tracking_disabled ? null : route('repairs.orders.tracking.remove', $order),
                 'addOriginalImages' => route('repairs.orders.images.add', $order),
                 'removeOriginalImage' => route('repairs.orders.images.remove', $order),
                 'addFinalImages' => route('repairs.orders.final_images.add', $order),

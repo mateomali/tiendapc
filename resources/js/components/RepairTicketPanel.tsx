@@ -1493,7 +1493,7 @@ function RepairEditCard({
     const deletePayment = (action?: string): void => {
         if (!action) return;
         if (window.confirm('Eliminar este movimiento del historial?')) {
-            router.post(action, {}, { preserveScroll: true });
+            router.post(action, {}, { preserveScroll: true, onSuccess: () => setEditingPayment(null) });
         }
     };
 
@@ -1658,6 +1658,13 @@ function RepairEditCard({
                 },
             },
         );
+    };
+
+    const removeTracking = (): void => {
+        if (!repair.actions?.removeTracking) return;
+        if (window.confirm(`¿Quitar el seguimiento público de la orden #${repair.id}? El cliente ya no podrá consultar sus trabajos con el DNI, PIN o QR.`)) {
+            router.post(repair.actions.removeTracking, {}, { preserveScroll: true });
+        }
     };
 
     const deleteRepair = (): void => {
@@ -2092,6 +2099,7 @@ function RepairEditCard({
             || canCancel
             || Boolean(repair.actions?.archive && !repair.archivado_at)
             || Boolean(repair.actions?.delete)
+            || Boolean(repair.actions?.removeTracking)
         );
 
         if (!mobile) {
@@ -2120,6 +2128,13 @@ function RepairEditCard({
                     <a key="tracking" href={ticket.trackingUrl} className={menuItem}>
                         <FaArrowRight aria-hidden="true" /> Seguimiento
                     </a>,
+                );
+            }
+            if (repair.actions?.removeTracking) {
+                secondaryItems.push(
+                    <button key="remove-tracking" type="button" className={menuItem} onClick={removeTracking}>
+                        <FaTimes aria-hidden="true" /> Quitar seguimiento
+                    </button>,
                 );
             }
             if (canCancel) {
@@ -2298,6 +2313,11 @@ function RepairEditCard({
                             <Link href={ticket.deliveryTicketUrl} className={cn(base, 'border border-[#0f766e] bg-[#0f766e] text-white')} title="Imprimir comprobante">
                                 <FaPrint aria-hidden="true" />{iconOnly ? null : 'Imprimir comprobante'}
                             </Link>
+                        ) : null}
+                        {repair.actions?.removeTracking ? (
+                            <button type="button" className={cn(base, 'border border-[#cbd5e1] bg-white text-[#334155]')} onClick={removeTracking} title="Quitar seguimiento" aria-label="Quitar seguimiento">
+                                <FaTimes aria-hidden="true" />{iconOnly ? null : 'Quitar seguimiento'}
+                            </button>
                         ) : null}
                         <a href={ticket.trackingUrl} className={cn(base, 'border border-[#2563eb] bg-[#2563eb] text-white')} title="Seguimiento">
                             <FaArrowRight aria-hidden="true" />{iconOnly ? null : 'Seguimiento'}
@@ -2579,7 +2599,7 @@ function RepairEditCard({
                                         </div>
                                     </div>
                                 ) : null}
-                                <details className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
+                                <details open={payments.length > 0} className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
                                     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
                                         <span className="font-black text-[#0f172a]">Historial de pagos e incrementos ({payments.length})</span>
                                         <span className="flex items-center gap-2 font-black text-[#0f172a]">
@@ -2614,13 +2634,13 @@ function RepairEditCard({
                                                                 ) : <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setEditingPayment(payment.id); editPaymentForm.setData({ amount: String(payment.amount), method: payment.method || 'efectivo', paid_at: payment.paid_at || todayInputValue() }); }}>Modificar seña</button>}
                                                             </div>
                                                         ) : null}
-                                                        {!readOnly ? (
+                                                        {!readOnly && payment.deleteAction ? (
                                                             <button
                                                                 type="button"
-                                                                className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-md text-xs font-black text-[#dc2626] transition hover:bg-[#fee2e2]"
+                                                                className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md border border-[#fecdd3] bg-[#fff1f2] text-sm font-black text-[#dc2626] transition hover:bg-[#fee2e2]"
                                                                 onClick={() => deletePayment(payment.deleteAction)}
-                                                                title="Eliminar movimiento"
-                                                                aria-label="Eliminar movimiento"
+                                                                title={isIncrement ? 'Quitar incremento' : 'Quitar seña registrada'}
+                                                                aria-label={isIncrement ? 'Quitar incremento' : 'Quitar seña registrada'}
                                                             >
                                                                 <FaTimes aria-hidden="true" />
                                                             </button>
