@@ -93,6 +93,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::post('/repairs/orders/{repairOrder}/payments/{repairPayment}/update', [WorkbenchController::class, 'updatePayment'])->name('repairs.orders.payments.update');
     Route::post('/repairs/orders/{repairOrder}/payments/{repairPayment}/delete', [WorkbenchController::class, 'deletePayment'])->name('repairs.orders.payments.delete');
     Route::post('/repairs/orders/{repairOrder}/state', [WorkbenchController::class, 'updateState'])->name('repairs.orders.state');
+    Route::post('/repairs/orders/{repairOrder}/tracking/restore', [WorkbenchController::class, 'restoreTracking'])->name('repairs.orders.tracking.restore');
     Route::post('/repairs/orders/{repairOrder}/tracking/remove', [WorkbenchController::class, 'removeTracking'])->name('repairs.orders.tracking.remove');
     Route::post('/repairs/orders/{repairOrder}/add-repair', [WorkbenchController::class, 'addRepair'])->name('repairs.orders.add_repair');
     Route::post('/repairs/orders/{repairOrder}/images/add', [WorkbenchController::class, 'addOriginalImages'])->name('repairs.orders.images.add');

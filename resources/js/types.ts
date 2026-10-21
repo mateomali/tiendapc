@@ -260,6 +260,7 @@ export interface RepairOrderView {
         cancel: string;
         moveBack: string;
         delete: string;
+        restoreTracking?: string | null;
         removeTracking?: string | null;
         addOriginalImages: string;
         removeOriginalImage: string;

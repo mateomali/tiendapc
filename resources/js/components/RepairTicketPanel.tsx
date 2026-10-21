@@ -1095,10 +1095,12 @@ function AddRepairModal({
                                 <option value="transferencia">Transferencia</option>
                             </select>
                         </EditField>
-                        <div className="min-h-5 text-xs font-semibold leading-5 text-[#475569] sm:col-span-2 lg:col-span-full">
-                            {transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}
-                            <label className="flex items-center gap-2"><input type="checkbox" checked={form.data.cash_discount_enabled} onChange={(event) => form.setData('cash_discount_enabled', event.target.checked)} />Descuento en efectivo</label>
-                        </div>
+                        {discountEligible(form.data.monto, true, pricing) && Number(form.data.senia || 0) < Number(form.data.monto) && (
+                            <div className="text-xs font-semibold leading-5 text-[#475569] sm:col-span-2 lg:col-span-full">
+                                {transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}
+                                <label className="flex items-center gap-2"><input type="checkbox" checked={form.data.cash_discount_enabled} onChange={(event) => form.setData('cash_discount_enabled', event.target.checked)} />Descuento en efectivo</label>
+                            </div>
+                        )}
                     </div>
                 </EditSection>
 
@@ -1660,6 +1662,13 @@ function RepairEditCard({
         );
     };
 
+    const restoreTracking = (): void => {
+        if (!repair.actions?.restoreTracking) return;
+        if (window.confirm(`¿Reintegrar el seguimiento público de la orden #${repair.id}? El cliente podrá volver a consultarla con el DNI, PIN o QR.`)) {
+            router.post(repair.actions.restoreTracking, {}, { preserveScroll: true });
+        }
+    };
+
     const removeTracking = (): void => {
         if (!repair.actions?.removeTracking) return;
         if (window.confirm(`¿Quitar el seguimiento público de la orden #${repair.id}? El cliente ya no podrá consultar sus trabajos con el DNI, PIN o QR.`)) {
@@ -2100,6 +2109,7 @@ function RepairEditCard({
             || Boolean(repair.actions?.archive && !repair.archivado_at)
             || Boolean(repair.actions?.delete)
             || Boolean(repair.actions?.removeTracking)
+            || Boolean(repair.actions?.restoreTracking)
         );
 
         if (!mobile) {
@@ -2128,6 +2138,13 @@ function RepairEditCard({
                     <a key="tracking" href={ticket.trackingUrl} className={menuItem}>
                         <FaArrowRight aria-hidden="true" /> Seguimiento
                     </a>,
+                );
+            }
+            if (repair.actions?.restoreTracking) {
+                secondaryItems.push(
+                    <button key="restore-tracking" type="button" className={menuItem} onClick={restoreTracking}>
+                        <FaArrowRight aria-hidden="true" /> Reintegrar seguimiento
+                    </button>,
                 );
             }
             if (repair.actions?.removeTracking) {
@@ -2313,6 +2330,11 @@ function RepairEditCard({
                             <Link href={ticket.deliveryTicketUrl} className={cn(base, 'border border-[#0f766e] bg-[#0f766e] text-white')} title="Imprimir comprobante">
                                 <FaPrint aria-hidden="true" />{iconOnly ? null : 'Imprimir comprobante'}
                             </Link>
+                        ) : null}
+                        {repair.actions?.restoreTracking ? (
+                            <button type="button" className={cn(base, 'border border-[#cbd5e1] bg-white text-[#334155]')} onClick={restoreTracking} title="Reintegrar seguimiento" aria-label="Reintegrar seguimiento">
+                                <FaArrowRight aria-hidden="true" />{iconOnly ? null : 'Reintegrar seguimiento'}
+                            </button>
                         ) : null}
                         {repair.actions?.removeTracking ? (
                             <button type="button" className={cn(base, 'border border-[#cbd5e1] bg-white text-[#334155]')} onClick={removeTracking} title="Quitar seguimiento" aria-label="Quitar seguimiento">

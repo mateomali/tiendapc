@@ -2457,6 +2457,10 @@ export default function WorkbenchPage({
                                             {groupedIndexes.map((jobIndex, rowIndex) => {
                                                 const rowJob = createForm.data.jobs[jobIndex];
                                                 const isOnlyRow = groupedIndexes.length === 1;
+                                                const showCashDiscount = !rowJob.a_presupuestar
+                                                    && rowJob.estado.toUpperCase() !== 'PAGADO'
+                                                    && cashDiscountApplies(Number(rowJob.monto))
+                                                    && Number(rowJob.senia || 0) < Number(rowJob.monto);
 
                                                 return (
                                                     <div key={`failure-row-${jobIndex}`} className="grid gap-2 rounded-lg border border-[#e6edf7] bg-[#fbfdff] p-3 md:grid md:grid-cols-[2rem_minmax(0,1fr)_9.5rem_8rem_8.5rem_2rem] md:items-start md:gap-x-3">
@@ -2496,11 +2500,11 @@ export default function WorkbenchPage({
                                                                         />
                                                                     </div>
                                                                     {suggestedPriceIndicator(jobIndex, true)}
-                                                                    {rowJob.cash_discount_enabled ? regularPriceIndicator(rowJob.monto, true) : <span className="text-xs">Sin descuento en efectivo</span>}
+                                                                    {showCashDiscount && (rowJob.cash_discount_enabled ? regularPriceIndicator(rowJob.monto, true) : <span className="text-xs">Sin descuento en efectivo</span>)}
                                                                     <button type="button" className={buttonClass('soft', 'sm', 'justify-self-start whitespace-nowrap text-[#92400e]')} onClick={() => updateJob(jobIndex, (current) => ({ ...current, a_presupuestar: true, monto: '' }))}>A presupuestar</button>
                                                                 </>
                                                             )}
-                                                            <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={rowJob.cash_discount_enabled} onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, cash_discount_enabled: event.target.checked }))} />Descuento en efectivo</label>
+                                                            {showCashDiscount && <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={rowJob.cash_discount_enabled} onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, cash_discount_enabled: event.target.checked }))} />Descuento en efectivo</label>}
                                                         </div>
                                                         <label className="grid content-start gap-1.5">
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Seña</span>
