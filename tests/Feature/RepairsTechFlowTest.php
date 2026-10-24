@@ -246,6 +246,32 @@ it('finds active repairs by model from consultations search', function (): void 
             ->where('tickets.0.repairs.0.modelo', 'Moto Edge 40'));
 });
 
+it('finds repairs by brand and model stored separately', function (string $term, ?array $fields): void {
+    foreach ([['id' => 1908, 'marca' => 'MOTOROLA', 'modelo' => 'G22'], ['id' => 1909, 'marca' => 'SAMSUNG', 'modelo' => 'G22']] as $device) {
+        RepairOrder::query()->create([
+            ...$device,
+            'reparacion' => 1,
+            'fecha' => now()->toDateString(),
+            'nombre_cliente' => 'Cliente',
+            'descripcion' => 'No enciende',
+            'estado' => 'PENDIENTE',
+            'entregado' => 'no',
+        ]);
+    }
+
+    $this->withSession(['repair_tech_authenticated' => true])
+        ->get(route('repairs.workbench', ['q' => $term, 'q_fields' => $fields]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('tickets', 1)
+            ->where('tickets.0.id', 1908));
+})->with([
+    'brand in default search' => ['motorola', null],
+    'brand in model search' => ['motorola', ['modelo']],
+    'brand and model' => ['motorola g22', ['modelo']],
+    'extra spaces' => ['  motorola   g22  ', ['modelo']],
+]);
+
 it('creates multi-job repair orders and redirects to the technical ticket', function (): void {
     $response = $this->withSession(['repair_tech_authenticated' => true])
         ->post(route('repairs.orders.store'), [

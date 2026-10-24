@@ -228,6 +228,7 @@ export interface RepairOrderView {
     isFullyPaid?: boolean;
     fecha_estimada?: string | null;
     estado: string;
+    listo_desde?: string | null;
     entregado: string;
     fecha_entregado?: string | null;
     deliveryPaymentMode?: 'cash' | 'regular' | null;

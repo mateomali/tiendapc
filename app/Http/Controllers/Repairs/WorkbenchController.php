@@ -1453,6 +1453,10 @@ class WorkbenchController extends Controller
     {
         $events ??= $order->events()->get();
         $availableStates ??= app(RepairService::class)->availableStates($delivered);
+        $readyEvent = $order->estado === 'LISTA'
+            ? $events->filter(fn (RepairEvent $event): bool => $event->estado_nuevo === 'LISTA'
+                && $event->estado_anterior !== 'LISTA')->sortByDesc('created_at')->first()
+            : null;
 
         return [
             'registro_id' => $order->registro_id,
@@ -1477,6 +1481,7 @@ class WorkbenchController extends Controller
             'isFullyPaid' => (float) $order->monto > 0 && (float) $order->senia >= (float) $order->monto,
             'fecha_estimada' => optional($order->fecha_estimada)->format('Y-m-d'),
             'estado' => $order->estado,
+            'listo_desde' => $readyEvent?->created_at?->format('Y-m-d'),
             'entregado' => $order->entregado,
             'fecha_entregado' => optional($order->fecha_entregado)->format('Y-m-d'),
             'deliveryPaymentMode' => app(RepairService::class)->deliveryPaymentMode($order),

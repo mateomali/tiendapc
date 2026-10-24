@@ -3040,7 +3040,7 @@ function RepairEditCard({
                         <PaymentStatus monto={monto} senia={senia} />
                         <SeniaBadge label={seniaLabel} />
                     </button>
-                    <div className={cn('relative flex items-center justify-center pl-2 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full', repairStatusRailFillClass(repair.estado))}>
+                    <div className={cn('relative flex flex-col items-center justify-center gap-1 pl-2 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full', repairStatusRailFillClass(repair.estado))}>
                         <button
                             type="button"
                             className={cn('inline-flex min-w-[5.8rem] items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[0.64rem] font-black uppercase leading-none', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
@@ -3051,6 +3051,7 @@ function RepairEditCard({
                             <span className={cn('h-2 w-2 rounded-full', repairStatusDotClass(repair.estado))} aria-hidden="true" />
                             <HighlightText value={compactStatusLabel(displayStatus)} term={highlightTerm} />
                         </button>
+                        {repair.estado === 'LISTA' ? <span className="text-center text-[0.65rem] font-semibold text-[#475569]">Listo desde: {repair.listo_desde ? formatLegacyDate(repair.listo_desde) : 'sin registro'}</span> : null}
                     </div>
                     <div className="flex items-center justify-end">
                         {readOnly ? (
@@ -3115,6 +3116,7 @@ function RepairEditCard({
                                 <span className={cn('rounded-full border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
                             </div>
                             <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
+                            {repair.estado === 'LISTA' ? <p className="text-[0.72rem] font-semibold">Listo desde: {repair.listo_desde ? formatLegacyDate(repair.listo_desde) : 'sin registro'}</p> : null}
                             <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
                                 <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>

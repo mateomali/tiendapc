@@ -1448,7 +1448,7 @@ class RepairService
         }
         $this->syncTaskQueueForState($order, $state);
 
-        if ($event !== 'CAMBIO_ESTADO_DIRECTO') {
+        if ($event !== 'CAMBIO_ESTADO_DIRECTO' || $previousState !== $state) {
             $this->recordEvent($order, $event, $previousState, $state);
         }
 
@@ -1931,7 +1931,7 @@ class RepairService
         $search = '%' . $term . '%';
         $numericTerm = ctype_digit($term) ? (int) $term : null;
 
-        $query->where(function ($subQuery) use ($activeFields, $search, $numericTerm): void {
+        $query->where(function ($subQuery) use ($activeFields, $search, $numericTerm, $term): void {
             foreach ($activeFields as $field) {
                 switch ($field) {
                     case 'id':
@@ -1947,7 +1947,14 @@ class RepairService
                         $subQuery->orWhere('contacto', 'like', $search);
                         break;
                     case 'modelo':
-                        $subQuery->orWhere('modelo', 'like', $search);
+                        $subQuery->orWhere(function ($deviceQuery) use ($term): void {
+                            foreach (preg_split('/\s+/u', $term, -1, PREG_SPLIT_NO_EMPTY) as $word) {
+                                $deviceQuery->where(function ($wordQuery) use ($word): void {
+                                    $wordQuery->where('marca', 'like', '%' . $word . '%')
+                                        ->orWhere('modelo', 'like', '%' . $word . '%');
+                                });
+                            }
+                        });
                         break;
                     case 'ingreso':
                         $this->applyDateGlobalSearch($subQuery, 'fecha', $search);
