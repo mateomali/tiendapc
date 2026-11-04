@@ -674,7 +674,10 @@ export default function CatalogPage({
             <section className={`${catalog.layout} catalog-font-scope`}>
                 <div className={catalog.layoutMain}>
                     <section className="mobile-catalog-controls" aria-label="Controles del catálogo">
-                        <p>{summary.productCount} {summary.productCount === 1 ? 'PRODUCTO' : 'PRODUCTOS'} EN CATÁLOGO</p>
+                        <div className="catalog-toolbar-heading">
+                            <h2><GridColumnsIcon /><span>Explorar productos</span></h2>
+                            <p role="status">{summary.productCount} {summary.productCount === 1 ? 'producto' : 'productos'}</p>
+                        </div>
                         <div className="mobile-catalog-buttons">
                             <button type="button" onClick={() => setMobilePanel('categories')} aria-haspopup="dialog" aria-controls="catalog-mobile-panel">
                                 <GridColumnsIcon /><span>Categorías</span>
@@ -734,11 +737,14 @@ export default function CatalogPage({
 
                     <section className={catalog.results}>
                         <div className="desktop-catalog-toolbar" ref={desktopToolbarRef} aria-label="Controles del catálogo en escritorio">
-                            <p className="desktop-catalog-count"><strong>{summary.productCount}</strong> {summary.productCount === 1 ? 'producto' : 'productos'} en catálogo</p>
+                            <div className="catalog-toolbar-heading">
+                                <h2><GridColumnsIcon /><span>Explorar productos</span></h2>
+                                <p className="desktop-catalog-count" role="status"><strong>{summary.productCount}</strong> {summary.productCount === 1 ? 'producto' : 'productos'}</p>
+                            </div>
                             <div className="desktop-catalog-actions">
                                 <button type="button" popoverTarget="desktop-categories" onClick={(event) => { setDesktopGroup(activeGroupKey || groups[0]?.key || ''); positionPopover(event.currentTarget, 860, true); }}><GridColumnsIcon />Categorías<span aria-hidden="true">⌄</span></button>
                                 <button type="button" popoverTarget="desktop-filters" onClick={(event) => { setDesktopFilterDraft({ onlyOffers: filters.onlyOffers, onlyNew: filters.onlyNew, onlyFeatured: filters.onlyFeatured }); positionPopover(event.currentTarget, 300); }}><FilterIcon />Filtros{[filters.onlyOffers, filters.onlyNew, filters.onlyFeatured].filter(Boolean).length > 0 ? ` (${[filters.onlyOffers, filters.onlyNew, filters.onlyFeatured].filter(Boolean).length})` : ''}</button>
-                                <label className="desktop-catalog-order" htmlFor="desktop-catalog-order">Ordenar por
+                                <label className="desktop-catalog-order" htmlFor="desktop-catalog-order"><SortIcon /><span>Ordenar por</span>
                                     <select id="desktop-catalog-order" value={filters.order} onChange={(event) => goToCatalogFilters({ order: event.currentTarget.value })}>
                                         <option value="fecha_ingreso">Más recientes</option>
                                         <option value="precio_asc">Menor precio</option>
@@ -782,14 +788,14 @@ export default function CatalogPage({
                         </div>
 
                         {activeFilters.length > 0 ? (
-                            <div className="catalog-active-filters flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm" aria-label="Filtros activos">
-                                <span className="font-semibold text-slate-700">Filtros:</span>
-                                <button type="button" className="catalog-clear-all" onClick={() => router.get(filters.clearUrl)}>Limpiar todo</button>
+                            <div className="catalog-active-filters" aria-label="Filtros activos">
+                                <span>Filtros activos:</span>
                                 {activeFilters.map((filter) => (
-                                    <button key={filter.label} type="button" onClick={filter.clear} aria-label={`Quitar filtro: ${filter.label}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-3 text-[#17376f] hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2">
-                                        {filter.label}<span aria-hidden="true">×</span>
+                                    <button key={filter.label} type="button" onClick={filter.clear} aria-label={`Quitar filtro: ${filter.label}`}>
+                                        <span>{filter.label}</span><span aria-hidden="true">×</span>
                                     </button>
                                 ))}
+                                <button type="button" className="catalog-clear-all" onClick={() => router.get(filters.clearUrl)}>Limpiar filtros</button>
                             </div>
                         ) : null}
                         {products.length > 0 ? (

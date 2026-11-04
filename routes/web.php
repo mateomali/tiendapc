@@ -19,7 +19,7 @@ use App\Http\Controllers\Repairs\WorkbenchController;
 use App\Http\Controllers\StoreController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [StoreController::class, 'home'])->name('home');
+Route::permanentRedirect('/', '/productos')->name('home');
 Route::get('/productos', [StoreController::class, 'catalog'])->name('store.catalog');
 Route::get('/productos-preview', [StoreController::class, 'catalog'])->name('store.catalog.preview');
 Route::get('/producto/{slug}', [StoreController::class, 'show'])->name('store.product.show');

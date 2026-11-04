@@ -623,11 +623,16 @@
 }
 
 /* Desktop catalog navigation. */
-.desktop-catalog-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #dbe3ef; background: #10264c; color: #f1f6ff; border-bottom-color: #365b91; }
+.desktop-catalog-toolbar { display: grid; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #365b91; background: #10264c; color: #f1f6ff; }
+.catalog-toolbar-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; padding-bottom: 12px; border-bottom: 1px solid #365b91; }
+.catalog-toolbar-heading h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.catalog-toolbar-heading svg { flex-shrink: 0; width: 18px; height: 18px; fill: none; stroke: #c8d9f3; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.catalog-toolbar-heading p { margin: 0; flex-shrink: 0; font-size: 13px; color: #c8d9f3; font-variant-numeric: tabular-nums; }
 .desktop-catalog-count { margin: 0; font-size: 14px; color: #c8d9f3; }
-.desktop-catalog-count strong { color: #fff; margin-right: 4px; font-size: 18px; }
+.desktop-catalog-count strong { color: #fff; font-size: inherit; }
 .desktop-catalog-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.desktop-catalog-actions > button, .desktop-catalog-order { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid #5276ab; border-radius: 6px; background: #1b3c70; font-size: 14px; color: #fff; }
+.desktop-catalog-actions > button[popovertarget="desktop-view"] { margin-left: auto; }
+.desktop-catalog-actions > button, .desktop-catalog-order { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid #5276ab; border-radius: 8px; background: #1b3c70; font-size: 14px; color: #fff; }
 .desktop-catalog-actions > button { cursor: pointer; font-weight: 600; }
 .desktop-catalog-actions svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: #a9dfff; }
 .desktop-catalog-order { color: #c8d9f3; }
@@ -659,22 +664,27 @@
 .desktop-view-menu select { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; background: #10264c; border-color: #5276ab; color: #fff; }
 .desktop-catalog-toolbar :is(button,select):focus-visible, .desktop-catalog-popover :is(button,select,input):focus-visible { outline: 2px solid #2456b4; outline-offset: 2px; outline-color: #7bd9fa; }
 @media (max-width: 860px) { .desktop-catalog-toolbar, .desktop-catalog-popover { display: none; } }
-.desktop-catalog-actions > button:first-child { background: #2858a5; border-color: #7da7e3; }
 .desktop-catalog-actions > button:hover, .desktop-catalog-actions > button[aria-expanded="true"] { background: #315f9f; border-color: #9bc8ff; }
 .desktop-popover-header button:hover { background: #284d80; color: #fff; }
 .desktop-category-heading:hover { color: #fff; background: #284d80; }
 .desktop-category-groups button { font-weight: 500; }
 .desktop-category-links button { font-weight: 400; line-height: 1.5; }
 .desktop-category-links button[aria-pressed="true"], .desktop-category-groups button[aria-pressed="true"] { font-weight: 700; }
-body:has(#desktop-categories:popover-open) .desktop-catalog-actions > button[popovertarget="desktop-categories"], body:has(#desktop-filters:popover-open) .desktop-catalog-actions > button[popovertarget="desktop-filters"], body:has(#desktop-view:popover-open) .desktop-catalog-actions > button[popovertarget="desktop-view"] { background: #315f9f; border-color: #9bc8ff; box-shadow: inset 0 -2px #7bd9fa; }
+body:has(#desktop-categories:popover-open) .desktop-catalog-actions > button[popovertarget="desktop-categories"], body:has(#desktop-filters:popover-open) .desktop-catalog-actions > button[popovertarget="desktop-filters"], body:has(#desktop-view:popover-open) .desktop-catalog-actions > button[popovertarget="desktop-view"] { background: #493b80; border-color: #b9a4ef; }
 .desktop-filter-reset { color: #9bdefc; }
 .desktop-filter-apply:hover { background: #315f9f; }
-/* Shared filter colors on desktop and mobile. */
-    .catalog-active-filters { background: #18345e; border-color: #365b91; color: #d5e5fb; }
-    .catalog-active-filters > span { color: #d5e5fb; }
-    .catalog-active-filters > button { border-color: #5276ab; background: #1b3c70; color: #fff; }
-    .catalog-active-filters > button:hover { background: #315f9f; }
-    .catalog-active-filters .catalog-clear-all { color: #9bdefc; background: transparent; }
+/* Active filters share the catalog toolbar palette. */
+.catalog-active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid #365b91; background: #10264c; color: #d5e5fb; font-size: 13px; }
+.catalog-active-filters > span { font-weight: 600; }
+.catalog-active-filters > button { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px; max-width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid #5276ab; border-radius: 8px; background: #1b3c70; color: #fff; cursor: pointer; text-align: left; }
+.catalog-active-filters > button > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.catalog-active-filters > button > span:last-child { flex-shrink: 0; font-size: 20px; line-height: 1; color: #d8c9ff; }
+.catalog-active-filters > button:hover { background: #315f9f; }
+.catalog-active-filters .catalog-clear-all { color: #d8c9ff; background: transparent; border-color: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.catalog-active-filters button:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+    .desktop-catalog-actions > button, .mobile-catalog-buttons button, .catalog-active-filters button { transition: background-color 150ms ease, border-color 150ms ease; }
+}
 
 /* Mobile store navigation and catalog controls. */
 .mobile-store-bar, .mobile-catalog-controls { display: none; }
@@ -721,14 +731,18 @@ body:has(#desktop-categories:popover-open) .desktop-catalog-actions > button[pop
     .mobile-store-search .legacy-mobile-brand + div { display: block; }
     .mobile-store-search a[aria-label^="Ir al carrito"] { display: none; }
     .mobile-catalog-controls { display: grid; gap: 10px; padding: 16px 12px; background: #10264c; color: #eff6ff; }
-    .mobile-catalog-controls > p { margin: 0 0 2px; font-size: 13px; font-weight: 700; letter-spacing: .045em; }
+    .mobile-catalog-controls .catalog-toolbar-heading h2 { font-size: 14px; }
+    .mobile-catalog-controls .catalog-toolbar-heading h2 > svg { display: none; }
+    .mobile-catalog-controls .catalog-toolbar-heading p { font-size: 12px; }
+    .catalog-active-filters { padding: 10px 12px; }
+    .catalog-active-filters > button { min-height: 44px; }
     .mobile-catalog-buttons { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
-    .mobile-catalog-buttons button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px; border: 1px solid #5276ab; border-radius: 6px; background: #1b3c70; color: #fff; font-size: 14px; font-weight: 600; }
+    .mobile-catalog-buttons button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px; border: 1px solid #5276ab; border-radius: 8px; background: #1b3c70; color: #fff; font-size: 14px; font-weight: 600; }
     .mobile-catalog-buttons button:hover { background: #315f9f; }
     .mobile-catalog-controls svg { flex-shrink: 0; width: 19px; height: 19px; fill: none; stroke: #a9dfff; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
     .mobile-catalog-controls :is(button,select):focus-visible { outline: 2px solid #7bd9fa; outline-offset: 2px; }
-    .mobile-catalog-order { display: grid; grid-template-columns: 20px auto minmax(0,1fr); align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid #5276ab; border-radius: 6px; background: #1b3c70; color: #c8d9f3; font-size: 14px; }
-    .mobile-catalog-order select { width: 100%; min-width: 0; min-height: 44px; border: 0; background: transparent; color: #fff; font-size: 16px; font-weight: 600; color-scheme: dark; }
+    .mobile-catalog-order { display: grid; grid-template-columns: 20px auto minmax(0,1fr); align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid #5276ab; border-radius: 8px; background: #1b3c70; color: #c8d9f3; font-size: 12px; }
+    .mobile-catalog-order select { width: 100%; min-width: 0; min-height: 44px; border: 0; background: transparent; color: #fff; font-size: 14px; font-weight: 600; color-scheme: dark; }
     .mobile-catalog-order select option { background-color: #10264c; color: #fff; }
     .catalog-results-count { display: none; }
 }
