@@ -1,4 +1,4 @@
-﻿import { cn } from './utils';
+import { cn } from './utils';
 
 const cardSurface =
     'rounded-[1rem] border border-[rgba(203,219,244,0.82)] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_12px_28px_rgba(18,58,132,0.075)]';
@@ -223,9 +223,9 @@ export const site = {
         'min-h-screen px-0 pt-0 pb-[1.8rem] text-[#102146] bg-[radial-gradient(circle_at_top_right,rgba(87,182,255,0.28),transparent_24%),radial-gradient(circle_at_top_left,rgba(36,86,184,0.2),transparent_20%),linear-gradient(180deg,#edf4ff_0%,#d9e7ff_26%,#d6e4ff_100%)] max-[860px]:pt-0',
     frame: 'mx-auto w-full max-[860px]:px-[0.18rem]',
     header:
-        'sticky top-0 z-40 overflow-hidden rounded-none border-x border-b border-t-0 border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.24rem_0.72rem_0.3rem] shadow-[0_14px_28px_rgba(8,25,70,0.20),0_3px_10px_rgba(90,173,255,0.10),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[10px] after:pointer-events-none after:absolute after:right-[-12%] after:bottom-[-70%] after:h-[28rem] after:w-[28rem] after:rounded-full after:bg-[radial-gradient(circle,rgba(92,196,255,0.12)_0%,rgba(92,196,255,0)_68%)] after:content-[\"\"] max-[860px]:relative max-[860px]:top-auto max-[860px]:z-auto max-[860px]:overflow-visible max-[860px]:rounded-none max-[860px]:border-t max-[860px]:p-[0.2rem_0.3rem] max-[860px]:backdrop-blur-none max-[860px]:after:hidden',
+        'sticky top-0 z-40 overflow-hidden rounded-none border-x border-b border-t-0 border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.24rem_0.72rem_0.3rem] shadow-[0_14px_28px_rgba(8,25,70,0.20),0_3px_10px_rgba(90,173,255,0.10),inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-[10px] after:pointer-events-none after:absolute after:right-[-12%] after:bottom-[-70%] after:h-[28rem] after:w-[28rem] after:rounded-full after:bg-[radial-gradient(circle,rgba(92,196,255,0.12)_0%,rgba(92,196,255,0)_68%)] after:content-[\"\"] max-[860px]:overflow-visible max-[860px]:rounded-none max-[860px]:border-t max-[860px]:p-[0.2rem_0.3rem] max-[860px]:backdrop-blur-none max-[860px]:after:hidden',
     headerInner:
-        'relative z-[1] mx-auto w-full max-w-[1160px] max-[860px]:max-w-none',
+        'relative z-[1] mx-auto w-full max-w-[1752px] max-[860px]:max-w-none',
     brandRow:
         'grid grid-cols-[minmax(220px,280px)_minmax(380px,620px)_auto] grid-rows-1 items-center justify-center gap-x-[0.95rem] gap-y-0 max-[1320px]:grid-cols-[minmax(190px,238px)_minmax(360px,1fr)_auto] max-[1080px]:grid-cols-[minmax(180px,218px)_minmax(280px,1fr)_auto] max-[860px]:grid-cols-[minmax(0,1fr)_auto] max-[860px]:grid-rows-none max-[860px]:gap-x-[0.22rem] max-[860px]:gap-y-[0.18rem]',
     mobileBrandTop:
@@ -354,9 +354,9 @@ export function siteAnnouncementItemClass(active: boolean, image: boolean, catal
 }
 
 export const siteAnnouncementImageShellClass =
-    'relative isolate w-full aspect-[8.4/1] overflow-hidden rounded-none shadow-none after:pointer-events-none after:absolute after:inset-0 after:bg-[linear-gradient(90deg,rgba(10,26,65,0.14)_0%,rgba(10,26,65,0)_18%,rgba(10,26,65,0)_82%,rgba(10,26,65,0.14)_100%)] after:content-[\"\"] max-[860px]:aspect-[4.1/1] max-[860px]:rounded-none max-[860px]:shadow-none max-[560px]:aspect-[5.1/1] max-[560px]:rounded-none';
+    'relative isolate h-[clamp(100px,8vw,150px)] w-full overflow-hidden rounded-none shadow-none after:pointer-events-none after:absolute after:inset-0 after:bg-[linear-gradient(90deg,rgba(10,26,65,0.14)_0%,rgba(10,26,65,0)_18%,rgba(10,26,65,0)_82%,rgba(10,26,65,0.14)_100%)] after:content-[\"\"] max-[860px]:h-[88px] max-[860px]:rounded-none max-[860px]:shadow-none max-[560px]:h-[72px] max-[560px]:rounded-none';
 export const siteAnnouncementImageClass =
-    'mx-auto h-full w-full max-w-none rounded-none object-cover saturate-[1.04] contrast-[1.02]';
+    'mx-auto h-full w-full max-w-none rounded-none object-contain saturate-[1.04] contrast-[1.02]';
 export const siteAnnouncementPlainImageClass = 'h-full w-full object-fill';
 export const siteAnnouncementTextClass =
     'relative z-[1] min-h-[34px] px-2.5 text-center text-[clamp(0.8rem,0.46vw+0.72rem,0.92rem)] font-extrabold leading-[1.2] text-[#f3f8ff] underline decoration-current underline-offset-2 shadow-none [text-shadow:0_0_12px_rgba(130,205,255,0.14)] max-[860px]:min-h-[30px] max-[860px]:px-2 max-[860px]:text-[0.78rem] max-[560px]:min-h-7 max-[560px]:px-1.5 max-[560px]:text-[0.72rem] max-[560px]:leading-[1.15]';
@@ -385,7 +385,7 @@ export const footer = {
 };
 
 export const catalog = {
-    layout: 'grid grid-cols-1 gap-0',
+    layout: 'mx-auto grid w-full min-w-0 grid-cols-1 gap-0 min-[861px]:max-w-[1800px] min-[861px]:px-6',
     layoutMain: 'grid grid-cols-1 gap-0',
     mobileControls: 'grid gap-0 min-[861px]:hidden',
     mobileControlsBar:
@@ -395,7 +395,7 @@ export const catalog = {
         'inline-flex min-h-[34px] items-center rounded-[0.68rem] bg-[rgba(8,27,67,0.26)] px-3 text-[0.76rem] font-black uppercase tracking-[0.06em] text-[#eaf4ff] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
     mobileControlsActions: 'flex items-end justify-end gap-[0.34rem]',
     mobileControlsButton:
-        'inline-flex h-8 min-h-8 w-8 min-w-8 items-center justify-center rounded-[0.58rem] border border-[rgba(205,227,255,0.76)] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(237,245,255,0.95)_100%)] p-0 text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_12px_rgba(7,32,88,0.10)]',
+        'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 px-2 text-xs font-semibold rounded-[0.58rem] border border-[rgba(205,227,255,0.76)] bg-[linear-gradient(180deg,rgba(255,255,255,0.97)_0%,rgba(237,245,255,0.95)_100%)] p-0 text-[#17427f] shadow-[inset_0_1px_0_rgba(255,255,255,0.92),0_5px_12px_rgba(7,32,88,0.10)]',
     mobileControlsIcon:
         'inline-flex h-4 w-4 flex-none items-center justify-center [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:fill-none [&_svg]:stroke-current [&_svg]:stroke-2 [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]',
     mobileSheetOverlay:
@@ -448,7 +448,7 @@ export const catalog = {
         'mb-0 hidden min-h-[3.25rem] w-full max-w-none grid-cols-[minmax(360px,1fr)_auto] items-center gap-2 rounded-none border-y border-x-0 border-[rgba(178,214,255,0.46)] bg-[radial-gradient(circle_at_84%_10%,rgba(124,211,255,0.12),transparent_20%),linear-gradient(180deg,rgba(42,87,169,0.98)_0%,rgba(34,69,143,0.98)_100%)] p-[0.42rem_0.7rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur-md min-[861px]:grid max-[1120px]:grid-cols-1 max-[1120px]:items-stretch',
     productToolbarFilters: 'min-w-0 min-[861px]:max-w-[1500px]',
     productToolbarActions: 'min-w-0 justify-self-end max-[1120px]:justify-self-stretch',
-    grid: 'grid grid-cols-1 gap-2.5',
+    grid: 'catalog-product-grid grid grid-cols-1 gap-2.5',
     empty: 'grid justify-items-center gap-[0.7rem] rounded-[1.3rem] border border-[rgba(155,194,242,0.92)] bg-[linear-gradient(180deg,#ffffff_0%,#eff6ff_100%)] px-4 py-8 text-center shadow-[0_14px_28px_rgba(33,74,154,0.12)] max-[860px]:rounded-[1.05rem]',
     marquee: 'relative mx-0 mb-0 overflow-hidden rounded-none border-y border-x-0 border-[rgba(146,189,255,0.28)] bg-[linear-gradient(90deg,rgba(5,31,79,0.72),rgba(16,61,137,0.82),rgba(5,31,79,0.72))] p-[0.2rem_0.75rem] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] max-[860px]:mx-0 max-[860px]:mb-0 max-[860px]:p-[0.16rem_0.62rem] max-[860px]:pr-10',
     marqueeTrack: 'flex w-full items-center justify-center whitespace-nowrap',
@@ -467,9 +467,10 @@ export function catalogOrderButtonClass(active: boolean): string {
     );
 }
 
-export function catalogGridClass(columns: 1 | 2 | 3 | 4 | 5 | 6): string {
+export function catalogGridClass(columns: 'auto' | 1 | 2 | 3 | 4 | 5 | 6): string {
     return cn(
         catalog.grid,
+        columns === 'auto' && 'min-[861px]:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]',
         columns === 1 && 'min-[861px]:mx-auto min-[861px]:w-[min(980px,100%)] min-[861px]:grid-cols-1',
         columns === 2 && 'min-[861px]:mx-auto min-[861px]:w-[min(760px,100%)] min-[861px]:grid-cols-2',
         columns === 3 && 'min-[861px]:mx-auto min-[861px]:w-[min(1080px,100%)] min-[861px]:grid-cols-3',

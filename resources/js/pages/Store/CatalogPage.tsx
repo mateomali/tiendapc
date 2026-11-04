@@ -1,6 +1,6 @@
-﻿import { Link, router } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import type { FocusEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PaymentMethodsLine } from '../../components/PaymentMethodsLine';
 import { SiteLayout } from '../../layouts/SiteLayout';
 import type { AnnouncementItem, CatalogCategory, CatalogGroup, CatalogProduct, HeaderSearchState, SharedPageProps } from '../../types';
@@ -86,8 +86,8 @@ interface CatalogToolbarButtonProps {
     children: JSX.Element | JSX.Element[] | string;
 }
 
-type CatalogGridColumns = 1 | 2 | 3 | 4 | 5 | 6;
-type MobileCatalogPanel = 'filters' | 'sort' | null;
+type CatalogGridColumns = 'auto' | 1 | 2 | 3 | 4 | 5 | 6;
+type MobileCatalogPanel = 'categories' | 'filters' | null;
 
 const catalogGridColumnOptions: CatalogGridColumns[] = [2, 3, 4, 5, 6];
 const catalogGridColumnsStorageKey = 'sudoku.catalog.gridColumns';
@@ -325,7 +325,7 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
                 </div>
             ) : null}
 
-            <Link href={product.detailUrl} className={`${catalogImageLinkClass} ${catalogImageToneClass(cardTone)}`} prefetch={['hover', 'click']} cacheFor="30s">
+            <Link href={product.detailUrl} title={product.name} className={`${catalogImageLinkClass} ${catalogImageToneClass(cardTone)}`} prefetch={['hover', 'click']} cacheFor="30s">
                 <img
                     src={activeImage}
                     alt={product.name}
@@ -334,6 +334,8 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
                     decoding="async"
                     fetchPriority={eagerImage ? 'high' : 'low'}
                     onError={(event) => {
+                        if (event.currentTarget.dataset.fallback) { event.currentTarget.style.visibility = 'hidden'; return; }
+                        event.currentTarget.dataset.fallback = 'true';
                         event.currentTarget.src = product.imageFallbackUrl;
                     }}
                 />
@@ -345,14 +347,14 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
                 <div className={catalogCategoryRowClass}>
                     <p className={catalogCategoryClass}>{product.categoryName}</p>
                 </div>
-                <Link href={product.detailUrl} className={catalogTitleClass} prefetch={['hover', 'click']} cacheFor="30s">
+                <Link href={product.detailUrl} title={product.name} className={catalogTitleClass} prefetch={['hover', 'click']} cacheFor="30s">
                     {product.name}
                 </Link>
 
                 {product.cashPrice ? (
                     <div className="grid justify-items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-center leading-tight text-emerald-900">
                         <span className="inline-flex items-center gap-1 text-[0.62rem] font-black uppercase tracking-[0.045em] text-emerald-700">
-                            Oferta en efectivo
+                            En efectivo
                             <CashIcon />
                         </span>
                         <strong className="catalog-preview-price-font text-[1.74rem] font-black leading-none text-emerald-950 [font-variant-numeric:tabular-nums] max-[560px]:text-[1.42rem]">${product.cashPriceLabel}</strong>
@@ -379,7 +381,7 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
                         className={catalogActionClass('primary', 'min-w-0 w-full')}
                         onClick={addToCart}
                     >
-                        <span>Agregar</span>
+                        <span>{showAddedFeedback ? 'Agregado' : 'Agregar'}</span>
                         <span className={catalogActionIconClass} aria-hidden="true">
                             <SolidCartIcon size={14} />
                         </span>
@@ -410,6 +412,7 @@ function CatalogProductCard({ product, cartUrl, eagerImage }: CatalogProductCard
 
 function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCardComponentProps): JSX.Element {
     const [imageIndex, setImageIndex] = useState(0);
+    const [failedImages, setFailedImages] = useState<string[]>([]);
     const [showAddedFeedback, setShowAddedFeedback] = useState(false);
 
     useEffect(() => {
@@ -464,7 +467,7 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
 
     return (
         <article
-            className="group relative grid min-h-[248px] overflow-hidden rounded-[0.75rem] border border-slate-200 bg-white text-slate-950 shadow-[0_2px_8px_rgba(15,23,42,0.08)] transition-colors duration-150 hover:border-[#2456b4]/45 max-[860px]:min-h-[176px] max-[860px]:grid-cols-[42%_minmax(0,1fr)]"
+            className="catalog-card group"
             data-testid="catalog-product-card-preview"
             onMouseEnter={showNextImage}
             onMouseLeave={showFirstImage}
@@ -481,21 +484,24 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
 
             <Link
                 href={product.detailUrl}
-                className="relative flex min-h-[178px] items-center justify-center overflow-hidden bg-[#f8fafc] p-3 ring-1 ring-slate-100 max-[860px]:min-h-0 max-[860px]:p-2"
+                className="catalog-card-image"
                 prefetch={['hover', 'click']}
                 cacheFor="30s"
             >
-                <img
+                {activeImage === product.imageFallbackUrl || failedImages.includes(activeImage) ? (
+                    <span className="catalog-card-placeholder" role="img" aria-label={`Imagen no disponible: ${product.name}`}>
+                        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><rect x="7" y="8" width="34" height="32" rx="3" /><circle cx="18" cy="19" r="3" /><path d="m8 34 10-10 8 8 6-6 9 9" /></svg>
+                        <span>Imagen no disponible</span>
+                    </span>
+                ) : <img
                     src={activeImage}
                     alt={product.name}
-                    className="h-full max-h-[220px] w-full object-contain transition duration-150 group-hover:scale-[1.015] max-[860px]:max-h-[160px]"
+                    className="catalog-card-photo"
                     loading={eagerImage ? 'eager' : 'lazy'}
                     decoding="async"
                     fetchPriority={eagerImage ? 'high' : 'low'}
-                    onError={(event) => {
-                        event.currentTarget.src = product.imageFallbackUrl;
-                    }}
-                />
+                    onError={() => setFailedImages((current) => current.includes(activeImage) ? current : [...current, activeImage])}
+                />}
 
                 <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
                     {product.hasOffer ? (
@@ -513,44 +519,35 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
                 <span className={catalogImageDetailsPillClass}>Más detalles</span>
             </Link>
 
-            <div className="grid min-w-0 content-start gap-2 p-3 max-[860px]:gap-1.5 max-[860px]:p-2.5">
-                <p className="catalog-preview-title-font m-0 min-w-0 truncate text-[0.68rem] font-[500] uppercase tracking-[0.04em] text-slate-500 max-[560px]:text-[0.6rem]">
+            <div className="catalog-card-content">
+                <p className="catalog-card-category catalog-preview-title-font">
                     {product.categoryName}
                 </p>
 
-                <Link href={product.detailUrl} className="catalog-preview-title-font line-clamp-2 min-h-[2.4rem] text-[0.96rem] font-[400] uppercase leading-[1.22] text-slate-950 no-underline max-[560px]:min-h-[2.05rem] max-[560px]:text-[0.84rem]" prefetch={['hover', 'click']} cacheFor="30s">
+                <Link href={product.detailUrl} title={product.name} className="catalog-card-title catalog-preview-title-font" prefetch={['hover', 'click']} cacheFor="30s">
                     {product.name}
                 </Link>
 
-                <div className="mt-1 grid justify-items-center gap-0.5 text-center">
-                    {product.hasOffer ? (
-                        <span className="catalog-preview-price-font text-[0.72rem] font-bold uppercase tracking-[0.025em] text-slate-400">
-                            Antes <span className="line-through">${product.priceLabel}</span>
-                        </span>
-                    ) : null}
-                    {product.cashPrice ? (
-                        <div className="grid w-full justify-items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1.5 leading-tight text-emerald-900">
-                            <span className="inline-flex items-center gap-1 text-[0.58rem] font-black uppercase tracking-[0.045em] text-emerald-700">
-                                Oferta en efectivo
-                                <CashIcon />
-                            </span>
-                            <strong className="catalog-preview-price-font text-[1.62rem] font-black leading-none text-emerald-950 [font-variant-numeric:tabular-nums] max-[560px]:text-[1.34rem]">${product.cashPriceLabel}</strong>
-                            <PaymentMethodsLine priceLabel={product.displayPriceLabel} />
-                        </div>
-                    ) : (
-                        <strong className="catalog-preview-price-font text-[1.78rem] font-extrabold leading-none text-black [font-variant-numeric:tabular-nums] max-[860px]:text-[1.55rem] max-[560px]:text-[1.34rem]">
-                            ${product.displayPriceLabel}
-                        </strong>
-                    )}
+                <div className={`catalog-card-price ${product.cashPrice ? 'catalog-card-price-cash' : ''}`}>
+                    <div className="catalog-card-price-caption">
+                        {product.cashPrice ? <span>En efectivo</span> : <span>Precio</span>}
+                        {product.hasOffer ? <span className="catalog-card-before">Antes <s>${product.priceLabel}</s></span> : null}
+                    </div>
+                    <strong className="catalog-card-amount catalog-preview-price-font">
+                        ${product.cashPrice ? product.cashPriceLabel : product.displayPriceLabel}
+                    </strong>
+                    <div className="catalog-card-price-secondary">
+                        {product.cashPrice ? <span>Otros medios <b>${product.displayPriceLabel}</b></span> : null}
+                    </div>
                 </div>
 
-                <div className="mt-auto grid gap-1.5 pt-1">
+                <div className="catalog-card-actions">
                     <button
                         type="button"
                         className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[#2456b4] bg-[#2456b4] px-3 py-2 text-[0.72rem] font-black uppercase tracking-[0.025em] text-white transition-colors duration-150 hover:bg-[#1d417d] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2456b4]"
                         onClick={addToCart}
                     >
-                        <span>Agregar</span>
+                        <span>{showAddedFeedback ? 'Agregado' : 'Agregar'}</span>
                         <span className={catalogActionIconClass} aria-hidden="true">
                             <SolidCartIcon size={14} />
                         </span>
@@ -589,19 +586,46 @@ export default function CatalogPage({
     previewCardGrid = false,
 }: CatalogPageProps): JSX.Element {
     const [mobilePanel, setMobilePanel] = useState<MobileCatalogPanel>(null);
+    const [mobileFilterDraft, setMobileFilterDraft] = useState({ onlyOffers: filters.onlyOffers, onlyNew: filters.onlyNew, onlyFeatured: filters.onlyFeatured });
+    useEffect(() => {
+        if (mobilePanel === 'filters') setMobileFilterDraft({ onlyOffers: filters.onlyOffers, onlyNew: filters.onlyNew, onlyFeatured: filters.onlyFeatured });
+    }, [mobilePanel, filters.onlyOffers, filters.onlyNew, filters.onlyFeatured]);
+    const mobileDialogRef = useRef<HTMLDialogElement>(null);
+    useEffect(() => {
+        const dialog = mobileDialogRef.current;
+        if (!dialog) return;
+        if (mobilePanel && !dialog.open) dialog.showModal();
+        if (!mobilePanel && dialog.open) dialog.close();
+        const previousOverflow = document.body.style.overflow;
+        if (mobilePanel) document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = previousOverflow; };
+    }, [mobilePanel]);
+
     const [gridColumns, setGridColumns] = useState<CatalogGridColumns>(() => {
         if (typeof window === 'undefined') {
-            return 4;
+            return 'auto';
         }
 
         const savedColumns = Number.parseInt(window.localStorage.getItem(catalogGridColumnsStorageKey) ?? '', 10);
-        return catalogGridColumnOptions.includes(savedColumns as CatalogGridColumns) ? (savedColumns as CatalogGridColumns) : 4;
+        return catalogGridColumnOptions.includes(savedColumns as CatalogGridColumns) ? (savedColumns as CatalogGridColumns) : 'auto';
     });
     const selectedCategoryItem = categories.find((category) => category.slug === filters.selectedCategory);
     const activeGroupKey = filters.selectedGroup !== '' ? filters.selectedGroup : selectedCategoryItem?.groupKey ?? '';
     const visibleCategories = activeGroupKey === '' ? categories : categories.filter((category) => category.groupKey === activeGroupKey);
-    const isFiltered = activeGroupKey !== '' || filters.selectedCategory !== '' || filters.selectedCategories.length > 0 || filters.onlyNew || filters.onlyOffers || filters.onlyFeatured || filters.order !== 'fecha_ingreso';
+    const isFiltered = activeGroupKey !== '' || filters.selectedCategory !== '' || filters.selectedCategories.length > 0 || filters.onlyNew || filters.onlyOffers || filters.onlyFeatured || filters.order !== 'fecha_ingreso' || filters.query.trim() !== '';
     const ProductCard = previewCardGrid ? CatalogProductPreviewCard : CatalogProductCard;
+    const activeFilters: { label: string; clear: () => void }[] = [];
+    if (filters.query.trim()) activeFilters.push({ label: `Buscar: ${filters.query}`, clear: () => goToCatalogFilters({ query: '' }) });
+    if (activeGroupKey) activeFilters.push({ label: groups.find((group) => group.key === activeGroupKey)?.label ?? activeGroupKey, clear: () => goToCatalogFilters({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }) });
+    const categorySlugs = [...new Set([filters.selectedCategory, ...filters.selectedCategories].filter(Boolean))];
+    categorySlugs.forEach((slug) => activeFilters.push({
+        label: categories.find((category) => category.slug === slug)?.name ?? slug,
+        clear: () => goToCatalogFilters({ selectedCategory: filters.selectedCategory === slug ? '' : filters.selectedCategory, selectedCategories: filters.selectedCategories.filter((value) => value !== slug) }),
+    }));
+    if (filters.onlyOffers) activeFilters.push({ label: 'Ofertas', clear: () => goToCatalogFilters({ onlyOffers: false }) });
+    if (filters.onlyNew) activeFilters.push({ label: 'Novedades', clear: () => goToCatalogFilters({ onlyNew: false }) });
+    if (filters.onlyFeatured) activeFilters.push({ label: 'Destacados', clear: () => goToCatalogFilters({ onlyFeatured: false }) });
+
 
     const updateGridColumns = (columns: CatalogGridColumns): void => {
         setGridColumns(columns);
@@ -631,24 +655,6 @@ export default function CatalogPage({
             onlyNew: false,
             onlyFeatured: false,
         });
-    };
-
-    const applyMobileProductFilter = (filter: 'offers' | 'all'): void => {
-        if (filter === 'all') {
-            router.get(filters.clearUrl, {}, { preserveScroll: true, preserveState: false });
-            setMobilePanel(null);
-            return;
-        }
-
-        router.get(filters.clearUrl, buildCatalogQuery(filters, {
-            selectedGroup: '',
-            selectedCategory: '',
-            selectedCategories: [],
-            onlyNew: false,
-            onlyOffers: filter === 'offers',
-            onlyFeatured: false,
-        }), { preserveScroll: true, preserveState: false });
-        setMobilePanel(null);
     };
 
     const renderCatalogToolbarLeft = (idPrefix: string): JSX.Element => (
@@ -784,8 +790,9 @@ export default function CatalogPage({
                     value={gridColumns}
                     aria-label="Cantidad de productos por fila"
                     title="Cantidad de productos por fila"
-                    onChange={(event) => updateGridColumns(Number.parseInt(event.currentTarget.value, 10) as CatalogGridColumns)}
+                    onChange={(event) => updateGridColumns(event.currentTarget.value === 'auto' ? 'auto' : Number.parseInt(event.currentTarget.value, 10) as CatalogGridColumns)}
                 >
+                    <option value="auto">AUTOMÁTICO</option>
                     {catalogGridColumnOptions.map((columns) => (
                         <option key={columns} value={columns}>
                             COLUMNAS {columns}
@@ -812,71 +819,71 @@ export default function CatalogPage({
     return (
         <SiteLayout
             title="Productos"
+            onOpenCategories={() => setMobilePanel('categories')}
             headerSearch={headerSearch}
             announcements={announcements}
             announcementMode="catalogLegacy"
         >
             <section className={`${catalog.layout} catalog-font-scope`}>
                 <div className={catalog.layoutMain}>
-                    <section className={catalog.mobileControls} aria-label="Controles del catálogo">
-                        <div className={catalog.mobileControlsBar}>
-                            <div className={catalog.mobileControlsFilters}>
-                                {renderCatalogToolbarLeft('mobile-inline')}
-                            </div>
-                            <div className={catalog.mobileControlsActions}>
-                                <button type="button" className={catalog.mobileControlsButton} onClick={() => setMobilePanel('filters')} aria-label="Filtros">
-                                    <span className={catalog.mobileControlsIcon}>
-                                        <FilterIcon />
-                                    </span>
-                                </button>
-                                <button type="button" className={catalog.mobileControlsButton} onClick={() => setMobilePanel('sort')} aria-label="Ordenar">
-                                    <span className={catalog.mobileControlsIcon}>
-                                        <SortIcon />
-                                    </span>
-                                </button>
-                            </div>
+                    <section className="mobile-catalog-controls" aria-label="Controles del catálogo">
+                        <p>{summary.productCount} {summary.productCount === 1 ? 'PRODUCTO' : 'PRODUCTOS'} EN CATÁLOGO</p>
+                        <div className="mobile-catalog-buttons">
+                            <button type="button" onClick={() => setMobilePanel('categories')} aria-haspopup="dialog" aria-controls="catalog-mobile-panel">
+                                <GridColumnsIcon /><span>Categorías</span>
+                            </button>
+                            <button type="button" onClick={() => setMobilePanel('filters')} aria-haspopup="dialog" aria-controls="catalog-mobile-panel">
+                                <FilterIcon /><span>Filtros{[filters.onlyNew, filters.onlyOffers, filters.onlyFeatured].filter(Boolean).length > 0 ? ` (${[filters.onlyNew, filters.onlyOffers, filters.onlyFeatured].filter(Boolean).length})` : ''}</span>
+                            </button>
                         </div>
-
-                        {mobilePanel ? (
-                            <div className={catalog.mobileSheetOverlay} role="presentation" onClick={() => setMobilePanel(null)}>
-                                <section className={catalog.mobileSheet} role="dialog" aria-modal="true" aria-label={mobilePanel === 'filters' ? 'Filtros del catálogo' : 'Ordenar productos'} onClick={(event) => event.stopPropagation()}>
-                                    <div className={catalog.mobileSheetHeader}>
-                                        <strong>{mobilePanel === 'filters' ? 'Filtros' : 'Ordenar'}</strong>
-                                        <button type="button" className={catalog.mobileSheetClose} onClick={() => setMobilePanel(null)} aria-label="Cerrar">
-                                            ×
-                                        </button>
-                                    </div>
-
-                                    {mobilePanel === 'filters' ? (
-                                        <div className={catalog.mobileSheetBody}>
-                                            <button type="button" className={catalog.mobileSheetOptionButton(filters.onlyOffers)} onClick={() => applyMobileProductFilter('offers')}>
-                                                <span aria-hidden="true">🔥</span>
-                                                Ofertas
-                                            </button>
-                                            <button type="button" className={catalog.mobileSheetOptionButton(!filters.onlyOffers && !filters.onlyFeatured)} onClick={() => applyMobileProductFilter('all')}>
-                                                <span className={catalogOrderIconClass}>
-                                                    <GridColumnsIcon />
-                                                </span>
-                                                Todos
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className={catalog.mobileSheetBody}>
-                                            <button type="button" className={catalog.mobileSheetOptionButton(filters.order === 'fecha_ingreso')} onClick={() => { goToCatalogFilters({ order: 'fecha_ingreso' }); setMobilePanel(null); }}>
-                                                Recientes
-                                            </button>
-                                            <button type="button" className={catalog.mobileSheetOptionButton(filters.order === 'precio_asc')} onClick={() => { goToCatalogFilters({ order: 'precio_asc' }); setMobilePanel(null); }}>
-                                                Menor precio
-                                            </button>
-                                            <button type="button" className={catalog.mobileSheetOptionButton(filters.order === 'precio_desc')} onClick={() => { goToCatalogFilters({ order: 'precio_desc' }); setMobilePanel(null); }}>
-                                                Mayor precio
-                                            </button>
-                                        </div>
-                                    )}
-                                </section>
-                            </div>
-                        ) : null}
+                        <div className="mobile-catalog-order">
+                            <SortIcon /><label htmlFor="mobile-catalog-order">Ordenar por</label>
+                            <select id="mobile-catalog-order" value={filters.order} onChange={(event) => goToCatalogFilters({ order: event.currentTarget.value })}>
+                                <option value="fecha_ingreso">Más recientes</option>
+                                <option value="precio_asc">Menor precio</option>
+                                <option value="precio_desc">Mayor precio</option>
+                            </select>
+                        </div>
                     </section>
+                    <dialog ref={mobileDialogRef} id="catalog-mobile-panel" className={`mobile-catalog-dialog ${mobilePanel === 'categories' ? 'is-categories' : ''}`} aria-labelledby="catalog-mobile-panel-title" onCancel={() => setMobilePanel(null)} onClose={() => setMobilePanel(null)} onClick={(event) => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) setMobilePanel(null); } }}>
+                        <div className="mobile-catalog-dialog-header">
+                            <h2 id="catalog-mobile-panel-title">{mobilePanel === 'categories' ? 'Categorías' : 'Filtros'}</h2>
+                            <button type="button" onClick={() => setMobilePanel(null)} aria-label="Cerrar panel">×</button>
+                        </div>
+                        <div className="mobile-catalog-dialog-body">
+                            {mobilePanel === 'categories' ? (
+                                <>
+                                    <button type="button" className="mobile-category-all" onClick={() => { goToCatalogFilters({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Todas las categorías</button>
+                                    {groups.map((group) => (
+                                        <details key={group.key} open={activeGroupKey === group.key ? true : undefined}>
+                                            <summary>{group.label}<span>{group.productCount}</span></summary>
+                                            <div className="mobile-category-links">
+                                                <button type="button" aria-pressed={activeGroupKey === group.key && !filters.selectedCategory} onClick={() => { goToCatalogFilters({ selectedGroup: group.key, selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Ver todo en {group.label}</button>
+                                                {categories.filter((category) => category.groupKey === group.key).map((category) => (
+                                                    <button type="button" key={category.id} aria-pressed={filters.selectedCategory === category.slug || filters.selectedCategories.includes(category.slug)} onClick={() => { goToCatalogFilters({ selectedGroup: group.key, selectedCategory: category.slug, selectedCategories: [] }); setMobilePanel(null); }}>
+                                                        <span>{category.name}</span><span>{category.productCount}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </details>
+                                    ))}
+                                    <nav className="mobile-category-navigation" aria-label="Secciones de la tienda">
+                                        {layout.navItems.map((item) => <Link key={item.href} href={item.href} onClick={() => setMobilePanel(null)}>{item.label}</Link>)}
+                                        <a href={layout.repairUrl}>Reparaciones</a>
+                                    </nav>
+                                </>
+                            ) : (
+                                <div className="mobile-filter-options">
+                                    <p>Mostrar productos</p>
+                                    <label><input type="checkbox" checked={mobileFilterDraft.onlyOffers} onChange={(event) => setMobileFilterDraft({ ...mobileFilterDraft, onlyOffers: event.currentTarget.checked })} />Ofertas</label>
+                                    <label><input type="checkbox" checked={mobileFilterDraft.onlyNew} onChange={(event) => setMobileFilterDraft({ ...mobileFilterDraft, onlyNew: event.currentTarget.checked })} />Novedades</label>
+                                    <label><input type="checkbox" checked={mobileFilterDraft.onlyFeatured} onChange={(event) => setMobileFilterDraft({ ...mobileFilterDraft, onlyFeatured: event.currentTarget.checked })} />Destacados</label>
+                                    <button type="button" className="mobile-filters-reset" onClick={() => setMobileFilterDraft({ onlyOffers: false, onlyNew: false, onlyFeatured: false })}>Quitar filtros de productos</button>
+                                </div>
+                            )}
+                        </div>
+                        <button type="button" className="mobile-catalog-dialog-done" onClick={() => { if (mobilePanel === 'filters') goToCatalogFilters(mobileFilterDraft); setMobilePanel(null); }}>{mobilePanel === 'filters' ? 'Aplicar filtros' : `Ver ${summary.productCount} productos`}</button>
+                    </dialog>
 
                     <section className={catalog.results}>
                         <div className={catalog.productToolbar}>
@@ -888,7 +895,18 @@ export default function CatalogPage({
                             </div>
                         </div>
 
-                        <div className={catalog.marquee}>
+
+                        {activeFilters.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm" aria-label="Filtros activos">
+                                <span className="font-semibold text-slate-700">Filtros:</span>
+                                {activeFilters.map((filter) => (
+                                    <button key={filter.label} type="button" onClick={filter.clear} aria-label={`Quitar filtro: ${filter.label}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-3 text-[#17376f] hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2">
+                                        {filter.label}<span aria-hidden="true">×</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+                        <div className={`${catalog.marquee} catalog-results-count`}>
                             <div className={catalog.marqueeTrack}>
                                 <span className={catalog.marqueeText}>PRODUCTOS DISPONIBLES: {summary.productCount}</span>
                             </div>

@@ -1,0 +1,1 @@
+const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage({viewport:{width:1920,height:1080}});await p.goto('http://127.0.0.1:8090/productos?q=SOUNDSTREAM');console.log(await p.locator('.catalog-card').evaluateAll(c=>c.map(x=>({width:x.offsetWidth}))));await b.close()})()

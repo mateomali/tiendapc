@@ -19,6 +19,7 @@ import {
 } from '../ui';
 
 interface SiteLayoutProps extends PropsWithChildren {
+    onOpenCategories?: () => void;
     title: string;
     headerSearch?: HeaderSearchState;
     announcements?: {
@@ -111,12 +112,14 @@ function isExternalAnnouncementUrl(url: string | undefined): boolean {
     return /^https?:\/\//i.test((url ?? '').trim());
 }
 
-export function SiteLayout({ children, title, headerSearch, announcements, announcementMode = 'default' }: SiteLayoutProps): JSX.Element {
+export function SiteLayout({ children, title, headerSearch, announcements, announcementMode = 'default', onOpenCategories }: SiteLayoutProps): JSX.Element {
     const { cart, layout } = usePage<SharedPageProps>().props;
     const [search, setSearch] = useState(headerSearch?.query ?? '');
     const [searching, setSearching] = useState(false);
     const [announcementIndex, setAnnouncementIndex] = useState(0);
+    const [failedAnnouncementImages, setFailedAnnouncementImages] = useState<string[]>([]);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [cartPulse, setCartPulse] = useState(false);
     const [startupNoticeOpen, setStartupNoticeOpen] = useState(false);
     const startupNotice = layout.startupNotice;
@@ -292,12 +295,12 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
     };
 
     const renderAnnouncementVisual = (item: AnnouncementItem): JSX.Element => {
-        if (item.displayType === 'image' && item.imageUrl) {
+        if (item.displayType === 'image' && item.imageUrl && !failedAnnouncementImages.includes(item.imageUrl)) {
             return (
                 <span className={isCatalogLegacyAnnouncements ? siteAnnouncementImageShellClass : 'h-full w-full'}>
                     <picture className="block h-full w-full">
                         {item.mobileImageUrl ? <source media="(max-width: 560px)" srcSet={item.mobileImageUrl} /> : null}
-                        <img src={item.imageUrl} alt={item.message || 'Anuncio promocional'} className={isCatalogLegacyAnnouncements ? siteAnnouncementImageClass : siteAnnouncementPlainImageClass} />
+                        <img onError={() => setFailedAnnouncementImages((current) => [...current, item.imageUrl!])} src={item.imageUrl} alt={item.message || 'Anuncio promocional'} className={isCatalogLegacyAnnouncements ? siteAnnouncementImageClass : siteAnnouncementPlainImageClass} />
                     </picture>
                 </span>
             );
@@ -347,7 +350,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
     return (
         <>
             <Head title={title} />
-            <div className={`${site.shell} catalog-font-scope`}>
+            <div className={`${site.shell} catalog-font-scope ${announcementMode === 'catalogLegacy' && cart.count > 0 ? 'max-[860px]:pb-24' : ''}`}>
                 {startupNoticeOpen && startupNotice ? (
                     <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/72 p-3 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="startup-notice-title">
                         <section
@@ -415,9 +418,17 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                 ) : null}
                 <div className={site.frame}>
                     <header className={site.header}>
-                        <div className={site.headerInner}>
+                        <div className="mobile-store-bar">
+                            <button type="button" aria-label={onOpenCategories ? 'Abrir categorías' : 'Abrir menú'} aria-haspopup={onOpenCategories ? 'dialog' : undefined} aria-controls={onOpenCategories ? 'catalog-mobile-panel' : 'site-mobile-nav'} onClick={() => onOpenCategories ? onOpenCategories() : setMobileMenuOpen((open) => !open)}>
+                                <MenuNavIcon open={mobileMenuOpen} />
+                            </button>
+                            <Link href={layout.brandUrl} className="mobile-store-logo"><img src={layout.logoUrl} alt="Sudoku" onError={(event) => { event.currentTarget.src = layout.logoFallbackUrl; }} /></Link>
+                            {headerSearch ? <button type="button" aria-label={mobileSearchOpen ? 'Cerrar búsqueda' : 'Abrir búsqueda'} aria-expanded={mobileSearchOpen} aria-controls="mobile-store-search" onClick={() => { setMobileSearchOpen((open) => !open); if (!mobileSearchOpen) window.setTimeout(() => document.querySelector<HTMLInputElement>('#mobile-store-search input')?.focus(), 0); }}><SearchNavIcon /></button> : <span />}
+                            <Link href={layout.cartUrl} className="mobile-store-cart" aria-label={`Ir al carrito, ${cart.count} productos`}><CartNavIcon />{cart.count > 0 ? <span data-cart-badge>{cart.count}</span> : null}</Link>
+                        </div>
+                        <div id="mobile-store-search" className={`${site.headerInner} mobile-store-search ${mobileSearchOpen ? 'is-open' : ''}`}>
                             <div className={site.brandRow}>
-                                <div className={site.mobileBrandTop}>
+                                <div className={`${site.mobileBrandTop} legacy-mobile-brand`}>
                                     <button
                                         type="button"
                                         className={siteMobileToggleClass(mobileMenuOpen)}
@@ -521,47 +532,6 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                             </a>
                         </nav>
                     </div>
-
-                    {headerSearch ? (
-                        <section className={site.mobileSearchDock} aria-label="Buscar productos">
-                            <div className={site.mobileSearchDockInner}>
-                                <div className={`${site.searchPanel} ${site.searchPanelHeader}`}>
-                                    <div className={site.searchRow}>
-                                        <input
-                                            value={search}
-                                            onChange={(event) => setSearch(event.currentTarget.value)}
-                                            onKeyDown={(event) => {
-                                                if (event.key === 'Enter') {
-                                                    submitSearch();
-                                                }
-                                            }}
-                                            placeholder="Buscar ej: cargador"
-                                            className={site.searchInput}
-                                            aria-busy={searching ? 'true' : 'false'}
-                                        />
-                                        <button
-                                            type="button"
-                                            className={`${site.searchButton} max-[860px]:before:hidden min-[861px]:inline-flex min-[861px]:min-h-[2.35rem] min-[861px]:min-w-[2.35rem] min-[861px]:items-center min-[861px]:justify-center min-[861px]:rounded-[0.72rem] min-[861px]:p-0 ${searching ? 'opacity-75' : ''}`}
-                                            onClick={() => submitSearch()}
-                                            aria-label="Buscar productos"
-                                            disabled={searching}
-                                        >
-                                            <span className={site.searchButtonIcon}>
-                                                <SearchNavIcon />
-                                            </span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <a href={layout.cartUrl} className={`${site.mobileHeaderCart} ${cartPulse ? site.mobileCartPulse : ''}`} aria-label={`Ir al carrito, ${cart.count} productos`}>
-                                    <span className={siteCartIconClass}>
-                                        <CartNavIcon />
-                                    </span>
-                                    <span className={siteCartBadgeClass} data-cart-badge>{cart.count}</span>
-                                </a>
-                            </div>
-                        </section>
-                    ) : null}
 
                     {mobileMenuOpen ? (
                         <div className={site.mobileMenuOverlay} role="presentation" onClick={() => setMobileMenuOpen(false)}>
@@ -677,6 +647,14 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                         {children}
                     </main>
 
+
+                    {announcementMode === 'catalogLegacy' && cart.count > 0 ? (
+                        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] min-[861px]:hidden">
+                            <Link href={layout.cartUrl} className="flex min-h-11 items-center justify-between rounded-lg bg-[#2456b4] px-4 py-2 font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2">
+                                <span>Ver carrito</span><span>{cart.count} {cart.count === 1 ? 'producto' : 'productos'} →</span>
+                            </Link>
+                        </div>
+                    ) : null}
                     <footer className={footer.root}>
                         <div className={footer.grid}>
                             <div className={`${footer.panel} ${footer.panelInfo}`}>
