@@ -1,3 +1,4 @@
+import { StoreAnnouncements } from '../../components/StoreAnnouncements';
 import { Link, router } from '@inertiajs/react';
 import type { FocusEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
@@ -506,7 +507,7 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
                 <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
                     {product.hasOffer ? (
                         <span className="rounded-md bg-[#d71920] px-2 py-1 text-[0.64rem] font-black uppercase tracking-[0.025em] text-white">
-                            -{product.discountPercentage}% 🔥
+                            -{product.discountPercentage}%
                         </span>
                     ) : null}
                     {product.isNew ? (
@@ -644,10 +645,38 @@ export default function CatalogPage({
     const [desktopFilterDraft, setDesktopFilterDraft] = useState({ onlyOffers: filters.onlyOffers, onlyNew: filters.onlyNew, onlyFeatured: filters.onlyFeatured });
     const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0, maxHeight: 400 });
     const desktopToolbarRef = useRef<HTMLDivElement>(null);
+    const [desktopCategoriesVisible, setDesktopCategoriesVisible] = useState(false);
+    useEffect(() => {
+        const controls = desktopToolbarRef.current?.querySelector('.desktop-catalog-actions');
+        const header = document.querySelector('header');
+        if (!controls || !header) return;
+
+        let observer: IntersectionObserver | null = null;
+        const syncVisibility = (): void => {
+            observer?.disconnect();
+            const headerBottom = header.getBoundingClientRect().bottom;
+            const desktop = window.matchMedia('(min-width: 861px)').matches;
+            setDesktopCategoriesVisible(desktop && controls.getBoundingClientRect().bottom <= headerBottom);
+            if (!desktop) return;
+            observer = new IntersectionObserver(([entry]) => {
+                setDesktopCategoriesVisible(entry.boundingClientRect.bottom <= headerBottom);
+            }, { rootMargin: `-${headerBottom}px 0px 0px 0px`, threshold: 0 });
+            observer.observe(controls);
+        };
+        syncVisibility();
+        const resizeObserver = new ResizeObserver(syncVisibility);
+        resizeObserver.observe(header);
+        window.addEventListener('resize', syncVisibility);
+        return () => {
+            observer?.disconnect();
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', syncVisibility);
+        };
+    }, []);
     const positionPopover = (button: HTMLButtonElement, width: number, categoriesMenu = false): void => {
         const rect = button.getBoundingClientRect();
         const left = categoriesMenu ? desktopToolbarRef.current?.getBoundingClientRect().left ?? rect.left : rect.left;
-        const top = rect.bottom + 8;
+        const top = Math.max(rect.bottom, button.closest('header')?.getBoundingClientRect().bottom ?? rect.bottom) + 8;
         setPopoverPosition({ top, left: Math.max(16, Math.min(left, window.innerWidth - width - 16)), maxHeight: Math.max(0, window.innerHeight - top - 16) });
     };
     const closeDesktopPopover = (id: string): void => { document.getElementById(id)?.hidePopover(); };
@@ -667,8 +696,9 @@ export default function CatalogPage({
         <SiteLayout
             title="Productos"
             onOpenCategories={() => setMobilePanel('categories')}
+            onOpenDesktopCategories={(button) => { setDesktopGroup(activeGroupKey || groups[0]?.key || ''); positionPopover(button, 860); }}
+            desktopCategoriesVisible={desktopCategoriesVisible}
             headerSearch={headerSearch}
-            announcements={announcements}
             announcementMode="catalogLegacy"
         >
             <section className={`${catalog.layout} catalog-font-scope`}>
@@ -798,18 +828,19 @@ export default function CatalogPage({
                                 <button type="button" className="catalog-clear-all" onClick={() => router.get(filters.clearUrl)}>Limpiar filtros</button>
                             </div>
                         ) : null}
+                        <StoreAnnouncements announcements={announcements} announcementMode="catalogLegacy" />
                         {products.length > 0 ? (
-                            <section className={previewCardGrid ? `${catalogGridClass(gridColumns)} !gap-1.5 max-[560px]:!gap-1` : catalogGridClass(gridColumns)}>
+                            <section className={catalogGridClass(gridColumns)}>
                                 {products.map((product, index) => (
                                     <ProductCard key={product.id} product={product} cartUrl={layout.cartUrl} eagerImage={index < 8} />
                                 ))}
                             </section>
                         ) : (
-                            <section className={catalog.empty}>
+                            <section className={`${catalog.empty} catalog-empty-state`}>
                                 <h2>No encontramos productos para ese filtro.</h2>
                                 <p>{filters.emptyText}</p>
                                 <button type="button" className={catalogActionClass('primary')} onClick={() => router.get(filters.clearUrl)}>
-                                    VER TODO EL CATALOGO
+                                    Ver todos los productos
                                 </button>
                             </section>
                         )}

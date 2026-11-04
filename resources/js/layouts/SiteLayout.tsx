@@ -1,3 +1,4 @@
+import { StoreAnnouncements } from '../components/StoreAnnouncements';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState, type PropsWithChildren } from 'react';
 import { FlashMessages } from '../components/FlashMessages';
@@ -5,12 +6,6 @@ import type { AnnouncementItem, HeaderSearchState, SharedPageProps } from '../ty
 import {
     footer,
     site,
-    siteAnnouncement,
-    siteAnnouncementImageClass,
-    siteAnnouncementImageShellClass,
-    siteAnnouncementItemClass,
-    siteAnnouncementPlainImageClass,
-    siteAnnouncementTextClass,
     siteCartBadgeClass,
     siteCartIconClass,
     siteCartLinkClass,
@@ -20,6 +15,8 @@ import {
 
 interface SiteLayoutProps extends PropsWithChildren {
     onOpenCategories?: () => void;
+    onOpenDesktopCategories?: (button: HTMLButtonElement) => void;
+    desktopCategoriesVisible?: boolean;
     title: string;
     headerSearch?: HeaderSearchState;
     announcements?: {
@@ -108,16 +105,10 @@ function FooterClockIcon(): JSX.Element {
     );
 }
 
-function isExternalAnnouncementUrl(url: string | undefined): boolean {
-    return /^https?:\/\//i.test((url ?? '').trim());
-}
-
-export function SiteLayout({ children, title, headerSearch, announcements, announcementMode = 'default', onOpenCategories }: SiteLayoutProps): JSX.Element {
+export function SiteLayout({ children, title, headerSearch, announcements, announcementMode = 'default', onOpenCategories, onOpenDesktopCategories, desktopCategoriesVisible = true }: SiteLayoutProps): JSX.Element {
     const { cart, layout } = usePage<SharedPageProps>().props;
     const [search, setSearch] = useState(headerSearch?.query ?? '');
     const [searching, setSearching] = useState(false);
-    const [announcementIndex, setAnnouncementIndex] = useState(0);
-    const [failedAnnouncementImages, setFailedAnnouncementImages] = useState<string[]>([]);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
     const [cartPulse, setCartPulse] = useState(false);
@@ -197,24 +188,6 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
         return () => mediaQuery.removeListener(syncMenuState);
     }, []);
 
-    useEffect(() => {
-        setAnnouncementIndex(0);
-    }, [announcements?.items.length]);
-
-    useEffect(() => {
-        if (!announcements || announcements.items.length <= 1) {
-            return;
-        }
-
-        const interval = window.setInterval(() => {
-            setAnnouncementIndex((current) => (current + 1) % announcements.items.length);
-        }, announcements.rotationMs);
-
-        return () => window.clearInterval(interval);
-    }, [announcements]);
-
-    const activeAnnouncement = announcements?.items[announcementIndex] ?? null;
-
     const buildSearchParams = (query: string): Record<string, string> => {
         const trimmedQuery = query.trim();
         return trimmedQuery ? { q: trimmedQuery } : {};
@@ -250,82 +223,10 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
         setStartupNoticeOpen(false);
     };
 
-    const showAnnouncementControls = (announcements?.items.length ?? 0) > 1;
-    const isCatalogLegacyAnnouncements = announcementMode === 'catalogLegacy';
-
-    const moveAnnouncement = (direction: -1 | 1): void => {
-        if (!announcements || announcements.items.length <= 1) {
-            return;
-        }
-
-        setAnnouncementIndex((current) => {
-            const next = current + direction;
-
-            if (next < 0) {
-                return announcements.items.length - 1;
-            }
-
-            return next % announcements.items.length;
-        });
-    };
-
-    const renderAnnouncementVisual = (item: AnnouncementItem): JSX.Element => {
-        if (item.displayType === 'image' && item.imageUrl && !failedAnnouncementImages.includes(item.imageUrl)) {
-            return (
-                <span className={isCatalogLegacyAnnouncements ? siteAnnouncementImageShellClass : 'h-full w-full'}>
-                    <picture className="block h-full w-full">
-                        {item.mobileImageUrl ? <source media="(max-width: 560px)" srcSet={item.mobileImageUrl} /> : null}
-                        <img onError={() => setFailedAnnouncementImages((current) => [...current, item.imageUrl!])} src={item.imageUrl} alt={item.message || 'Anuncio promocional'} className={isCatalogLegacyAnnouncements ? siteAnnouncementImageClass : siteAnnouncementPlainImageClass} />
-                    </picture>
-                </span>
-            );
-        }
-
-        if (isCatalogLegacyAnnouncements) {
-            return <span className={siteAnnouncementTextClass}>{item.message}</span>;
-        }
-
-        return (
-            <div className={siteAnnouncement.copy}>
-                <span className={siteAnnouncement.kicker}>Novedades</span>
-                <strong>{item.message}</strong>
-            </div>
-        );
-    };
-
-    const renderAnnouncementItem = (item: AnnouncementItem, index: number): JSX.Element => {
-        const isActive = index === announcementIndex;
-        const itemClassName = siteAnnouncementItemClass(isActive, item.displayType === 'image' && Boolean(item.imageUrl), isCatalogLegacyAnnouncements);
-        const content = renderAnnouncementVisual(item);
-        const href = (item.linkUrl ?? '').trim();
-
-        if (href === '' || href === '#') {
-            return (
-                <span key={`announcement-${item.id}-${index}`} className={itemClassName}>
-                    {content}
-                </span>
-            );
-        }
-
-        if (isExternalAnnouncementUrl(href)) {
-            return (
-                <a key={`announcement-${item.id}-${index}`} href={href} className={itemClassName} target="_blank" rel="noopener noreferrer">
-                    {content}
-                </a>
-            );
-        }
-
-        return (
-            <Link key={`announcement-${item.id}-${index}`} href={href} className={itemClassName} prefetch={['hover', 'click']} cacheFor="30s">
-                {content}
-            </Link>
-        );
-    };
-
     return (
         <>
             <Head title={title} />
-            <div className={`${site.shell} catalog-font-scope ${announcementMode === 'catalogLegacy' && cart.count > 0 ? 'max-[860px]:pb-24' : ''}`}>
+            <div className={`${site.shell} catalog-font-scope ${announcementMode === 'catalogLegacy' ? 'is-catalog-page' : ''} ${announcementMode === 'catalogLegacy' && cart.count > 0 ? 'max-[860px]:pb-24' : ''}`}>
                 {startupNoticeOpen && startupNotice ? (
                     <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/72 p-3 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="startup-notice-title">
                         <section
@@ -399,11 +300,18 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                 <span className="mobile-store-button-label">Menú</span>
                             </button>
                             <Link href={layout.brandUrl} className="mobile-store-logo"><img src={layout.logoUrl} alt="Sudoku" onError={(event) => { event.currentTarget.src = layout.logoFallbackUrl; }} /></Link>
-                            {headerSearch ? <button type="button" aria-label={mobileSearchOpen ? 'Cerrar búsqueda' : 'Abrir búsqueda'} aria-expanded={mobileSearchOpen} aria-controls="mobile-store-search" onClick={() => { setMobileSearchOpen((open) => !open); if (!mobileSearchOpen) window.setTimeout(() => document.querySelector<HTMLInputElement>('#mobile-store-search input')?.focus(), 0); }}><SearchNavIcon /><span className="mobile-store-button-label">{mobileSearchOpen ? 'Cerrar' : 'Buscar'}</span></button> : <span />}
+                            {headerSearch ? <button type="button" aria-label={mobileSearchOpen ? 'Cerrar búsqueda' : 'Abrir búsqueda'} aria-expanded={mobileSearchOpen} aria-controls="mobile-store-search" onClick={() => { setMobileSearchOpen((open) => !open); if (!mobileSearchOpen) window.setTimeout(() => document.querySelector<HTMLInputElement>('#mobile-store-search input')?.focus(), 0); }}>{mobileSearchOpen ? <CloseIcon /> : <SearchNavIcon />}<span className="mobile-store-button-label">{mobileSearchOpen ? 'Cerrar' : 'Buscar'}</span></button> : <span />}
                             <Link href={layout.cartUrl} className="mobile-store-cart" aria-label={`Ir al carrito, ${cart.count} productos`}><CartNavIcon /><span className="mobile-store-button-label">Carrito</span>{cart.count > 0 ? <span data-cart-badge>{cart.count}</span> : null}</Link>
                         </div>
                         <div id="mobile-store-search" className={`${site.headerInner} mobile-store-search ${mobileSearchOpen ? 'is-open' : ''}`}>
-                            <div className={site.brandRow}>
+                            <div className={`${site.brandRow} ${onOpenDesktopCategories ? 'catalog-header-row' : ''}`}>
+                                {onOpenDesktopCategories ? (
+                                    <button type="button" className="desktop-sticky-categories" hidden={!desktopCategoriesVisible} popoverTarget="desktop-categories" aria-label="Abrir categorías del catálogo" aria-haspopup="dialog" title="Categorías" onClick={(event) => onOpenDesktopCategories(event.currentTarget)}>
+                                        <MenuNavIcon open={false} />
+                                    </button>
+                                ) : null}
+
+
                                 <div className={`${site.mobileBrandTop} legacy-mobile-brand`}>
                                     <button
                                         type="button"
@@ -429,7 +337,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     </Link>
                                 </div>
 
-                            <div className={site.headerCenter}>
+                            <div className={`${site.headerCenter} ${onOpenDesktopCategories ? 'catalog-header-tools' : ''}`}>
                                 {headerSearch ? (
                                     <div className={`${site.searchPanel} ${site.searchPanelHeader}`}>
                                         <div className={site.searchRow}>
@@ -565,58 +473,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                         </section>
                     ) : null}
 
-                    {activeAnnouncement ? (
-                        <section
-                            className={isCatalogLegacyAnnouncements ? siteAnnouncement.shellCatalog : siteAnnouncement.shell}
-                            aria-label="Novedades"
-                        >
-                            {isCatalogLegacyAnnouncements ? (
-                                <div className={siteAnnouncement.track} aria-live="polite">
-                                    {announcements?.items.map((item, index) => renderAnnouncementItem(item, index))}
-                                    <button
-                                        type="button"
-                                        className={`${siteAnnouncement.arrowCatalog} ${siteAnnouncement.arrowCatalogPrev}`}
-                                        onClick={() => moveAnnouncement(-1)}
-                                        aria-label="Mensaje anterior"
-                                        disabled={!showAnnouncementControls}
-                                    >
-                                        &#8249;
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={`${siteAnnouncement.arrowCatalog} ${siteAnnouncement.arrowCatalogNext}`}
-                                        onClick={() => moveAnnouncement(1)}
-                                        aria-label="Siguiente mensaje"
-                                        disabled={!showAnnouncementControls}
-                                    >
-                                        &#8250;
-                                    </button>
-                                </div>
-                            ) : (
-                                <>
-                                    <button
-                                        type="button"
-                                        className={siteAnnouncement.arrow}
-                                        onClick={() => moveAnnouncement(-1)}
-                                        aria-label="Anterior"
-                                        disabled={!showAnnouncementControls}
-                                    >
-                                        &#8249;
-                                    </button>
-                                    {renderAnnouncementItem(activeAnnouncement, announcementIndex)}
-                                    <button
-                                        type="button"
-                                        className={siteAnnouncement.arrow}
-                                        onClick={() => moveAnnouncement(1)}
-                                        aria-label="Siguiente"
-                                        disabled={!showAnnouncementControls}
-                                    >
-                                        &#8250;
-                                    </button>
-                                </>
-                            )}
-                        </section>
-                    ) : null}
+                    <StoreAnnouncements announcements={announcements} announcementMode={announcementMode} />
 
                     <main className={site.main}>
                         <FlashMessages />
@@ -631,11 +488,11 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                             </Link>
                         </div>
                     ) : null}
-                    <footer className={footer.root}>
+                    <footer className={`${footer.root} ${announcementMode === 'catalogLegacy' ? 'catalog-footer' : ''}`}>
                         <div className={footer.grid}>
-                            <div className={`${footer.panel} ${footer.panelInfo}`}>
+                            <div className={`${footer.panel} ${footer.panelInfo} catalog-footer-panel`}>
                                 <div className={footer.heading}>
-                                    <p className={footer.kicker}>Tienda</p>
+                                    <p className={`${footer.kicker} catalog-footer-kicker`}>Tienda</p>
                                     <p className={footer.title}>Horario y contacto</p>
                                 </div>
                                 <div className={footer.facts}>
@@ -657,7 +514,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     </div>
                                 </div>
                                 <div className={footer.actions}>
-                                    <span className={footer.actionLabel}>{layout.footer.ctaTitle}</span>
+                                    <span className={`${footer.actionLabel} catalog-footer-cta-label`}>{layout.footer.ctaTitle}</span>
                                     <a href={layout.footer.whatsappUrl} className={footer.whatsapp} aria-label="Abrir WhatsApp" target="_blank" rel="noreferrer">
                                         <span className={footer.whatsappText}>WhatsApp</span>
                                         <span className={footer.whatsappIcon}>
@@ -666,12 +523,12 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     </a>
                                 </div>
                             </div>
-                            <div className={footer.panel}>
+                            <div className={`${footer.panel} catalog-footer-panel`}>
                                 <div className={footer.heading}>
-                                    <p className={footer.kicker}>Mapa</p>
-                                    <p className={footer.title}>{layout.footer.address}</p>
+                                    <p className={`${footer.kicker} catalog-footer-kicker`}>Mapa</p>
+                                    <p className={footer.title}>{announcementMode === 'catalogLegacy' ? 'Cómo llegar' : layout.footer.address}</p>
                                 </div>
-                                <div className={footer.mapShell}>
+                                <div className={`${footer.mapShell} catalog-footer-map`}>
                                     <iframe
                                         src={layout.footer.mapUrl}
                                         className={footer.map}
