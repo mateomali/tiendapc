@@ -215,34 +215,9 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
 
     const activeAnnouncement = announcements?.items[announcementIndex] ?? null;
 
-    const buildSearchParams = (query: string): Record<string, string | number> => {
-        const params: Record<string, string | number> = {};
-
-        if (query.trim() !== '') {
-            params.q = query.trim();
-        }
-
-        if (headerSearch?.group) {
-            params.grupo = headerSearch.group;
-        }
-
-        if (headerSearch?.order && headerSearch.order !== 'fecha_ingreso') {
-            params.orden = headerSearch.order;
-        }
-
-        if (headerSearch?.onlyNew) {
-            params.novedades = 1;
-        }
-
-        if (headerSearch?.onlyOffers) {
-            params.ofertas = 1;
-        }
-
-        if (headerSearch?.onlyFeatured) {
-            params.destacados = 1;
-        }
-
-        return params;
+    const buildSearchParams = (query: string): Record<string, string> => {
+        const trimmedQuery = query.trim();
+        return trimmedQuery ? { q: trimmedQuery } : {};
     };
 
     const buildSearchUrl = (query: string): string => {
@@ -421,10 +396,11 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                         <div className="mobile-store-bar">
                             <button type="button" aria-label={onOpenCategories ? 'Abrir categorías' : 'Abrir menú'} aria-haspopup={onOpenCategories ? 'dialog' : undefined} aria-controls={onOpenCategories ? 'catalog-mobile-panel' : 'site-mobile-nav'} onClick={() => onOpenCategories ? onOpenCategories() : setMobileMenuOpen((open) => !open)}>
                                 <MenuNavIcon open={mobileMenuOpen} />
+                                <span className="mobile-store-button-label">Menú</span>
                             </button>
                             <Link href={layout.brandUrl} className="mobile-store-logo"><img src={layout.logoUrl} alt="Sudoku" onError={(event) => { event.currentTarget.src = layout.logoFallbackUrl; }} /></Link>
-                            {headerSearch ? <button type="button" aria-label={mobileSearchOpen ? 'Cerrar búsqueda' : 'Abrir búsqueda'} aria-expanded={mobileSearchOpen} aria-controls="mobile-store-search" onClick={() => { setMobileSearchOpen((open) => !open); if (!mobileSearchOpen) window.setTimeout(() => document.querySelector<HTMLInputElement>('#mobile-store-search input')?.focus(), 0); }}><SearchNavIcon /></button> : <span />}
-                            <Link href={layout.cartUrl} className="mobile-store-cart" aria-label={`Ir al carrito, ${cart.count} productos`}><CartNavIcon />{cart.count > 0 ? <span data-cart-badge>{cart.count}</span> : null}</Link>
+                            {headerSearch ? <button type="button" aria-label={mobileSearchOpen ? 'Cerrar búsqueda' : 'Abrir búsqueda'} aria-expanded={mobileSearchOpen} aria-controls="mobile-store-search" onClick={() => { setMobileSearchOpen((open) => !open); if (!mobileSearchOpen) window.setTimeout(() => document.querySelector<HTMLInputElement>('#mobile-store-search input')?.focus(), 0); }}><SearchNavIcon /><span className="mobile-store-button-label">{mobileSearchOpen ? 'Cerrar' : 'Buscar'}</span></button> : <span />}
+                            <Link href={layout.cartUrl} className="mobile-store-cart" aria-label={`Ir al carrito, ${cart.count} productos`}><CartNavIcon /><span className="mobile-store-button-label">Carrito</span>{cart.count > 0 ? <span data-cart-badge>{cart.count}</span> : null}</Link>
                         </div>
                         <div id="mobile-store-search" className={`${site.headerInner} mobile-store-search ${mobileSearchOpen ? 'is-open' : ''}`}>
                             <div className={site.brandRow}>

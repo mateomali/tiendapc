@@ -132,6 +132,8 @@ class StoreController extends Controller
             'kind' => 'catalog',
             'headerSearch' => [
                 'query' => $filters['query'],
+                'category' => $filters['selectedCategory'],
+                'categories' => $filters['selectedCategories'],
                 'group' => $filters['selectedGroup'],
                 'order' => $filters['order'],
                 'onlyNew' => $filters['onlyNew'],

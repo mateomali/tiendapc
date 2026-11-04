@@ -80,6 +80,8 @@ export interface AnnouncementItem {
 
 export interface HeaderSearchState {
     query: string;
+    category?: string;
+    categories?: string[];
     group: string;
     order: string;
     onlyNew: boolean;

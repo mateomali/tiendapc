@@ -611,8 +611,6 @@ export default function CatalogPage({
     });
     const selectedCategoryItem = categories.find((category) => category.slug === filters.selectedCategory);
     const activeGroupKey = filters.selectedGroup !== '' ? filters.selectedGroup : selectedCategoryItem?.groupKey ?? '';
-    const visibleCategories = activeGroupKey === '' ? categories : categories.filter((category) => category.groupKey === activeGroupKey);
-    const isFiltered = activeGroupKey !== '' || filters.selectedCategory !== '' || filters.selectedCategories.length > 0 || filters.onlyNew || filters.onlyOffers || filters.onlyFeatured || filters.order !== 'fecha_ingreso' || filters.query.trim() !== '';
     const ProductCard = previewCardGrid ? CatalogProductPreviewCard : CatalogProductCard;
     const activeFilters: { label: string; clear: () => void }[] = [];
     if (filters.query.trim()) activeFilters.push({ label: `Buscar: ${filters.query}`, clear: () => goToCatalogFilters({ query: '' }) });
@@ -638,183 +636,32 @@ export default function CatalogPage({
         router.get(filters.clearUrl, buildCatalogQuery(filters, overrides), { preserveScroll: true, preserveState: true });
     };
 
-    const toggleCatalogFlag = (flag: 'onlyNew' | 'onlyOffers'): void => {
-        if (flag === 'onlyNew') {
-            const nextOnlyNew = !filters.onlyNew;
-            goToCatalogFilters({
-                onlyNew: nextOnlyNew,
-                onlyOffers: false,
-                onlyFeatured: false,
-            });
-            return;
-        }
-
-        const nextOnlyOffers = !filters.onlyOffers;
-        goToCatalogFilters({
-            onlyOffers: nextOnlyOffers,
-            onlyNew: false,
-            onlyFeatured: false,
-        });
+    const selectCatalogCategory = (selection: Pick<CatalogPageProps['filters'], 'selectedGroup' | 'selectedCategory' | 'selectedCategories'>): void => {
+        goToCatalogFilters({ ...selection, query: '', order: 'fecha_ingreso', onlyNew: false, onlyOffers: false, onlyFeatured: false });
     };
 
-    const renderCatalogToolbarLeft = (idPrefix: string): JSX.Element => (
-        <div className={catalog.toolbarLeft}>
-            <div className={catalog.toolbarSegment}>
-                <label htmlFor={`${idPrefix}-catalog-group`} className="sr-only">
-                    CATEGORIA
-                </label>
-                <select
-                    id={`${idPrefix}-catalog-group`}
-                    data-testid="catalog-group-select"
-                    className={catalog.select}
-                    title="Filtra productos por rubro principal"
-                    value={activeGroupKey}
-                    onChange={(event) => {
-                        const nextGroupKey = event.currentTarget.value;
-                        goToCatalogFilters({
-                            selectedGroup: nextGroupKey,
-                            selectedCategory: '',
-                            selectedCategories: [],
-                        });
-                    }}
-                >
-                    <option value="">TODAS</option>
-                    {groups.map((group) => (
-                        <option key={group.key} value={group.key}>
-                            {group.label}
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            {activeGroupKey !== '' ? (
-                <div className={catalog.toolbarSubcategory}>
-                    <label htmlFor={`${idPrefix}-catalog-category`} className="sr-only">
-                        SUBCATEGORIA
-                    </label>
-                    <select
-                        id={`${idPrefix}-catalog-category`}
-                        data-testid="catalog-subcategory-select"
-                        className={catalog.select}
-                        title="Afina el listado dentro de la categoria elegida"
-                        value={filters.selectedCategory}
-                        onChange={(event) => {
-                            const selectedSlug = event.currentTarget.value;
-                            const selected = categories.find((category) => category.slug === selectedSlug);
-
-                            goToCatalogFilters({
-                                selectedGroup: selected?.groupKey ?? activeGroupKey,
-                                selectedCategory: selectedSlug,
-                                selectedCategories: [],
-                            });
-                        }}
-                    >
-                        <option value="">TODAS</option>
-                        {visibleCategories.map((category) => (
-                            <option key={category.id} value={category.slug}>
-                                {category.name}
-                            </option>
-                        ))}
-                    </select>
-                </div>
-            ) : null}
-        </div>
-    );
-
-    const renderCatalogToolbarRight = (idPrefix: string): JSX.Element => (
-        <div className={catalog.toolbarRight}>
-            <form className={catalog.orderForm} onSubmit={(event) => event.preventDefault()}>
-                <label htmlFor={`${idPrefix}-catalog-order-buttons`} className={catalog.orderLabel}>ORDEN</label>
-                <div id={`${idPrefix}-catalog-order-buttons`} className={catalog.orderToggle} role="group" aria-label="Filtros y orden del catálogo">
-                    <CatalogToolbarButton
-                        ariaLabel="Mostrar novedades"
-                        tooltip="Mostrar productos nuevos"
-                        isActive={filters.onlyNew}
-                        onClick={() => toggleCatalogFlag('onlyNew')}
-                    >
-                        <span className={catalogOrderIconClass}>
-                            <ClockIcon />
-                        </span>
-                        <span>Novedades</span>
-                    </CatalogToolbarButton>
-
-                    <CatalogToolbarButton
-                        ariaLabel="Mostrar ofertas"
-                        tooltip="Mostrar productos en oferta"
-                        isActive={filters.onlyOffers}
-                        onClick={() => toggleCatalogFlag('onlyOffers')}
-                    >
-                        <span className={catalogOrderFireIconClass} aria-hidden="true">
-                            {'\u{1F525}'}
-                        </span>
-                        <span>Ofertas</span>
-                    </CatalogToolbarButton>
-
-                    <CatalogToolbarButton
-                        ariaLabel="Ordenar por precio ascendente"
-                        tooltip="Ordenar de menor a mayor precio"
-                        isActive={filters.order === 'precio_asc'}
-                        onClick={() => goToCatalogFilters({ order: filters.order === 'precio_asc' ? 'fecha_ingreso' : 'precio_asc' })}
-                    >
-                        <span className={catalogOrderCurrencyClass}>$</span>
-                        <span className={catalogOrderIconClass}>
-                            <PriceAscIcon />
-                        </span>
-                        <span>Menor precio</span>
-                    </CatalogToolbarButton>
-
-                    <CatalogToolbarButton
-                        ariaLabel="Ordenar por precio descendente"
-                        tooltip="Ordenar de mayor a menor precio"
-                        isActive={filters.order === 'precio_desc'}
-                        onClick={() => goToCatalogFilters({ order: filters.order === 'precio_desc' ? 'fecha_ingreso' : 'precio_desc' })}
-                    >
-                        <span className={catalogOrderCurrencyClass}>$</span>
-                        <span className={catalogOrderIconClass}>
-                            <PriceDescIcon />
-                        </span>
-                        <span>Mayor precio</span>
-                    </CatalogToolbarButton>
-                </div>
-            </form>
-
-            <form className={catalog.densityForm} onSubmit={(event) => event.preventDefault()}>
-                <label htmlFor={`${idPrefix}-catalog-grid-columns`} className={catalog.densityLabel} aria-label="Columnas">
-                    <span className={catalog.densityIcon}>
-                        <GridColumnsIcon />
-                    </span>
-                </label>
-                <select
-                    id={`${idPrefix}-catalog-grid-columns`}
-                    className={catalog.densitySelect}
-                    value={gridColumns}
-                    aria-label="Cantidad de productos por fila"
-                    title="Cantidad de productos por fila"
-                    onChange={(event) => updateGridColumns(event.currentTarget.value === 'auto' ? 'auto' : Number.parseInt(event.currentTarget.value, 10) as CatalogGridColumns)}
-                >
-                    <option value="auto">AUTOMÁTICO</option>
-                    {catalogGridColumnOptions.map((columns) => (
-                        <option key={columns} value={columns}>
-                            COLUMNAS {columns}
-                        </option>
-                    ))}
-                </select>
-            </form>
-
-            <button
-                type="button"
-                className={catalog.clearButton}
-                aria-label="Limpiar filtros"
-                title="Limpiar todos los filtros"
-                onClick={() => router.get(filters.clearUrl)}
-            >
-                <span className={catalog.clearIcon}>
-                    <ClearIcon />
-                </span>
-                <span>Limpiar</span>
-            </button>
-        </div>
-    );
+    const [desktopGroup, setDesktopGroup] = useState(activeGroupKey || groups[0]?.key || '');
+    const [desktopFilterDraft, setDesktopFilterDraft] = useState({ onlyOffers: filters.onlyOffers, onlyNew: filters.onlyNew, onlyFeatured: filters.onlyFeatured });
+    const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0, maxHeight: 400 });
+    const desktopToolbarRef = useRef<HTMLDivElement>(null);
+    const positionPopover = (button: HTMLButtonElement, width: number, categoriesMenu = false): void => {
+        const rect = button.getBoundingClientRect();
+        const left = categoriesMenu ? desktopToolbarRef.current?.getBoundingClientRect().left ?? rect.left : rect.left;
+        const top = rect.bottom + 8;
+        setPopoverPosition({ top, left: Math.max(16, Math.min(left, window.innerWidth - width - 16)), maxHeight: Math.max(0, window.innerHeight - top - 16) });
+    };
+    const closeDesktopPopover = (id: string): void => { document.getElementById(id)?.hidePopover(); };
+    useEffect(() => {
+        const dismissPopovers = (): void => {
+            for (const id of ['desktop-categories', 'desktop-filters', 'desktop-view']) {
+                const panel = document.getElementById(id);
+                if (panel?.matches(':popover-open')) panel.hidePopover();
+            }
+        };
+        window.addEventListener('scroll', dismissPopovers, { passive: true });
+        window.addEventListener('resize', dismissPopovers);
+        return () => { window.removeEventListener('scroll', dismissPopovers); window.removeEventListener('resize', dismissPopovers); };
+    }, []);
 
     return (
         <SiteLayout
@@ -853,14 +700,14 @@ export default function CatalogPage({
                         <div className="mobile-catalog-dialog-body">
                             {mobilePanel === 'categories' ? (
                                 <>
-                                    <button type="button" className="mobile-category-all" onClick={() => { goToCatalogFilters({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Todas las categorías</button>
+                                    <button type="button" className="mobile-category-all" onClick={() => { selectCatalogCategory({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Todas las categorías</button>
                                     {groups.map((group) => (
                                         <details key={group.key} open={activeGroupKey === group.key ? true : undefined}>
                                             <summary>{group.label}<span>{group.productCount}</span></summary>
                                             <div className="mobile-category-links">
-                                                <button type="button" aria-pressed={activeGroupKey === group.key && !filters.selectedCategory} onClick={() => { goToCatalogFilters({ selectedGroup: group.key, selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Ver todo en {group.label}</button>
+                                                <button type="button" aria-pressed={activeGroupKey === group.key && !filters.selectedCategory} onClick={() => { selectCatalogCategory({ selectedGroup: group.key, selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Ver todo en {group.label}</button>
                                                 {categories.filter((category) => category.groupKey === group.key).map((category) => (
-                                                    <button type="button" key={category.id} aria-pressed={filters.selectedCategory === category.slug || filters.selectedCategories.includes(category.slug)} onClick={() => { goToCatalogFilters({ selectedGroup: group.key, selectedCategory: category.slug, selectedCategories: [] }); setMobilePanel(null); }}>
+                                                    <button type="button" key={category.id} aria-pressed={filters.selectedCategory === category.slug || filters.selectedCategories.includes(category.slug)} onClick={() => { selectCatalogCategory({ selectedGroup: group.key, selectedCategory: category.slug, selectedCategories: [] }); setMobilePanel(null); }}>
                                                         <span>{category.name}</span><span>{category.productCount}</span>
                                                     </button>
                                                 ))}
@@ -886,19 +733,58 @@ export default function CatalogPage({
                     </dialog>
 
                     <section className={catalog.results}>
-                        <div className={catalog.productToolbar}>
-                            <div className={catalog.productToolbarFilters}>
-                                {renderCatalogToolbarLeft('desktop')}
-                            </div>
-                            <div className={catalog.productToolbarActions}>
-                                {renderCatalogToolbarRight('desktop')}
+                        <div className="desktop-catalog-toolbar" ref={desktopToolbarRef} aria-label="Controles del catálogo en escritorio">
+                            <p className="desktop-catalog-count"><strong>{summary.productCount}</strong> {summary.productCount === 1 ? 'producto' : 'productos'} en catálogo</p>
+                            <div className="desktop-catalog-actions">
+                                <button type="button" popoverTarget="desktop-categories" onClick={(event) => { setDesktopGroup(activeGroupKey || groups[0]?.key || ''); positionPopover(event.currentTarget, 860, true); }}><GridColumnsIcon />Categorías<span aria-hidden="true">⌄</span></button>
+                                <button type="button" popoverTarget="desktop-filters" onClick={(event) => { setDesktopFilterDraft({ onlyOffers: filters.onlyOffers, onlyNew: filters.onlyNew, onlyFeatured: filters.onlyFeatured }); positionPopover(event.currentTarget, 300); }}><FilterIcon />Filtros{[filters.onlyOffers, filters.onlyNew, filters.onlyFeatured].filter(Boolean).length > 0 ? ` (${[filters.onlyOffers, filters.onlyNew, filters.onlyFeatured].filter(Boolean).length})` : ''}</button>
+                                <label className="desktop-catalog-order" htmlFor="desktop-catalog-order">Ordenar por
+                                    <select id="desktop-catalog-order" value={filters.order} onChange={(event) => goToCatalogFilters({ order: event.currentTarget.value })}>
+                                        <option value="fecha_ingreso">Más recientes</option>
+                                        <option value="precio_asc">Menor precio</option>
+                                        <option value="precio_desc">Mayor precio</option>
+                                    </select>
+                                </label>
+                                <button type="button" popoverTarget="desktop-view" onClick={(event) => positionPopover(event.currentTarget, 220)}><GridColumnsIcon />Vista</button>
                             </div>
                         </div>
-
+                        <div id="desktop-categories" popover="auto" className="desktop-catalog-popover desktop-category-menu" style={popoverPosition} role="dialog" aria-label="Categorías del catálogo">
+                            <div className="desktop-popover-header"><h2>Categorías</h2><button type="button" popoverTarget="desktop-categories" popoverTargetAction="hide" aria-label="Cerrar categorías">×</button></div>
+                            <div className="desktop-category-columns">
+                                <div className="desktop-category-groups" role="group" aria-label="Rubros">
+                                    {groups.map((group) => <button type="button" key={group.key} aria-pressed={desktopGroup === group.key} onClick={() => setDesktopGroup(group.key)}><span>{group.label}</span><span>{group.productCount}</span></button>)}
+                                    <button type="button" className="desktop-all-categories" onClick={() => { selectCatalogCategory({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}>Todas las categorías</button>
+                                </div>
+                                <div className="desktop-category-options">
+                                    <button type="button" className="desktop-category-heading" onClick={() => { selectCatalogCategory({ selectedGroup: desktopGroup, selectedCategory: '', selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}>Ver todo en {groups.find((group) => group.key === desktopGroup)?.label}<span aria-hidden="true">→</span></button>
+                                    <div className="desktop-category-links">
+                                        {categories.filter((category) => category.groupKey === desktopGroup).map((category) => <button type="button" key={category.id} aria-pressed={filters.selectedCategory === category.slug || filters.selectedCategories.includes(category.slug)} onClick={() => { selectCatalogCategory({ selectedGroup: category.groupKey, selectedCategory: category.slug, selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}><span>{category.name}</span><span>{category.productCount}</span></button>)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="desktop-filters" popover="auto" className="desktop-catalog-popover desktop-filter-menu" style={popoverPosition} role="dialog" aria-label="Filtros del catálogo">
+                            <div className="desktop-popover-header"><h2>Filtros</h2><button type="button" popoverTarget="desktop-filters" popoverTargetAction="hide" aria-label="Cerrar filtros">×</button></div>
+                            <div className="desktop-filter-options">
+                                <label><input type="checkbox" checked={desktopFilterDraft.onlyOffers} onChange={(event) => setDesktopFilterDraft({ ...desktopFilterDraft, onlyOffers: event.currentTarget.checked })} />Ofertas</label>
+                                <label><input type="checkbox" checked={desktopFilterDraft.onlyNew} onChange={(event) => setDesktopFilterDraft({ ...desktopFilterDraft, onlyNew: event.currentTarget.checked })} />Novedades</label>
+                                <label><input type="checkbox" checked={desktopFilterDraft.onlyFeatured} onChange={(event) => setDesktopFilterDraft({ ...desktopFilterDraft, onlyFeatured: event.currentTarget.checked })} />Destacados</label>
+                                <button type="button" className="desktop-filter-reset" onClick={() => setDesktopFilterDraft({ onlyOffers: false, onlyNew: false, onlyFeatured: false })}>Quitar filtros de productos</button>
+                                <button type="button" className="desktop-filter-apply" onClick={() => { goToCatalogFilters(desktopFilterDraft); closeDesktopPopover('desktop-filters'); }}>Aplicar filtros</button>
+                            </div>
+                        </div>
+                        <div id="desktop-view" popover="auto" className="desktop-catalog-popover desktop-view-menu" style={popoverPosition} role="dialog" aria-label="Vista del catálogo">
+                            <label htmlFor="desktop-grid-columns">Productos por fila</label>
+                            <select id="desktop-grid-columns" aria-label="Cantidad de productos por fila" value={gridColumns} onChange={(event) => updateGridColumns(event.currentTarget.value === 'auto' ? 'auto' : Number.parseInt(event.currentTarget.value, 10) as CatalogGridColumns)}>
+                                <option value="auto">Automático</option>
+                                {catalogGridColumnOptions.map((columns) => <option key={columns} value={columns}>{columns} columnas</option>)}
+                            </select>
+                        </div>
 
                         {activeFilters.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm" aria-label="Filtros activos">
+                            <div className="catalog-active-filters flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm" aria-label="Filtros activos">
                                 <span className="font-semibold text-slate-700">Filtros:</span>
+                                <button type="button" className="catalog-clear-all" onClick={() => router.get(filters.clearUrl)}>Limpiar todo</button>
                                 {activeFilters.map((filter) => (
                                     <button key={filter.label} type="button" onClick={filter.clear} aria-label={`Quitar filtro: ${filter.label}`} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-slate-300 px-3 text-[#17376f] hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2">
                                         {filter.label}<span aria-hidden="true">×</span>
@@ -906,17 +792,6 @@ export default function CatalogPage({
                                 ))}
                             </div>
                         ) : null}
-                        <div className={`${catalog.marquee} catalog-results-count`}>
-                            <div className={catalog.marqueeTrack}>
-                                <span className={catalog.marqueeText}>PRODUCTOS DISPONIBLES: {summary.productCount}</span>
-                            </div>
-                            {isFiltered ? (
-                                <button type="button" className={catalog.marqueeClearButton} onClick={() => router.get(filters.clearUrl)} aria-label="Quitar filtros">
-                                    <CloseIcon />
-                                </button>
-                            ) : null}
-                        </div>
-
                         {products.length > 0 ? (
                             <section className={previewCardGrid ? `${catalogGridClass(gridColumns)} !gap-1.5 max-[560px]:!gap-1` : catalogGridClass(gridColumns)}>
                                 {products.map((product, index) => (

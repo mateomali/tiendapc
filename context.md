@@ -1,5 +1,17 @@
 # Contexto de Diseño
 
+## Página de inicio pública
+
+- La página de inicio es `https://www.sudokumerlo.com/productos`.
+- La raíz `https://www.sudokumerlo.com/` debe redirigir a `/productos`.
+- El logo y los enlaces de inicio deben apuntar al catálogo (`store.catalog`).
+- Mantener el dominio público separado de las direcciones del servidor local.
+
+## Navegación del catálogo
+
+- Elegir una categoría, un rubro o todas las categorías limpia la búsqueda, ofertas, novedades, destacados y orden previo.
+- Las búsquedas siempre son globales: envían solo el texto y limpian categorías, rubros y filtros activos.
+
 ## Propaganda impresa
 
 Cuando el usuario escriba "propaganda", tomar como referencia el diseño aprobado en:

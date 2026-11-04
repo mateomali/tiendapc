@@ -1,0 +1,46 @@
+const { chromium } = require('playwright');
+const { expect } = require('@playwright/test');
+const assert = require('node:assert/strict');
+(async () => {
+    const browser = await chromium.launch();
+    const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('http://127.0.0.1:8090/productos');
+    const toolbar = page.locator('.desktop-catalog-toolbar');
+    await expect(toolbar).toBeVisible();
+    await toolbar.getByRole('button', { name: 'Categorías' }).click();
+    const categories = page.locator('#desktop-categories');
+    await expect(categories).toBeVisible();
+    await page.screenshot({ path: 'tmp/catalog-desktop-categories.png' });
+    await page.keyboard.press('Escape');
+    await expect(categories).not.toBeVisible();
+    await toolbar.getByRole('button', { name: 'Categorías' }).click();
+    const category = categories.locator('.desktop-category-links button').first();
+    const name = await category.locator('span').first().textContent();
+    await category.click();
+    await expect(categories).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Quitar filtro: ' + name, exact: true })).toBeVisible();
+    await toolbar.getByRole('button', { name: 'Filtros' }).click();
+    const filters = page.locator('#desktop-filters');
+    await filters.getByRole('checkbox', { name: 'Ofertas', exact: true }).check();
+    await filters.getByRole('button', { name: 'Aplicar filtros', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Quitar filtro: Ofertas', exact: true })).toBeVisible();
+    await page.locator('#desktop-catalog-order').selectOption('precio_asc');
+    await expect(page.locator('#desktop-catalog-order')).toHaveValue('precio_asc');
+    await toolbar.getByRole('button', { name: 'Vista', exact: true }).click();
+    await page.locator('#desktop-grid-columns').selectOption('3');
+    await expect(page.locator('#desktop-grid-columns')).toHaveValue('3');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Limpiar todo', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Limpiar todo', exact: true })).toHaveCount(0);
+    for (const width of [861, 1024, 1366, 1920, 390]) {
+        await page.setViewportSize({ width, height: 900 });
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        if (width > 860) await expect(toolbar).toBeVisible();
+        else await expect(toolbar).not.toBeVisible();
+    }
+    assert.deepEqual(errors, []);
+    await browser.close();
+    console.log('PASS: desktop categories, filters, sorting, density, clear, Escape, responsive layout, JavaScript');
+})().catch(error => { console.error(error); process.exit(1); });
