@@ -392,7 +392,7 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                                 </span>
                             </button>
                             <a href={product.whatsappUrl} className={catalogActionClass('success', 'min-h-12 px-[1.3rem]')}>
-                                <span>Comprar ya!</span>
+                                <span>Consultar por WhatsApp</span>
                                 <span className={catalogActionIconClass} aria-hidden="true">
                                     <WhatsAppIcon size={16} />
                                 </span>

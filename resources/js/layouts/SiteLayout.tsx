@@ -207,9 +207,20 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
 
     const submitSearch = (query = search): void => {
         setMobileMenuOpen(false);
+        setMobileSearchOpen(false);
         router.visit(buildSearchUrl(query), {
             preserveState: true,
-            preserveScroll: false,
+            preserveScroll: true,
+            onSuccess: () => {
+                window.requestAnimationFrame(() => {
+                    const result = document.querySelector<HTMLElement>('.catalog-product-grid > article, .catalog-empty-state');
+                    if (!result) return;
+                    result.tabIndex = -1;
+                    result.focus({ preventScroll: true });
+                    const headerHeight = document.querySelector('.store-sticky-header')?.getBoundingClientRect().height ?? 0;
+                    window.scrollTo({ top: Math.max(0, window.scrollY + result.getBoundingClientRect().top - headerHeight - 12), behavior: 'instant' });
+                });
+            },
             onStart: () => setSearching(true),
             onFinish: () => setSearching(false),
         });

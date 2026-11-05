@@ -636,12 +636,27 @@ export default function CatalogPage({
 
     const goToCatalogFilters = (
         overrides: Partial<Pick<CatalogPageProps['filters'], 'selectedCategory' | 'selectedCategories' | 'selectedGroup' | 'query' | 'order' | 'onlyNew' | 'onlyOffers' | 'onlyFeatured'>>,
+        focusFirstProduct = false,
     ): void => {
-        router.get(filters.clearUrl, buildCatalogQuery(filters, overrides), { preserveScroll: true, preserveState: true });
+        router.get(filters.clearUrl, buildCatalogQuery(filters, overrides), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                if (!focusFirstProduct) return;
+                window.requestAnimationFrame(() => {
+                    const result = document.querySelector<HTMLElement>('.catalog-product-grid > article, .catalog-empty-state');
+                    if (!result) return;
+                    result.tabIndex = -1;
+                    result.focus({ preventScroll: true });
+                    const headerHeight = document.querySelector('.store-sticky-header')?.getBoundingClientRect().height ?? 0;
+                    window.scrollTo({ top: Math.max(0, window.scrollY + result.getBoundingClientRect().top - headerHeight - 12), behavior: 'instant' });
+                });
+            },
+        });
     };
 
     const selectCatalogCategory = (selection: Pick<CatalogPageProps['filters'], 'selectedGroup' | 'selectedCategory' | 'selectedCategories'>): void => {
-        goToCatalogFilters({ ...selection, query: '', order: 'fecha_ingreso', onlyNew: false, onlyOffers: false, onlyFeatured: false });
+        goToCatalogFilters({ ...selection, query: '', order: 'fecha_ingreso', onlyNew: false, onlyOffers: false, onlyFeatured: false }, true);
     };
 
     const [desktopGroup, setDesktopGroup] = useState(activeGroupKey || groups[0]?.key || '');
