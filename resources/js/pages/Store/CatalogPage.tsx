@@ -504,20 +504,23 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
                     onError={() => setFailedImages((current) => current.includes(activeImage) ? current : [...current, activeImage])}
                 />}
 
-                <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+                <div className={`absolute left-2 flex flex-wrap gap-1.5 ${product.cashPrice ? 'top-12 min-[861px]:top-9' : 'top-2'}`}>
                     {product.hasOffer ? (
-                        <span className="rounded-md bg-[#d71920] px-2 py-1 text-[0.64rem] font-black uppercase tracking-[0.025em] text-white">
-                            -{product.discountPercentage}%
+                        <span className="rounded-md bg-[#d71920] px-2.5 py-1.5 text-xs font-black uppercase leading-none text-white">
+                            {product.discountPercentage}% OFF
                         </span>
                     ) : null}
-                    {product.isNew ? (
+                    {product.isNew && !product.hasOffer ? (
                         <span className="rounded-md border border-sky-200 bg-white/95 px-2 py-1 text-[0.64rem] font-black uppercase tracking-[0.025em] text-[#0b6f95]">
                             Nuevo
                         </span>
                     ) : null}
                 </div>
 
-                <span className={catalogImageDetailsPillClass}>Más detalles</span>
+                {product.cashPrice ? (
+                    <span className="catalog-card-cash-badge"><span className="min-[861px]:hidden">DESCUENTO EN EFECTIVO</span><span className="max-[860px]:hidden">DESCUENTO EN EFECTIVO</span></span>
+                ) : null}
+
             </Link>
 
             <div className="catalog-card-content">
@@ -531,7 +534,7 @@ function CatalogProductPreviewCard({ product, cartUrl, eagerImage }: CatalogCard
 
                 <div className={`catalog-card-price ${product.cashPrice ? 'catalog-card-price-cash' : ''}`}>
                     <div className="catalog-card-price-caption">
-                        {product.cashPrice ? <span>En efectivo</span> : <span>Precio</span>}
+                        {product.cashPrice ? <span>En efectivo</span> : null}
                         {product.hasOffer ? <span className="catalog-card-before">Antes <s>${product.priceLabel}</s></span> : null}
                     </div>
                     <strong className="catalog-card-amount catalog-preview-price-font">
@@ -705,7 +708,7 @@ export default function CatalogPage({
                 <div className={catalog.layoutMain}>
                     <section className="mobile-catalog-controls" aria-label="Controles del catálogo">
                         <div className="catalog-toolbar-heading">
-                            <h2><GridColumnsIcon /><span>Explorar productos</span></h2>
+                            <h2><span>Explorar productos</span></h2>
                             <p role="status">{summary.productCount} {summary.productCount === 1 ? 'producto' : 'productos'}</p>
                         </div>
                         <div className="mobile-catalog-buttons">
@@ -733,15 +736,15 @@ export default function CatalogPage({
                         <div className="mobile-catalog-dialog-body">
                             {mobilePanel === 'categories' ? (
                                 <>
-                                    <button type="button" className="mobile-category-all" onClick={() => { selectCatalogCategory({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Todas las categorías</button>
+                                    <button type="button" className="mobile-category-all" onClick={() => { selectCatalogCategory({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>TODAS LAS CATEGORÍAS</button>
                                     {groups.map((group) => (
                                         <details key={group.key} open={activeGroupKey === group.key ? true : undefined}>
-                                            <summary>{group.label}<span>{group.productCount}</span></summary>
+                                            <summary>{group.label.toLocaleUpperCase('es')}<span>{group.productCount}</span></summary>
                                             <div className="mobile-category-links">
-                                                <button type="button" aria-pressed={activeGroupKey === group.key && !filters.selectedCategory} onClick={() => { selectCatalogCategory({ selectedGroup: group.key, selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>Ver todo en {group.label}</button>
+                                                <button type="button" aria-pressed={activeGroupKey === group.key && !filters.selectedCategory} onClick={() => { selectCatalogCategory({ selectedGroup: group.key, selectedCategory: '', selectedCategories: [] }); setMobilePanel(null); }}>VER TODO EN {group.label.toLocaleUpperCase('es')}</button>
                                                 {categories.filter((category) => category.groupKey === group.key).map((category) => (
                                                     <button type="button" key={category.id} aria-pressed={filters.selectedCategory === category.slug || filters.selectedCategories.includes(category.slug)} onClick={() => { selectCatalogCategory({ selectedGroup: group.key, selectedCategory: category.slug, selectedCategories: [] }); setMobilePanel(null); }}>
-                                                        <span>{category.name}</span><span>{category.productCount}</span>
+                                                        <span>{category.name.toLocaleUpperCase('es')}</span><span>{category.productCount}</span>
                                                     </button>
                                                 ))}
                                             </div>
@@ -768,7 +771,7 @@ export default function CatalogPage({
                     <section className={catalog.results}>
                         <div className="desktop-catalog-toolbar" ref={desktopToolbarRef} aria-label="Controles del catálogo en escritorio">
                             <div className="catalog-toolbar-heading">
-                                <h2><GridColumnsIcon /><span>Explorar productos</span></h2>
+                                <h2><span>Explorar productos</span></h2>
                                 <p className="desktop-catalog-count" role="status"><strong>{summary.productCount}</strong> {summary.productCount === 1 ? 'producto' : 'productos'}</p>
                             </div>
                             <div className="desktop-catalog-actions">
@@ -788,13 +791,13 @@ export default function CatalogPage({
                             <div className="desktop-popover-header"><h2>Categorías</h2><button type="button" popoverTarget="desktop-categories" popoverTargetAction="hide" aria-label="Cerrar categorías">×</button></div>
                             <div className="desktop-category-columns">
                                 <div className="desktop-category-groups" role="group" aria-label="Rubros">
-                                    {groups.map((group) => <button type="button" key={group.key} aria-pressed={desktopGroup === group.key} onClick={() => setDesktopGroup(group.key)}><span>{group.label}</span><span>{group.productCount}</span></button>)}
-                                    <button type="button" className="desktop-all-categories" onClick={() => { selectCatalogCategory({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}>Todas las categorías</button>
+                                    {groups.map((group) => <button type="button" key={group.key} aria-pressed={desktopGroup === group.key} onClick={() => setDesktopGroup(group.key)}><span>{group.label.toLocaleUpperCase('es')}</span><span>{group.productCount}</span></button>)}
+                                    <button type="button" className="desktop-all-categories" onClick={() => { selectCatalogCategory({ selectedGroup: '', selectedCategory: '', selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}>TODAS LAS CATEGORÍAS</button>
                                 </div>
                                 <div className="desktop-category-options">
-                                    <button type="button" className="desktop-category-heading" onClick={() => { selectCatalogCategory({ selectedGroup: desktopGroup, selectedCategory: '', selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}>Ver todo en {groups.find((group) => group.key === desktopGroup)?.label}<span aria-hidden="true">→</span></button>
+                                    <button type="button" className="desktop-category-heading" onClick={() => { selectCatalogCategory({ selectedGroup: desktopGroup, selectedCategory: '', selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}>VER TODO EN {groups.find((group) => group.key === desktopGroup)?.label.toLocaleUpperCase('es')}<span aria-hidden="true">→</span></button>
                                     <div className="desktop-category-links">
-                                        {categories.filter((category) => category.groupKey === desktopGroup).map((category) => <button type="button" key={category.id} aria-pressed={filters.selectedCategory === category.slug || filters.selectedCategories.includes(category.slug)} onClick={() => { selectCatalogCategory({ selectedGroup: category.groupKey, selectedCategory: category.slug, selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}><span>{category.name}</span><span>{category.productCount}</span></button>)}
+                                        {categories.filter((category) => category.groupKey === desktopGroup).map((category) => <button type="button" key={category.id} aria-pressed={filters.selectedCategory === category.slug || filters.selectedCategories.includes(category.slug)} onClick={() => { selectCatalogCategory({ selectedGroup: category.groupKey, selectedCategory: category.slug, selectedCategories: [] }); closeDesktopPopover('desktop-categories'); }}><span>{category.name.toLocaleUpperCase('es')}</span><span>{category.productCount}</span></button>)}
                                     </div>
                                 </div>
                             </div>

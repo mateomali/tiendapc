@@ -166,7 +166,7 @@ class StoreController extends Controller
                     ->values(),
             ],
             'groups' => $this->serializeGroups($categories, $filters['selectedGroup'], $filters['selectedCategory'], $filters['query'], $filters['order'], $filters['onlyNew'], $filters['onlyOffers'], $filters['onlyFeatured'], $clearRoute),
-            'categories' => $this->serializeCategories($categories, $filters, $products, $clearRoute),
+            'categories' => $this->serializeCategories($categories, $filters, $clearRoute),
             'products' => $products
                 ->map(fn (Product $product): array => $this->serializeCatalogProduct($product, (int) ($cartQuantities->get($product->id) ?? 0), $newSince))
                 ->values(),
@@ -391,21 +391,18 @@ class StoreController extends Controller
     /**
      * @param Collection<int, Category> $categories
      * @param array{query: string, selectedCategory: string, selectedCategories: array<int, string>, selectedGroup: string, order: string, onlyNew: bool, onlyOffers: bool, onlyFeatured: bool} $filters
-     * @param Collection<int, Product> $products
      * @return array<int, array{id: int, name: string, slug: string, groupKey: string, productCount: int, url: string, isSelected: bool}>
      */
-    private function serializeCategories(Collection $categories, array $filters, Collection $products, string $catalogRouteName = 'store.catalog'): array
+    private function serializeCategories(Collection $categories, array $filters, string $catalogRouteName = 'store.catalog'): array
     {
-        $productCountsByCategory = $products->countBy('category_id');
-
         return $categories
-            ->map(function (Category $category) use ($filters, $productCountsByCategory, $catalogRouteName): array {
+            ->map(function (Category $category) use ($filters, $catalogRouteName): array {
                 return [
                     'id' => $category->id,
                     'name' => $category->name,
                     'slug' => $category->slug,
                     'groupKey' => (string) $category->group_key,
-                    'productCount' => (int) ($productCountsByCategory->get($category->id) ?? 0),
+                    'productCount' => (int) ($category->sellable_products_count ?? 0),
                     'url' => route($catalogRouteName, $this->catalogQuery([
                         'categoria' => $category->slug,
                         'categorias' => null,
@@ -571,8 +568,10 @@ class StoreController extends Controller
             'images' => $images,
             'imageUrl' => $images[0] ?? asset('assets/img/logo-placeholder.svg'),
             'imageFallbackUrl' => asset('assets/img/logo-placeholder.svg'),
+            'price' => $basePrice,
             'priceLabel' => $this->money($basePrice),
             'offerPriceLabel' => $hasOffer && $product->offer_price !== null ? $this->money((int) $product->offer_price) : '',
+            'displayPrice' => $displayPrice,
             'displayPriceLabel' => $this->money($displayPrice),
             'cashPrice' => $cashPrice,
             'cashPriceLabel' => $cashPrice !== null ? $this->money($cashPrice) : '',

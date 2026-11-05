@@ -153,8 +153,10 @@ export interface ProductDetail {
     images: string[];
     imageUrl: string;
     imageFallbackUrl: string;
+    price: number;
     priceLabel: string;
     offerPriceLabel: string;
+    displayPrice: number;
     displayPriceLabel: string;
     cashPrice?: number | null;
     cashPriceLabel: string;

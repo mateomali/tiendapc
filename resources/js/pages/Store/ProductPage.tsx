@@ -293,7 +293,7 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                             <span>Volver al catalogo</span>
                         </Link>
                         {product.hasOffer && product.discountPercentage > 0 ? (
-                            <div className={catalogOfferRibbonClass} aria-label={`Descuento del ${product.discountPercentage}%`}>
+                            <div className="absolute -left-14 top-8 z-[4] flex h-10 w-56 -rotate-45 items-center justify-center bg-[#d71920] px-8 text-sm font-black uppercase leading-none text-white min-[561px]:h-12 min-[561px]:text-base" aria-label={`Descuento del ${product.discountPercentage}%`}>
                                 {'\u{1F525}'}Oferta -{product.discountPercentage}%
                             </div>
                         ) : null}
@@ -372,6 +372,9 @@ export default function ProductPage({ headerSearch, product, relatedProducts, re
                             ) : (
                                 <strong className={`${productPriceClass} catalog-preview-price-font text-[2.4rem] max-[640px]:text-[2rem]`}>${product.displayPriceLabel}</strong>
                             )}
+                            {product.price > (product.cashPrice ?? product.displayPrice) ? (
+                                <span className="text-sm font-bold text-[#b3131a]">Ahorrás ${(product.price - (product.cashPrice ?? product.displayPrice)).toLocaleString('es-AR')}{product.cashPrice ? ' en efectivo' : ''}</span>
+                            ) : null}
                             {product.cashPrice && product.cashDiscountNote ? (
                                 <span className="max-w-sm text-[0.74rem] font-bold leading-5 text-emerald-900">{product.cashDiscountNote}</span>
                             ) : null}

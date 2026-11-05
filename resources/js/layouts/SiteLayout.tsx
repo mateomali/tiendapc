@@ -349,7 +349,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                                         submitSearch();
                                                     }
                                                 }}
-                                                placeholder="Buscar por producto, ejemplo: auricular o cargador..."
+                                                placeholder="Buscar producto..."
                                                 className={site.searchInput}
                                                 aria-busy={searching ? 'true' : 'false'}
                                             />
@@ -455,7 +455,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                                 submitSearch();
                                             }
                                         }}
-                                        placeholder="Buscar por producto, ejemplo: auricular o cargador..."
+                                        placeholder="Buscar producto..."
                                         className={site.searchInput}
                                         aria-busy={searching ? 'true' : 'false'}
                                     />

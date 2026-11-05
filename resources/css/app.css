@@ -569,7 +569,7 @@
 }
 .catalog-card-price {
     display: grid;
-    grid-template-rows: 16px 28px 18px;
+    grid-template-rows: 16px 36px minmax(18px, auto);
     align-content: start;
     margin: 0 12px;
     padding: 6px 8px;
@@ -577,7 +577,7 @@
     border-radius: 6px;
     text-align: center;
 }
-.catalog-card-price-cash { background: #effbf4; border-color: #bbebcd; }
+.catalog-card-price-cash { background: transparent; }
 .catalog-card-price-caption {
     display: flex;
     align-items: center;
@@ -589,7 +589,7 @@
 }
 .catalog-card-price-cash .catalog-card-price-caption { color: #096545; }
 .catalog-card-before { color: #64748b; font-size: 10px; font-weight: 400; }
-.catalog-card-amount { font-size: 27px; line-height: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.catalog-card-amount { font-size: 32px; line-height: 36px; color: #102146; font-weight: 800; font-variant-numeric: tabular-nums; }
 .catalog-card-price-secondary { font-size: 10px; line-height: 16px; color: #526580; }
 .catalog-card-price-secondary b { margin-left: 4px; color: #243b58; }
 .catalog-card-actions { display: grid; align-content: start; gap: 6px; margin: 0 12px 12px; }
@@ -615,9 +615,9 @@
     .catalog-card-title { grid-column: 2; grid-row: 2; margin: 0 10px; }
     .catalog-card-price { grid-column: 2; grid-row: 3; margin: 0 10px; padding: 4px; }
     .catalog-card-actions { grid-column: 2; grid-row: 4; margin: 0 10px 10px; }
-    .catalog-card-price { grid-template-rows: 16px 28px auto; }
+    .catalog-card-price { grid-template-rows: auto 34px auto; }
     .catalog-card-price-secondary:empty { display: none; }
-    .catalog-card-amount { font-size: 25px; }
+    .catalog-card-amount { font-size: 30px; line-height: 34px; }
     .catalog-card-placeholder { font-size: 11px; }
     .catalog-card-before { font-size: 9px; }
 }
@@ -627,9 +627,9 @@
 .is-catalog-page header::after { display: none; }
 .is-catalog-page .catalog-product-grid:has(.catalog-card) { background: #edf2f8; padding: 16px; column-gap: 12px; row-gap: 10px; }
 .is-catalog-page .catalog-card { border-color: #d6e0ed; }
-.is-catalog-page .catalog-card-category { font-size: 11px; line-height: 16px; color: #53657d; }
-.is-catalog-page .catalog-card-title { font-weight: 600; line-height: 20px; }
-.is-catalog-page .catalog-card-price:not(.catalog-card-price-cash) { background: #f5f7fb; border-color: #e2e9f2; }
+.is-catalog-page .catalog-card-category { font-size: 10px; line-height: 14px; color: #64748b; }
+.is-catalog-page .catalog-card-title { font-weight: 600; line-height: 21px; }
+.is-catalog-page .catalog-card-price { background: transparent; border: 0; }
 .is-catalog-page .catalog-card-price-caption { font-size: 11px; }
 .is-catalog-page .catalog-card-actions > button { font-size: 13px; font-weight: 700; text-transform: none; letter-spacing: 0; }
 .is-catalog-page .catalog-empty-state { padding: 32px 24px; border: 0; border-radius: 0; background: #f5f7fb; box-shadow: none; }
@@ -841,4 +841,48 @@ body:has(#desktop-categories:popover-open) .desktop-catalog-actions > button[pop
     .mobile-catalog-order select { width: 100%; min-width: 0; min-height: 44px; border: 0; background: transparent; color: #fff; font-size: 14px; font-weight: 600; color-scheme: dark; }
     .mobile-catalog-order select option { background-color: #10264c; color: #fff; }
     .catalog-results-count { display: none; }
+}
+
+
+.catalog-card-price-caption:empty { visibility: hidden; }
+@media (max-width: 860px) {
+    .catalog-card-price-caption:empty { display: none; }
+    .catalog-card-price:has(.catalog-card-price-caption:empty) { grid-template-rows: 34px auto; }
+}
+
+.catalog-card-price-cash .catalog-card-amount { color: #096545; }
+.catalog-card { transition: border-color 160ms ease, box-shadow 160ms ease; }
+@media (hover: hover) and (pointer: fine) {
+    .is-catalog-page .catalog-card:hover {
+        border-color: #2456b4;
+        box-shadow: 0 2px 8px rgb(16 33 70 / 16%);
+    }
+}
+.is-catalog-page .catalog-card:focus-within { border-color: #2456b4; }
+@media (prefers-reduced-motion: reduce) {
+    .catalog-card { transition: none; }
+}
+
+.catalog-card-cash-badge {
+    position: absolute;
+    inset: 0 0 auto;
+    background: #096545;
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 16px;
+    color: white;
+}
+@media (max-width: 860px) {
+    .catalog-card-cash-badge {
+        inset: 6px auto auto 6px;
+        max-width: calc(100% - 12px);
+        border-radius: 4px;
+        background: #e4f5eb;
+        padding: 4px 6px;
+        font-size: 10px;
+        line-height: 14px;
+        color: #096545;
+    }
 }

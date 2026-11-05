@@ -90,3 +90,30 @@ it('renders the public repairs tracking page through the legacy accented url', f
             ->where('searched', false)
             ->where('publicView.resetUrl', route('repairs.tracking')));
 });
+
+it('keeps category totals when filtering products', function (): void {
+    foreach (['audio', 'cables'] as $slug) {
+        $category = Category::query()->create(['name' => $slug, 'slug' => $slug, 'group_key' => 'electronica', 'is_hidden' => false]);
+        Product::query()->create(['category_id' => $category->id, 'name' => $slug, 'slug' => $slug, 'price' => 100, 'is_active' => true]);
+    }
+    Product::query()->create(['category_id' => $category->id, 'name' => 'Inactive', 'slug' => 'inactive', 'price' => 100, 'is_active' => false]);
+    foreach ([['categoria' => 'audio'], ['q' => 'audio'], ['categorias' => ['audio']], ['ofertas' => 1]] as $filters) {
+        $this->get(route('store.catalog', $filters))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('categories.0.productCount', 1)
+                ->where('categories.1.productCount', 1)
+                ->where('groups.0.productCount', 2));
+    }
+});
+
+it('provides numeric prices for the detail savings with offer and cash discount', function (): void {
+    SiteGlobalConfig::putValue('product_cash_discount_enabled', '1');
+    SiteGlobalConfig::putValue('product_cash_discount_threshold', '0');
+    $category = Category::query()->create(['name' => 'Audio', 'slug' => 'detail-audio', 'group_key' => 'electronica', 'is_hidden' => false]);
+    Product::query()->create(['category_id' => $category->id, 'name' => 'Speaker', 'slug' => 'detail-speaker', 'price' => 10000, 'offer_price' => 8000, 'cash_discount_mode' => 'manual', 'cash_price' => 7000, 'is_active' => true]);
+    $this->get(route('store.product.show', 'detail-speaker'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('product.price', 10000)
+            ->where('product.displayPrice', 8000)
+            ->where('product.cashPrice', 7000));
+});
