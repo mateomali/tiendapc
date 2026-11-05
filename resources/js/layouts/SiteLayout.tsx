@@ -293,7 +293,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                     </div>
                 ) : null}
                 <div className={site.frame}>
-                    <header className={site.header}>
+                    <header className={`${site.header} store-sticky-header`}>
                         <div className="mobile-store-bar">
                             <button type="button" aria-label={onOpenCategories ? 'Abrir categorías' : 'Abrir menú'} aria-haspopup={onOpenCategories ? 'dialog' : undefined} aria-controls={onOpenCategories ? 'catalog-mobile-panel' : 'site-mobile-nav'} onClick={() => onOpenCategories ? onOpenCategories() : setMobileMenuOpen((open) => !open)}>
                                 <MenuNavIcon open={mobileMenuOpen} />
@@ -304,13 +304,14 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                             <Link href={layout.cartUrl} className="mobile-store-cart" aria-label={`Ir al carrito, ${cart.count} productos`}><CartNavIcon /><span className="mobile-store-button-label">Carrito</span>{cart.count > 0 ? <span data-cart-badge>{cart.count}</span> : null}</Link>
                         </div>
                         <div id="mobile-store-search" className={`${site.headerInner} mobile-store-search ${mobileSearchOpen ? 'is-open' : ''}`}>
-                            <div className={`${site.brandRow} ${onOpenDesktopCategories ? 'catalog-header-row' : ''}`}>
+                            <div className={`${site.brandRow} catalog-header-row`}>
                                 {onOpenDesktopCategories ? (
                                     <button type="button" className="desktop-sticky-categories" hidden={!desktopCategoriesVisible} popoverTarget="desktop-categories" aria-label="Abrir categorías del catálogo" aria-haspopup="dialog" title="Categorías" onClick={(event) => onOpenDesktopCategories(event.currentTarget)}>
                                         <MenuNavIcon open={false} />
                                     </button>
-                                ) : null}
-
+                                ) : (
+                                    <button type="button" className="desktop-sticky-categories" popoverTarget="store-navigation" aria-label="Abrir menú de la tienda" aria-haspopup="true"><MenuNavIcon open={false} /></button>
+                                )}
 
                                 <div className={`${site.mobileBrandTop} legacy-mobile-brand`}>
                                     <button
@@ -337,7 +338,7 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                                     </Link>
                                 </div>
 
-                            <div className={`${site.headerCenter} ${onOpenDesktopCategories ? 'catalog-header-tools' : ''}`}>
+                            <div className={`${site.headerCenter} catalog-header-tools`}>
                                 {headerSearch ? (
                                     <div className={`${site.searchPanel} ${site.searchPanelHeader}`}>
                                         <div className={site.searchRow}>
@@ -394,6 +395,12 @@ export function SiteLayout({ children, title, headerSearch, announcements, annou
                             </div>
                         </div>
                     </header>
+                    {!onOpenDesktopCategories ? (
+                        <nav id="store-navigation" popover="auto" className="store-navigation-popover" aria-label="Secciones de la tienda">
+                            {layout.navItems.map((item) => <Link key={item.href} href={item.href} onClick={() => document.getElementById('store-navigation')?.hidePopover()}>{item.label}</Link>)}
+                            <a href={layout.repairUrl}>Reparaciones</a>
+                        </nav>
+                    ) : null}
 
                     <div className={site.desktopNavShell}>
                         <nav className={site.desktopNavRow} aria-label="Principal">

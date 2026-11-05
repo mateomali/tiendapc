@@ -886,3 +886,12 @@ body:has(#desktop-categories:popover-open) .desktop-catalog-actions > button[pop
         color: #096545;
     }
 }
+
+/* Shared storefront header, including product details and cart. */
+html, body { overflow-x: clip; }
+.store-sticky-header { position: sticky; top: 0; z-index: 40; background: #2b5297; box-shadow: 0 2px 8px rgb(8 25 70 / 12%); backdrop-filter: none; }
+.store-sticky-header::after { display: none; }
+.store-navigation-popover { position: fixed; inset: 76px auto auto 16px; margin: 0; width: 240px; max-height: calc(100dvh - 92px); overflow-y: auto; padding: 8px; border: 1px solid #5276ab; border-radius: 8px; background: #18345e; color: #f1f6ff; box-shadow: 0 2px 8px rgb(4 15 35 / 25%); }
+.store-navigation-popover a { display: flex; align-items: center; min-height: 44px; padding: 8px 12px; border-radius: 4px; }
+.store-navigation-popover a:hover { background: #284d80; }
+.store-navigation-popover a:focus-visible { outline: 2px solid #7bd9fa; outline-offset: -2px; }
