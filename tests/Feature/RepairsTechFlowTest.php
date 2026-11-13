@@ -311,7 +311,7 @@ it('creates multi-job repair orders and redirects to the technical ticket', func
 
     $orderId = (int) RepairOrder::query()->max('id');
 
-    $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $orderId]));
+    $response->assertRedirect(route('repairs.workbench'));
 
     expect(RepairOrder::query()->where('id', $orderId)->count())->toBe(2);
     expect(RepairPayment::query()->where('orden_id', $orderId)->count())->toBe(2);
@@ -365,7 +365,7 @@ it('uses the device model catalog to keep repair model names unified', function 
 
     $order = RepairOrder::query()->latest('id')->firstOrFail();
 
-    $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $order->id]));
+    $response->assertRedirect(route('repairs.workbench'));
     expect($order->modelo)->toBe('A52');
     expect(RepairDeviceModel::query()->where('model', 'A52')->where('brand', 'SAMSUNG')->value('usage_count'))->toBe(4);
 
@@ -413,7 +413,7 @@ it('stores and exposes phone part accessories only for phone repairs', function 
         ]);
 
     $orderId = (int) RepairOrder::query()->max('id');
-    $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $orderId]));
+    $response->assertRedirect(route('repairs.workbench'));
 
     $phoneRepair = RepairOrder::query()->where('id', $orderId)->where('reparacion', 1)->firstOrFail();
     $otherRepair = RepairOrder::query()->where('id', $orderId)->where('reparacion', 2)->firstOrFail();
@@ -733,7 +733,7 @@ it('generates a verifier token for tickets without dni and uses it for public tr
     $order = RepairOrder::query()->latest('id')->firstOrFail();
     $token = (string) $order->tracking_token;
 
-    $response->assertRedirect(route('repairs.tickets.show', ['orderId' => $order->id]));
+    $response->assertRedirect(route('repairs.workbench'));
     expect($token)->toMatch('/^\d{5}$/');
 
     $this->withSession(['repair_tech_authenticated' => true])

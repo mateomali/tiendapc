@@ -871,11 +871,11 @@ class WorkbenchController extends Controller
         try {
             $order = $repairService->create($request->validated(), $request->allFiles());
         } catch (RuntimeException $exception) {
-            return back()->withInput()->with('error', $exception->getMessage());
+            return back()->withInput()->withErrors(['save' => $exception->getMessage()]);
         }
 
         return redirect()
-            ->route('repairs.tickets.show', ['orderId' => $order->id])
+            ->route('repairs.workbench')
             ->with('success', 'Orden de reparacion creada.');
     }
 

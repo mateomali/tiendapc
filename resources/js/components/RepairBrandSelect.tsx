@@ -56,7 +56,7 @@ export function RepairBrandSelect({ value, onChange, className }: {
                         <li key={brand} id={`${id}-${index}`} role="option" aria-selected={value === brand}
                             className={cn('flex min-h-10 cursor-pointer items-center gap-2 px-3 py-2 text-sm font-semibold text-slate-800', active === index && 'bg-slate-100')}
                             onMouseDown={(event) => event.preventDefault()}
-                            onMouseEnter={() => setActive(index)} onClick={() => choose(index)}>
+                            onMouseEnter={() => setActive(index)} onClick={(event) => { event.preventDefault(); event.stopPropagation(); choose(index); }}>
                             {brand ? <BrandIcon brand={brand} /> : <span className="w-10 shrink-0" />}
                             <span>{brand || 'Elegir marca...'}</span>
                         </li>

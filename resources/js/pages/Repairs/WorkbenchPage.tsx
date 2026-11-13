@@ -509,6 +509,7 @@ export default function WorkbenchPage({
     const [pendingFailureOptions, setPendingFailureOptions] = useState<Record<number, string>>({});
     const [customEstimatedDateJobs, setCustomEstimatedDateJobs] = useState<Record<number, boolean>>({});
     const [activeIntakeStep, setActiveIntakeStep] = useState<IntakeStep>('client');
+    const [attemptedIntakeStep, setAttemptedIntakeStep] = useState<IntakeStep | null>(null);
     const [mobileWizardIntake, setMobileWizardIntake] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
     const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -803,13 +804,14 @@ export default function WorkbenchPage({
     }, []);
 
     const submitCreateForm = (): void => {
+        if (createForm.processing) return;
         createForm.transform((data) => ({
             ...data,
             jobs: normalizedJobsForSubmit(),
         }));
 
         createForm.post(route('repairs.orders.store'), {
-            preserveScroll: true,
+            preserveScroll: 'errors',
             forceFormData: true,
             onSuccess: () => {
                 createForm.reset();
@@ -826,6 +828,9 @@ export default function WorkbenchPage({
                 }
                 setPartSearches({});
                 setActiveIntakeStep('client');
+            },
+            onError: () => {
+                window.requestAnimationFrame(() => document.getElementById('intake-save-errors')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
             },
             onFinish: () => createForm.transform((data) => data),
         });
@@ -1042,8 +1047,28 @@ export default function WorkbenchPage({
 
         createForm.setData(
             'jobs',
-            createForm.data.jobs.filter((_, jobIndex) => jobIndex !== index),
+            createForm.data.jobs.filter((_, jobIndex) => jobIndex !== index).map((job, nextIndex) => (
+                nextIndex === index && !createForm.data.jobs[index].same_device && job.same_device
+                    ? {
+                        ...job,
+                        same_device: false,
+                        marca: createForm.data.jobs[index].marca,
+                        modelo: createForm.data.jobs[index].modelo,
+                        color: createForm.data.jobs[index].color,
+                        categorias_reparacion: createForm.data.jobs[index].categorias_reparacion,
+                        unlock_type: createForm.data.jobs[index].unlock_type,
+                        unlock_value: createForm.data.jobs[index].unlock_value,
+                        images: createForm.data.jobs[index].images,
+                    }
+                    : job
+            )),
         );
+        const reindex = <T,>(current: Record<number, T>): Record<number, T> => Object.fromEntries(
+            Object.entries(current).filter(([key]) => Number(key) !== index)
+                .map(([key, value]) => [Number(key) > index ? Number(key) - 1 : Number(key), value]),
+        );
+        setPartSearches(reindex);
+        setPendingFailureOptions(reindex);
         setImagePreviews((current) => {
             const next: Record<number, string[]> = {};
             Object.entries(current).forEach(([key, value]) => {
@@ -1077,6 +1102,7 @@ export default function WorkbenchPage({
     };
 
     const matchingInventoryParts = (index: number): RepairPartInventoryOption[] => {
+        if (createForm.data.jobs[index]?.inventory_part_id) return [];
         const query = (partSearches[index] ?? createForm.data.jobs[index]?.repuesto ?? '').trim().toLowerCase();
 
         if (query.length < 2) {
@@ -1338,46 +1364,60 @@ export default function WorkbenchPage({
 
         return Number.isFinite(amount) && amount > 0;
     };
-    const isIntakeStepComplete = (step: IntakeStep): boolean => {
+    const missingIntakeFields = (step: IntakeStep): { field: CreateFlowField; label: string }[] => {
+        const missing: { field: CreateFlowField; label: string }[] = [];
         if (step === 'client') {
-            return createForm.data.id_orden.trim() !== '' && createForm.data.nombre_cliente.trim() !== '';
+            if (!createForm.data.id_orden.trim() || Number(createForm.data.id_orden) <= 0) missing.push({ field: 'order-id', label: 'ID de orden' });
+            if (!createForm.data.nombre_cliente.trim()) missing.push({ field: 'customer-name', label: 'Nombre del cliente' });
         }
-
-        if (step === 'device') {
-            return createForm.data.jobs.every((job) => {
-                const hasDeviceData = job.same_device || (
-                    job.modelo.trim() !== ''
-                    && (!isPhoneCategory(job.categorias_reparacion) || job.marca.trim() !== '')
-                );
-
-                return hasDeviceData && job.descripcion.trim() !== '' && (hasValidAmount(job.monto) || job.a_presupuestar);
-            });
-        }
-
-        if (step === 'extras') {
-            return createForm.data.jobs.every((job) => job.fecha_estimada.trim() !== '');
-        }
-
-        return true;
+        createForm.data.jobs.forEach((job, index) => {
+            const device = `Equipo #${deviceOrdinalForJob(index)}`;
+            if (step === 'device') {
+                if (!job.same_device || index === 0) {
+                    if (isPhoneCategory(job.categorias_reparacion) && !job.marca.trim()) missing.push({ field: `job-${index}-brand`, label: `${device}: marca` });
+                    if (!job.modelo.trim()) missing.push({ field: `job-${index}-model`, label: `${device}: modelo / equipo` });
+                }
+                if (!job.descripcion.trim()) missing.push({ field: `job-${index}-description`, label: `${device}, falla ${index + 1}: detalle de la falla` });
+                if (!job.a_presupuestar && !hasValidAmount(job.monto)) missing.push({ field: `job-${index}-amount`, label: `${device}, falla ${index + 1}: monto o A presupuestar` });
+            }
+            if (step === 'extras' && (!job.same_device || index === 0) && !job.fecha_estimada.trim()) missing.push({ field: `job-${index}-date`, label: `${device}: fecha estimada` });
+        });
+        return missing;
     };
-    const canGoToNextIntakeStep = isIntakeStepComplete(activeIntakeStep);
-    const canSelectIntakeStep = (targetIndex: number): boolean => {
-        if (targetIndex <= activeIntakeStepIndex) {
-            return true;
+    const intakeMissing = missingIntakeFields(activeIntakeStep);
+    const showIntakeErrors = attemptedIntakeStep === activeIntakeStep && intakeMissing.length > 0;
+    const validationProps = (field: CreateFlowField) => ({
+        'data-intake-field': field,
+        'aria-invalid': showIntakeErrors && intakeMissing.some((item) => item.field === field) ? true : undefined,
+        'aria-describedby': showIntakeErrors && intakeMissing.some((item) => item.field === field) ? 'intake-validation' : undefined,
+    });
+    const focusIntakeField = (field: CreateFlowField): void => {
+        window.requestAnimationFrame(() => {
+            const wrapper = document.querySelector<HTMLElement>(`[data-intake-field="${field}"]`);
+            const control = wrapper?.matches('input, textarea, select, button') ? wrapper
+                : wrapper?.querySelector<HTMLElement>('input, textarea, select, button');
+            control?.focus({ preventScroll: true });
+            (control ?? wrapper)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        });
+    };
+    const goToIntakeStep = (targetIndex: number): void => {
+        if (targetIndex > activeIntakeStepIndex) {
+            for (const step of intakeSteps.slice(0, targetIndex)) {
+                const missing = missingIntakeFields(step.key);
+                if (missing.length) {
+                    setActiveIntakeStep(step.key);
+                    setAttemptedIntakeStep(step.key);
+                    focusIntakeField(missing[0].field);
+                    return;
+                }
+            }
         }
-
-        return intakeSteps.slice(0, targetIndex).every((step) => isIntakeStepComplete(step.key));
+        setAttemptedIntakeStep(null);
+        setActiveIntakeStep(intakeSteps[targetIndex].key);
+        window.requestAnimationFrame(() => document.getElementById('intake-step-navigation')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     };
-    const goToPreviousIntakeStep = (): void => {
-        setActiveIntakeStep(intakeSteps[Math.max(0, activeIntakeStepIndex - 1)].key);
-    };
-    const goToNextIntakeStep = (): void => {
-        if (!canGoToNextIntakeStep) {
-            return;
-        }
-
-        setActiveIntakeStep(intakeSteps[Math.min(intakeSteps.length - 1, activeIntakeStepIndex + 1)].key);
-    };
+    const goToPreviousIntakeStep = (): void => goToIntakeStep(Math.max(0, activeIntakeStepIndex - 1));
+    const goToNextIntakeStep = (): void => goToIntakeStep(Math.min(intakeSteps.length - 1, activeIntakeStepIndex + 1));
 
     const descriptionOptions = [
         ...serviceTemplates.map((template) => ({
@@ -2240,7 +2280,12 @@ export default function WorkbenchPage({
 
                 <form
                     id="intake-flow-form"
-                    className="grid gap-5 rounded-xl border border-[#dce5f2] bg-white p-3 shadow-sm md:p-5"
+                    onChange={(event) => {
+                        if (event.target instanceof HTMLSelectElement && window.matchMedia('(max-width: 767px)').matches) {
+                            event.target.blur();
+                        }
+                    }}
+                    className="grid gap-5 rounded-xl border border-[#dce5f2] bg-white p-3 shadow-sm md:p-5 [&_[aria-invalid=true]]:ring-2 [&_[aria-invalid=true]]:ring-red-500"
                     noValidate={isWizardIntake}
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -2249,7 +2294,7 @@ export default function WorkbenchPage({
                 >
                     {isWizardIntake ? (
                         <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-2.5 sm:p-3">
-                            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                            <div id="intake-step-navigation" className="grid scroll-mt-4 grid-cols-2 gap-2 md:grid-cols-4">
                                 {intakeSteps.map((step, stepIndex) => {
                                     const isDone = stepIndex < activeIntakeStepIndex;
                                     const isActive = activeIntakeStep === step.key;
@@ -2266,8 +2311,7 @@ export default function WorkbenchPage({
                                                         ? 'border-[#86efac] bg-[#f0fdf4] text-[#166534] hover:bg-[#dcfce7]'
                                                         : 'border-[#cbd5e1] bg-white text-[#475569] hover:border-[#93c5fd] hover:bg-[#eff6ff]',
                                             )}
-                                            onClick={() => canSelectIntakeStep(stepIndex) ? setActiveIntakeStep(step.key) : undefined}
-                                            disabled={!canSelectIntakeStep(stepIndex)}
+                                            onClick={() => goToIntakeStep(stepIndex)}
                                             aria-current={isActive ? 'step' : undefined}
                                         >
                                             <span className={cn(
@@ -2289,6 +2333,22 @@ export default function WorkbenchPage({
                         </div>
                     ) : null}
 
+                    {showIntakeErrors ? (
+                        <div id="intake-validation" role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                            <p className="font-bold">Para continuar, completá estos datos:</p>
+                            <ul className="mt-2 grid gap-2">
+                                {intakeMissing.map((item) => <li key={item.field}><button type="button" className="min-h-10 text-left underline underline-offset-2" onClick={() => focusIntakeField(item.field)}>{item.label}</button></li>)}
+                            </ul>
+                        </div>
+                    ) : null}
+
+                    {Object.keys(createForm.errors).length > 0 ? (
+                        <div id="intake-save-errors" role="alert" tabIndex={-1} className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                            <p className="font-bold">No se pudo guardar la orden. Revisá los siguientes datos:</p>
+                            <ul className="mt-2 list-inside list-disc">{Object.entries(createForm.errors).map(([key, message]) => <li key={key}>{message}</li>)}</ul>
+                        </div>
+                    ) : null}
+
                     {/* ============ CLIENTE ============ */}
                     <section className={cn('grid gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('client') && 'hidden')}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2298,12 +2358,12 @@ export default function WorkbenchPage({
                         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[12rem_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">ID de orden <span className="text-[#dc2626]">*</span></span>
-                                <input className={intakeControl} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required />
+                                <input {...validationProps('order-id')} className={intakeControl} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required />
                                 <span className="text-xs font-semibold text-[#475569]">Editable si está libre.</span>
                             </label>
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">Nombre del cliente <span className="text-[#dc2626]">*</span></span>
-                                <input className={intakeControl} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required placeholder="Ej: Juan Pérez" />
+                                <input {...validationProps('customer-name')} className={intakeControl} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required placeholder="Ej: Juan Pérez" />
                             </label>
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">DNI</span>
@@ -2388,13 +2448,13 @@ export default function WorkbenchPage({
                                             {isPhoneCategory(job.categorias_reparacion) ? (
                                                 <label className="grid content-start gap-1.5">
                                                     <span className="text-[13px] font-bold text-[#334155]">Marca</span>
-                                                    <RepairBrandSelect className={intakeControl} value={job.marca} onChange={(value) => changeJobBrand(index, value)} />
+                                                    <div {...validationProps(`job-${index}-brand`)}><RepairBrandSelect className={intakeControl} value={job.marca} onChange={(value) => changeJobBrand(index, value)} /></div>
                                                 </label>
                                             ) : null}
                                             <div className={cn('grid content-start gap-1.5', !isPhoneCategory(job.categorias_reparacion) && 'sm:col-span-2 xl:col-span-2')}>
                                                 <label className="grid content-start gap-1.5">
                                                     <span className="text-[13px] font-bold text-[#334155]">Modelo / equipo <span className="text-[#dc2626]">*</span></span>
-                                                    <input className={intakeControl} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} placeholder="Ej: Samsung A54" />
+                                                    <input {...validationProps(`job-${index}-model`)} className={intakeControl} value={job.modelo} onChange={(event) => changeJobModel(index, event.target.value)} placeholder="Ej: Samsung A54" />
                                                 </label>
                                                 {renderDeviceModelSuggestions(index)}
                                             </div>
@@ -2465,9 +2525,9 @@ export default function WorkbenchPage({
                                                     && Number(rowJob.senia || 0) < Number(rowJob.monto);
 
                                                 return (
-                                                    <div key={`failure-row-${jobIndex}`} className="grid gap-2 rounded-lg border border-[#e6edf7] bg-[#fbfdff] p-3 md:grid md:grid-cols-[2rem_minmax(0,1fr)_9.5rem_8rem_8.5rem_2rem] md:items-start md:gap-x-3">
-                                                        <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e8effc] text-[0.72rem] font-black text-[#1d4ed8]">{jobIndex + 1}</span>
-                                                        <label className="grid content-start gap-1.5">
+                                                    <div key={`failure-row-${jobIndex}`} className="relative grid grid-cols-2 gap-3 rounded-lg border border-[#e6edf7] bg-[#fbfdff] p-3 md:grid md:grid-cols-[2rem_minmax(0,1fr)_9.5rem_8rem_8.5rem_2rem] md:items-start md:gap-x-3">
+                                                        <span className="col-span-2 mb-1 grid h-6 w-6 md:col-span-1 md:mb-0 place-items-center rounded-full bg-[#e8effc] text-[0.72rem] font-black text-[#1d4ed8]">{jobIndex + 1}</span>
+                                                        <label className="col-span-2 grid min-w-0 content-start gap-1.5 md:col-span-1">
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Detalle de la falla <span className="text-[#dc2626]">*</span></span>
                                                             <textarea
                                                                 rows={2}
@@ -2475,11 +2535,12 @@ export default function WorkbenchPage({
                                                                 value={rowJob.descripcion}
                                                                 onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, descripcion: event.target.value }))}
                                                                 required
+                                                                {...validationProps(`job-${jobIndex}-description`)}
                                                                 aria-label="Detalle de la falla"
                                                                 placeholder="Detalle de la falla"
                                                             />
                                                         </label>
-                                                        <div className="grid content-start gap-1.5">
+                                                        <div className="grid min-w-0 content-start gap-1.5">
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Monto</span>
                                                             {rowJob.a_presupuestar ? (
                                                                 <div className="grid gap-1.5">
@@ -2498,6 +2559,7 @@ export default function WorkbenchPage({
                                                                             onFocus={() => clearAmountForTyping(jobIndex, 'monto')}
                                                                             onKeyDown={preventAmountArrowStep}
                                                                             onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value, a_presupuestar: Number(event.target.value) > 0 ? false : current.a_presupuestar }))}
+                                                                            {...validationProps(`job-${jobIndex}-amount`)}
                                                                             aria-label="Monto"
                                                                         />
                                                                     </div>
@@ -2524,7 +2586,7 @@ export default function WorkbenchPage({
                                                                 />
                                                             </div>
                                                         </label>
-                                                        <label className="grid content-start gap-1.5">
+                                                        <label className="col-span-2 grid min-w-0 content-start gap-1.5 md:col-span-1">
                                                             <span className="text-xs font-bold text-[#475569] md:hidden">Medio</span>
                                                             <select
                                                                 className={intakeControl}
@@ -2539,8 +2601,10 @@ export default function WorkbenchPage({
                                                         </label>
                                                         <button
                                                             type="button"
-                                                            className={cn(buttonClass('danger', 'sm'), 'justify-self-start')}
-                                                            onClick={() => {
+                                                            className={cn(buttonClass('danger', 'sm'), 'absolute right-2 top-2 !h-11 !w-11 !p-0 md:static md:!h-8 md:!w-8 md:justify-self-center')}
+                                                            onClick={(event) => {
+                                                                event.preventDefault();
+                                                                event.stopPropagation();
                                                                 if (!isOnlyRow) {
                                                                     removeJob(jobIndex);
                                                                     return;
@@ -2578,7 +2642,7 @@ export default function WorkbenchPage({
                                         <div className="grid items-start gap-x-5 gap-y-4 lg:grid-cols-[12rem_minmax(0,1fr)]">
                                             <label className="grid content-start gap-1.5">
                                                 <span className="text-[13px] font-bold text-[#334155]">Fecha estimada</span>
-                                                {renderEstimatedDateField(index, job, intakeControl)}
+                                                <div {...validationProps(`job-${index}-date`)}>{renderEstimatedDateField(index, job, intakeControl)}</div>
                                             </label>
                                             <label className="grid content-start gap-1.5">
                                                 <span className="text-[13px] font-bold text-[#334155]">Observaciones</span>
@@ -2714,10 +2778,10 @@ export default function WorkbenchPage({
                             </button>
                             {activeIntakeStep === 'summary' ? (
                                 <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}>
-                                    <FaSave aria-hidden="true" /> {createForm.processing ? 'Guardando...' : 'Guardar orden'}
+                                    <FaSave aria-hidden="true" /> {createForm.processing ? (createForm.progress ? `Subiendo fotos... ${createForm.progress.percentage ?? 0}%` : 'Guardando...') : 'Guardar orden'}
                                 </button>
                             ) : (
-                                <button className={buttonClass('primary')} type="button" onClick={goToNextIntakeStep} disabled={!canGoToNextIntakeStep}>
+                                <button className={buttonClass('primary')} type="button" onClick={goToNextIntakeStep}>
                                     Siguiente
                                 </button>
                             )}
@@ -2734,7 +2798,7 @@ export default function WorkbenchPage({
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                             <button className={buttonClass('soft')} type="button" onClick={() => addJob()}><FaPlusCircle aria-hidden="true" />Otro equipo</button>
-                            <button className={buttonClass('primary')} type="submit" form="intake-flow-form" disabled={createForm.processing}><FaSave aria-hidden="true" />{createForm.processing ? 'Guardando...' : 'Guardar orden'}</button>
+                            <button className={buttonClass('primary')} type="submit" form="intake-flow-form" disabled={createForm.processing}><FaSave aria-hidden="true" />{createForm.processing ? (createForm.progress ? `Subiendo fotos... ${createForm.progress.percentage ?? 0}%` : 'Guardando...') : 'Guardar orden'}</button>
                         </div>
                     </div>
                 ) : null}

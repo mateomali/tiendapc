@@ -2350,33 +2350,55 @@ class RepairService
      */
     private function storeImages(array $images, int $orderId, int $repairNumber, string $prefix): array
     {
+        if ($images === []) {
+            return [];
+        }
+
         $stored = [];
+        $paths = [];
         $uploadDirectory = public_path((string) config('tienda.uploads.repairs'));
         $thumbDirectory = public_path((string) config('tienda.uploads.repairs_thumbnails'));
 
-        File::ensureDirectoryExists($uploadDirectory);
-        File::ensureDirectoryExists($thumbDirectory);
+        try {
+            File::ensureDirectoryExists($uploadDirectory);
+            File::ensureDirectoryExists($thumbDirectory);
 
-        foreach ($images as $index => $image) {
-            if (! $image instanceof UploadedFile) {
-                continue;
+            foreach ($images as $index => $image) {
+                if (! $image instanceof UploadedFile || ! $image->isValid()) {
+                    throw new \RuntimeException('La imagen recibida no es valida.');
+                }
+
+                $expectedSize = $image->getSize();
+                $expectedHash = hash_file('sha256', $image->getPathname());
+                if (! $expectedHash || ! $expectedSize) {
+                    throw new \RuntimeException('No se pudo leer la imagen recibida.');
+                }
+                $extension = $image->guessExtension() ?: 'jpg';
+                $filename = sprintf('orden_%d_%d_%s_%d_%s.%s', $orderId, $repairNumber, $prefix, $index + 1, Str::lower(Str::random(8)), $extension);
+                $original = $uploadDirectory . DIRECTORY_SEPARATOR . $filename;
+                $thumbnail = $thumbDirectory . DIRECTORY_SEPARATOR . 'thumb_' . $filename;
+                $paths[] = $original;
+                $paths[] = $thumbnail;
+
+                $image->move($uploadDirectory, $filename);
+                if (! File::copy($original, $thumbnail)) {
+                    throw new \RuntimeException('No se pudo guardar la miniatura.');
+                }
+                foreach ([$original, $thumbnail] as $path) {
+                    clearstatcache(true, $path);
+                    if (! is_file($path) || ! is_readable($path) || filesize($path) !== $expectedSize
+                        || hash_file('sha256', $path) !== $expectedHash) {
+                        throw new \RuntimeException('No se pudo verificar la imagen guardada.');
+                    }
+                }
+                $stored[] = $filename;
             }
-
-            $extension = $image->getClientOriginalExtension() !== '' ? $image->getClientOriginalExtension() : 'jpg';
-            $filename = sprintf(
-                'orden_%d_%d_%s_%d_%s.%s',
-                $orderId,
-                $repairNumber,
-                $prefix,
-                $index + 1,
-                Str::lower(Str::random(8)),
-                $extension,
-            );
-
-            $image->move($uploadDirectory, $filename);
-            File::copy($uploadDirectory . DIRECTORY_SEPARATOR . $filename, $thumbDirectory . DIRECTORY_SEPARATOR . 'thumb_' . $filename);
-
-            $stored[] = $filename;
+        } catch (\Throwable $exception) {
+            foreach ($paths as $path) {
+                clearstatcache(true, $path);
+                @unlink($path);
+            }
+            throw new \RuntimeException('No se pudieron guardar y verificar las fotos en el servidor. La orden no fue guardada. Volve a seleccionar las fotos e intenta nuevamente.', 0, $exception);
         }
 
         return $stored;

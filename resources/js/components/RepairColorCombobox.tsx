@@ -148,7 +148,7 @@ export function RepairColorCombobox({ className, value, onChange, disabled }: Re
                                 normalizeRepairKey(value) === option.value && 'bg-[#dbeafe]',
                             )}
                             onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => selectColor(option.value)}
+                            onClick={(event) => { event.preventDefault(); event.stopPropagation(); selectColor(option.value); }}
                         >
                             <span className={cn('h-3.5 w-3.5 shrink-0 rounded-sm border border-[#64748b]', option.swatchClass)} aria-hidden="true" />
                             <span>{option.label}</span>
