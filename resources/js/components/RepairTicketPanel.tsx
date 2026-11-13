@@ -1222,6 +1222,64 @@ function AddRepairModal({
     );
 }
 
+function MobileDevicePhotos({ repairs, readOnly }: { repairs: RepairOrderView[]; readOnly: boolean }): JSX.Element | null {
+    const [selectedImage, setSelectedImage] = useState<RepairImageView | null>(null);
+    const images = Array.from(new Map(repairs.flatMap((repair) => [...repair.imagenes, ...repair.imagenes_finales]).map((image) => [image.filename, image])).values());
+    const modelLabel = displayRepairModel(repairs[0]);
+
+    if (images.length === 0) {
+        return !readOnly && repairs[0].actions?.addOriginalImages
+            ? <MobileModelPhotoCapture repair={repairs[0]} modelLabel={modelLabel} />
+            : null;
+    }
+
+    return (
+        <div className="mt-2 grid gap-2">
+            <span className="text-xs font-semibold text-[#475569]">Fotos del dispositivo</span>
+            <div className="flex gap-2 overflow-x-auto">
+                {images.map((image) => (
+                    <button key={image.filename} type="button" className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white" onClick={() => setSelectedImage(image)} aria-label={`Ver foto de ${modelLabel}`}>
+                        <img src={image.thumbnailUrl || image.url} alt={modelLabel} className="h-full w-full object-cover" />
+                    </button>
+                ))}
+            </div>
+            {selectedImage ? (
+                <ModalShell title={`Fotos del dispositivo - ${modelLabel}`} onClose={() => setSelectedImage(null)}>
+                    <img src={selectedImage.url} alt={modelLabel} className="max-h-[70vh] w-full object-contain" />
+                </ModalShell>
+            ) : null}
+        </div>
+    );
+}
+
+function MobileModelPhotoCapture({ repair, modelLabel }: { repair: RepairOrderView; modelLabel: string }): JSX.Element {
+    const mobilePhotoForm = useForm<{ images: File[] }>({ images: [] });
+    const captureMobilePhoto = (event: ChangeEvent<HTMLInputElement>): void => {
+        const file = event.currentTarget.files?.[0];
+        event.currentTarget.value = '';
+        if (!file || mobilePhotoForm.processing || !repair.actions?.addOriginalImages) return;
+
+        mobilePhotoForm.transform(() => ({ images: [file] }));
+        mobilePhotoForm.post(repair.actions.addOriginalImages, {
+            preserveScroll: true,
+            forceFormData: true,
+            onFinish: () => mobilePhotoForm.transform((data) => data),
+        });
+    };
+    return (
+        <div className="mt-2 grid gap-1.5">
+        <label className={buttonClass('primary', 'sm', cn('min-h-11 w-full cursor-pointer', mobilePhotoForm.processing && 'pointer-events-none opacity-60'))}>
+            <FaCamera aria-hidden="true" />
+            {mobilePhotoForm.processing ? 'Guardando foto...' : 'Sacar foto'}
+            <input className="sr-only" type="file" accept="image/*" capture="environment" aria-label={`Sacar foto de ${modelLabel}`} disabled={mobilePhotoForm.processing} onChange={captureMobilePhoto} />
+        </label>
+        {Object.values(mobilePhotoForm.errors).length > 0 ? (
+            <p role="alert" className="text-xs font-semibold text-[#be123c]">{Object.values(mobilePhotoForm.errors).join(' ')}</p>
+        ) : null}
+    </div>
+    );
+}
+
 function RepairEditCard({
     repair,
     serviceCategories,
@@ -3157,22 +3215,6 @@ function RepairEditCard({
                     </div>
                 </summary>
                 <div className="grid gap-2.5 p-2.5">
-                    {galleryImages.length > 0 ? (
-                        <div className="grid gap-2 rounded-xl bg-slate-50 p-2">
-                            <div className="flex items-center justify-between text-xs font-black uppercase text-slate-600">
-                                <span>Fotos del equipo</span>
-                                <span>{galleryImages.length}</span>
-                            </div>
-                            <div className="flex gap-2 overflow-x-auto">
-                                {galleryImages.map((image, index) => (
-                                    <button key={`${image.filename}-${index}`} type="button" className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white" onClick={() => setGalleryIndex(index)}>
-                                        <img src={image.thumbnailUrl || image.url} alt={image.filename} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.classList.add('opacity-0'); }} />
-                                        <span className="absolute bottom-0 inset-x-0 bg-slate-950/65 py-0.5 text-[0.58rem] font-bold text-white">{index < repair.imagenes.length ? 'Inicial' : 'Final'}</span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    ) : null}
                     <div className="grid grid-cols-2 gap-1.5">
                         {repair.dni !== 12345678 ? <FieldSummary label="DNI" value={<HighlightText value={repair.dni} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
                         {repair.contacto ? <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto} term={highlightTerm} />} onClick={openInlineEditor} /> : null}
@@ -3458,6 +3500,7 @@ export function RepairTicketPanel({
                                         {isToday(first.fecha_estimada) ? <span className="text-[#92400e]">Hoy</span> : null}
                                         {overdueLabel(first) ? <span className="text-[#be123c]">{overdueLabel(first)}</span> : null}
                                     </div> : null}
+                                    <MobileDevicePhotos repairs={group} readOnly={readOnly} />
                                 </div>
                             )}
                             {group.map((repair) => (
