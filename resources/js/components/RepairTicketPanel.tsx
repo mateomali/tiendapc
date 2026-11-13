@@ -232,10 +232,8 @@ function deliveredDetailLabel(value?: string | null): string {
     const days = daysSinceDate(value);
 
     if (days === null) return 'Sin fecha';
-    if (days === 0) return 'Entregada hoy';
-    if (days === 1) return 'Entregada hace 1 dia';
-
-    return `Entregada hace ${days} dias`;
+    const elapsed = days === 0 ? 'Entregada hoy' : `Entregada hace ${days} ${days === 1 ? 'día' : 'días'}`;
+    return `${elapsed} (${formatLegacyDate(value)})`;
 }
 
 function escapeRegExp(value: string): string {
@@ -3073,6 +3071,11 @@ function RepairEditCard({
                                         Garantia
                                     </button>
                                 ) : null}
+                                {rowIndex === 0 && ticket.whatsappUrl ? (
+                                    <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={buttonClass('soft', 'sm')} title="WhatsApp cliente">
+                                        <FaWhatsapp aria-hidden="true" /> Contactar
+                                    </a>
+                                ) : null}
                                 {rowIndex === 0 && ticket.newOrderUrl ? (
                                     <Link href={ticket.newOrderUrl} className="rounded-md border border-[#111827] bg-[#111827] px-2 py-1 text-[0.66rem] font-black uppercase text-white no-underline transition hover:bg-[#0b1220]">
                                         Nueva orden
@@ -3193,6 +3196,11 @@ function RepairEditCard({
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={moveBackToConsultas}>
                             Reingresar por garantia
                         </button>
+                    ) : null}
+                    {readOnly && rowIndex === 0 && ticket.whatsappUrl ? (
+                        <a href={ticket.whatsappUrl} target="_blank" rel="noreferrer" className={buttonClass('soft', 'sm', 'w-full')}>
+                            <FaWhatsapp aria-hidden="true" /> WhatsApp cliente
+                        </a>
                     ) : null}
                     {readOnly && rowIndex === 0 && ticket.newOrderUrl ? (
                         <Link href={ticket.newOrderUrl} className={buttonClass('primary', 'sm', 'w-full')}>

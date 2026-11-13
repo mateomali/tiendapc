@@ -1,6 +1,7 @@
+import { RepairBrandSelect } from '../../components/RepairBrandSelect';
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaSpinner, FaTimes, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
+import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaSpinner, FaTimes, FaTrashAlt, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from '../../components/RepairPartAccessoriesFields';
 import { normalizeRepairKey as normalizeDeviceSearch, phoneBrandOptions, RepairColorCombobox } from '../../components/RepairColorCombobox';
@@ -435,10 +436,8 @@ function deliveredStatusLabel(value?: string | null): string {
     const days = daysSinceDate(value);
 
     if (days === null) return 'Entregado';
-    if (days === 0) return 'Entregado hoy';
-    if (days === 1) return 'Entregado hace 1 dia';
-
-    return `Entregado hace ${days} dias`;
+    const elapsed = days === 0 ? 'Entregado hoy' : `Entregado hace ${days} ${days === 1 ? 'día' : 'días'}`;
+    return `${elapsed} (${value!.slice(0, 10).split('-').reverse().join('/')})`;
 }
 
 export default function WorkbenchPage({
@@ -2377,16 +2376,19 @@ export default function WorkbenchPage({
                                             <label className="grid content-start gap-1.5">
                                                 <span className="text-[13px] font-bold text-[#334155]">Categoría</span>
                                                 <select className={intakeControl} value={job.categorias_reparacion} onChange={(event) => changeJobCategory(index, event.target.value)}>
-                                                    {serviceCategories.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}
+                                                    {serviceCategories.map((category) => {
+                                                        const name = category.label.toLocaleLowerCase('es');
+                                                        const icon = name.includes('celular') ? '📱'
+                                                            : name.includes('computadora') ? '💻'
+                                                                : name.includes('consola') ? '🎮' : '🛠️';
+                                                        return <option key={category.value} value={category.value}>{icon} {category.label}</option>;
+                                                    })}
                                                 </select>
                                             </label>
                                             {isPhoneCategory(job.categorias_reparacion) ? (
                                                 <label className="grid content-start gap-1.5">
                                                     <span className="text-[13px] font-bold text-[#334155]">Marca</span>
-                                                    <select className={intakeControl} value={job.marca} onChange={(event) => changeJobBrand(index, event.target.value)}>
-                                                        <option value="">Elegir marca...</option>
-                                                        {phoneBrandOptions.map((brand) => (<option key={brand} value={brand}>{brand}</option>))}
-                                                    </select>
+                                                    <RepairBrandSelect className={intakeControl} value={job.marca} onChange={(value) => changeJobBrand(index, value)} />
                                                 </label>
                                             ) : null}
                                             <div className={cn('grid content-start gap-1.5', !isPhoneCategory(job.categorias_reparacion) && 'sm:col-span-2 xl:col-span-2')}>
@@ -2535,17 +2537,34 @@ export default function WorkbenchPage({
                                                                 <option value="transferencia">Transferencia</option>
                                                             </select>
                                                         </label>
-                                                        {!isOnlyRow ? (
-                                                            <button
-                                                                type="button"
-                                                                className={cn(buttonClass('danger', 'sm'), 'justify-self-start')}
-                                                                onClick={() => removeJob(jobIndex)}
-                                                                aria-label={`Quitar falla ${jobIndex + 1}`}
-                                                                title="Quitar falla"
-                                                            >
-                                                                <FaTimes aria-hidden="true" />
-                                                            </button>
-                                                        ) : <span aria-hidden="true" />}
+                                                        <button
+                                                            type="button"
+                                                            className={cn(buttonClass('danger', 'sm'), 'justify-self-start')}
+                                                            onClick={() => {
+                                                                if (!isOnlyRow) {
+                                                                    removeJob(jobIndex);
+                                                                    return;
+                                                                }
+                                                                updateJob(jobIndex, (current) => ({
+                                                                    ...current,
+                                                                    tipo_servicio: '',
+                                                                    descripcion: '',
+                                                                    monto: '0',
+                                                                    senia: '0',
+                                                                    senia_method: 'efectivo',
+                                                                    a_presupuestar: false,
+                                                                    repuesto: '',
+                                                                    pedir_repuesto: false,
+                                                                    inventory_part_id: '',
+                                                                }));
+                                                                setPendingFailureOptions((current) => ({ ...current, [index]: '' }));
+                                                                setPartSearches((current) => ({ ...current, [jobIndex]: '' }));
+                                                            }}
+                                                            aria-label={`Quitar falla ${jobIndex + 1}`}
+                                                            title="Quitar falla"
+                                                        >
+                                                            <FaTrashAlt aria-hidden="true" className="h-4 w-4 shrink-0" />
+                                                        </button>
                                                     </div>
                                                 );
                                             })}

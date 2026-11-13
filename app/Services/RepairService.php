@@ -91,9 +91,7 @@ class RepairService
 
     public const FAILURE_TEMPLATES = [
         'No enciende' => 'No enciende.',
-        'Modulo' => 'Cambio de modulo.',
-        'Pin de carga' => 'Falla en pin de carga.',
-        'Bateria' => 'Cambio de bateria.',
+        'Placa de carga' => 'Falla en placa de carga.',
         'Software' => 'Revision de software.',
         'Humedad' => 'Equipo con posible dano por humedad.',
     ];
@@ -167,7 +165,23 @@ class RepairService
             ? (string) $base->dni
             : (trim((string) $base->tracking_token) !== '' ? $base->trackingVerifier() : (string) config('tienda.repair_default_dni'));
 
-        return hash_equals($expected, trim((string) $verifier)) ? $orders : collect();
+        if (! hash_equals($expected, trim((string) $verifier))) {
+            return collect();
+        }
+
+        $trackingDays = max(1, (int) SiteGlobalConfig::value('repair_tracking_days', '60'));
+        $today = CarbonImmutable::today('America/Argentina/Buenos_Aires');
+
+        return $orders->filter(function (RepairOrder $order) use ($trackingDays, $today): bool {
+            if ($order->entregado !== 'si' || ! $order->fecha_entregado) {
+                return true;
+            }
+
+            return $today->lessThan(
+                CarbonImmutable::parse($order->fecha_entregado, 'America/Argentina/Buenos_Aires')
+                    ->startOfDay()->addDays($trackingDays),
+            );
+        })->values();
     }
 
     public function lookupClientByDni(int $dni): ?array
