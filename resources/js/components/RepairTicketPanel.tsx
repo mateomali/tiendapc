@@ -1237,11 +1237,33 @@ function MobileDevicePhotos({ repairs, readOnly }: { repairs: RepairOrderView[];
         <div className="mt-2 grid gap-2">
             <span className="text-xs font-semibold text-[#475569]">Fotos del dispositivo</span>
             <div className="flex gap-2 overflow-x-auto">
-                {images.map((image) => (
-                    <button key={image.filename} type="button" className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white" onClick={() => setSelectedImage(image)} aria-label={`Ver foto de ${modelLabel}`}>
-                        <img src={image.thumbnailUrl || image.url} alt={modelLabel} className="h-full w-full object-cover" />
-                    </button>
-                ))}
+                {images.map((image) => {
+                    const owner = repairs.find((repair) => repair.imagenes.some((candidate) => candidate.filename === image.filename))
+                        ?? repairs.find((repair) => repair.imagenes_finales.some((candidate) => candidate.filename === image.filename));
+                    const isOriginal = owner?.imagenes.some((candidate) => candidate.filename === image.filename);
+                    const removeAction = isOriginal ? owner?.actions?.removeOriginalImage : owner?.actions?.removeFinalImage;
+
+                    return (
+                        <div key={image.filename} className="relative h-28 w-24 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white">
+                            <button type="button" className="block h-full w-full" onClick={() => setSelectedImage(image)} aria-label={`Ver foto de ${modelLabel}`}>
+                                <img src={image.thumbnailUrl || image.url} alt={modelLabel} className="h-full w-full object-contain" />
+                            </button>
+                            {!readOnly && removeAction ? (
+                                <button
+                                    type="button"
+                                    className="group absolute right-0 top-0 flex h-11 w-11 items-start justify-end rounded-md p-1 text-[#b91c1c] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[#dc2626]"
+                                    onClick={() => router.post(removeAction, { filename: image.filename }, { preserveScroll: true })}
+                                    aria-label={`Quitar foto de ${modelLabel}`}
+                                    title="Quitar foto"
+                                >
+                                    <span className="grid h-6 w-6 place-items-center rounded border border-slate-200 bg-white/95 text-[11px] shadow-sm transition-colors group-hover:border-[#fecaca] group-hover:bg-[#fef2f2]">
+                                        <FaTrashAlt aria-hidden="true" />
+                                    </span>
+                                </button>
+                            ) : null}
+                        </div>
+                    );
+                })}
             </div>
             {selectedImage ? (
                 <ModalShell title={`Fotos del dispositivo - ${modelLabel}`} onClose={() => setSelectedImage(null)}>
