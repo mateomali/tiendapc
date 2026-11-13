@@ -17,10 +17,12 @@ test('mobile intake removes failures and preserves the device', async ({ page })
     await page.getByPlaceholder('Ej: Samsung A54').fill('Samsung A54');
     const services = page.locator('select').filter({ has: page.locator('option', { hasText: 'Elegir falla o servicio frecuente...' }) });
     const descriptions = page.getByRole('textbox', { name: 'Detalle de la falla', exact: true });
+    await expect(descriptions).toHaveCount(0);
+    await expect(services.locator('option').last()).toHaveText('Otro servicio');
     await services.selectOption({ label: 'Desbloqueo' });
     await expect(descriptions).toHaveValue('Desbloqueo de equipo');
     await page.getByRole('button', { name: 'Quitar falla 1', exact: true }).tap();
-    await expect(descriptions).toHaveValue('');
+    await expect(descriptions).toHaveCount(0);
     await expect(page.getByPlaceholder('Ej: Samsung A54')).toHaveValue('Samsung A54');
     await services.selectOption({ label: 'Desbloqueo' });
     await services.selectOption({ label: 'Cambio de bateria' });
@@ -72,7 +74,10 @@ test('next explains missing fields and focuses them on mobile', async ({ page })
     await page.getByPlaceholder('Ej: Samsung A54').fill('Samsung A54');
     await next.tap();
     const description = page.getByRole('textbox', { name: 'Detalle de la falla', exact: true });
-    await expect(description).toBeFocused();
+    const services = page.getByRole('combobox', { name: 'Elegir falla o servicio', exact: true });
+    await expect(services).toBeFocused();
+    await services.selectOption({ label: 'Otro servicio' });
+    await expect(description).toHaveValue('');
     await description.fill('Pantalla rota');
     await next.tap();
     const amount = page.getByRole('textbox', { name: 'Monto', exact: true });

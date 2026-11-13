@@ -129,6 +129,7 @@ interface TicketPricingSettings {
 }
 
 interface RepairJobFormData {
+    failure_selected?: boolean;
     same_device: boolean;
     marca: string;
     modelo: string;
@@ -512,6 +513,7 @@ export default function WorkbenchPage({
     const [attemptedIntakeStep, setAttemptedIntakeStep] = useState<IntakeStep | null>(null);
     const [mobileWizardIntake, setMobileWizardIntake] = useState<boolean>(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
     const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+    const [mobileSearchOptionsOpen, setMobileSearchOptionsOpen] = useState(false);
     const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
     const [partSearches, setPartSearches] = useState<Record<number, string>>({});
     const [expandedPartPanels, setExpandedPartPanels] = useState<Record<number, boolean>>({});
@@ -1377,8 +1379,9 @@ export default function WorkbenchPage({
                     if (isPhoneCategory(job.categorias_reparacion) && !job.marca.trim()) missing.push({ field: `job-${index}-brand`, label: `${device}: marca` });
                     if (!job.modelo.trim()) missing.push({ field: `job-${index}-model`, label: `${device}: modelo / equipo` });
                 }
-                if (!job.descripcion.trim()) missing.push({ field: `job-${index}-description`, label: `${device}, falla ${index + 1}: detalle de la falla` });
-                if (!job.a_presupuestar && !hasValidAmount(job.monto)) missing.push({ field: `job-${index}-amount`, label: `${device}, falla ${index + 1}: monto o A presupuestar` });
+                if (!job.failure_selected) missing.push({ field: `job-${index}-description`, label: `${device}: elegí una falla o servicio de la lista` });
+                else if (!job.descripcion.trim()) missing.push({ field: `job-${index}-description`, label: `${device}, falla ${index + 1}: detalle de la falla` });
+                if (job.failure_selected && !job.a_presupuestar && !hasValidAmount(job.monto)) missing.push({ field: `job-${index}-amount`, label: `${device}, falla ${index + 1}: monto o A presupuestar` });
             }
             if (step === 'extras' && (!job.same_device || index === 0) && !job.fecha_estimada.trim()) missing.push({ field: `job-${index}-date`, label: `${device}: fecha estimada` });
         });
@@ -1434,7 +1437,7 @@ export default function WorkbenchPage({
             value: template.description,
             usage: serviceOptionUsage[`failure:${template.value}`] ?? 0,
         })),
-    ].sort((left, right) => right.usage - left.usage || left.label.localeCompare(right.label, 'es', { sensitivity: 'base' }));
+    ].sort((left, right) => Number(left.key === 'service:otro') - Number(right.key === 'service:otro') || right.usage - left.usage || left.label.localeCompare(right.label, 'es', { sensitivity: 'base' }));
 
     const applyDescriptionOption = (index: number, optionKey: string): void => {
         const option = descriptionOptions.find((item) => item.key === optionKey);
@@ -1468,10 +1471,11 @@ export default function WorkbenchPage({
             ? (serviceTemplates.find((item) => item.value === option.value)?.repuesto ?? '')
             : '';
 
-        if (source.descripcion.trim() === '') {
+        if (!source.failure_selected) {
             updateJob(index, (job) => ({
                 ...job,
-                tipo_servicio: option.type === 'service' ? option.value : job.tipo_servicio,
+                failure_selected: true,
+                tipo_servicio: option.type === 'service' ? option.value : '',
                 descripcion: description,
                 repuesto: job.repuesto.trim() === '' ? repuesto : job.repuesto,
             }));
@@ -1483,6 +1487,7 @@ export default function WorkbenchPage({
             ...createForm.data.jobs.slice(0, index + 1),
             {
                 ...nextJob,
+                failure_selected: true,
                 tipo_servicio: option.type === 'service' ? option.value : '',
                 descripcion: description,
                 repuesto,
@@ -1872,24 +1877,26 @@ export default function WorkbenchPage({
                 </div>
             ) : null}
             {isConsultas ? (
-            <section className="sticky z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-[0_6px_18px_rgba(15,23,42,0.10)] xl:hidden" style={{ top: 'var(--repair-header-offset, 5.6rem)' }}>
+            <section className="sticky z-20 grid gap-2 rounded-lg border border-[#cbd5e1] bg-white p-2 text-[#0f172a] shadow-sm xl:hidden" style={{ top: 'var(--repair-header-offset, 5.6rem)' }}>
                 <form
-                    className="grid grid-cols-[minmax(0,1fr)_44px_44px_44px] gap-2"
+                    className="grid grid-cols-[minmax(0,1fr)_44px_44px] gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
                         submitCleanSearch(true);
                     }}
                 >
+                    <div className="relative min-w-0">
                     <input
-                        className="h-11 min-w-0 rounded-md border border-[#cbd5e1] bg-white px-3 text-[1rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
+                        className="h-11 w-full min-w-0 rounded-md border border-[#cbd5e1] bg-white pl-3 pr-11 text-[1rem] font-semibold text-[#0f172a] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#2563eb20]"
                         placeholder="Buscar orden"
                         value={filtersForm.data.q}
                         onChange={(event) => filtersForm.setData('q', event.target.value)}
                     />
-                    <button type="submit" className="grid h-11 place-items-center rounded-md bg-[#2563eb] text-white" aria-label="Buscar">
+                    <button type="submit" className="absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-r-md text-[#2563eb]" aria-label="Buscar">
                         <FaSearch aria-hidden="true" />
                     </button>
-                    <button type="button" className="relative grid h-11 min-w-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileFiltersOpen(true)} aria-label="Abrir filtros">
+                    </div>
+                    <button type="button" className="relative grid h-11 min-w-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]" onClick={() => setMobileSearchOptionsOpen((open) => !open)} aria-expanded={mobileSearchOptionsOpen} aria-controls="mobile-search-options" aria-label="Opciones de búsqueda y filtros">
                         <FaFilter aria-hidden="true" />
                         {activeMobileFilters > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-md bg-[#ef4444] px-1 text-[0.65rem] font-bold text-white">{activeMobileFilters}</span> : null}
                     </button>
@@ -1897,85 +1904,68 @@ export default function WorkbenchPage({
                         <FaPlusCircle aria-hidden="true" />
                     </Link>
                 </form>
-                <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5">
-                    {searchFieldOptions.map((option) => {
-                        const active = activeSearchFields.includes(option.key);
-
-                        return (
-                            <button
-                                key={option.key}
-                                type="button"
-                                className={cn(
-                                    'inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md border px-2.5 text-[0.72rem] font-bold transition',
-                                    active
-                                        ? 'border-[#2563eb] bg-[#2563eb] text-white'
-                                        : 'border-[#bfdbfe] bg-white text-[#1d4ed8] hover:border-[#2563eb] hover:bg-[#eff6ff]',
-                                )}
-                                onClick={() => toggleSearchField(option.key)}
-                                aria-pressed={active}
-                            >
-                                {option.label}
-                            </button>
-                        );
-                    })}
+                {mobileSearchOptionsOpen ? (
+                <div id="mobile-search-options" className="absolute inset-x-0 top-full mt-1 grid grid-cols-2 gap-2 rounded-lg border border-[#cbd5e1] bg-white p-3 shadow-md">
+                    <div className="relative grid min-w-0 gap-1">
+                        <span className="text-xs font-semibold text-[#475569]">Buscar por</span>
+                        <details className="group">
+                            <summary className="flex h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-[#cbd5e1] bg-white px-2 text-sm font-semibold text-[#0f172a] focus-visible:outline-2 focus-visible:outline-[#2563eb]">
+                                <span className="truncate">{activeSearchFields.length === defaultSearchFields.length ? 'Todos los campos' : activeSearchFields.length === 1 ? searchFieldOptions.find((option) => option.key === activeSearchFields[0])?.label : activeSearchFields.length + ' campos'}</span>
+                                <span aria-hidden="true" className="text-xs group-open:rotate-180">&#9662;</span>
+                            </summary>
+                            <div className="absolute left-0 top-full z-30 mt-1 grid max-h-[55vh] w-[min(18rem,calc(100vw-2.5rem))] gap-0.5 overflow-y-auto rounded-md border border-[#cbd5e1] bg-white p-2 shadow-md" role="group" aria-label="Campos de búsqueda">
+                                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-2 text-sm font-semibold hover:bg-slate-50">
+                                    <input type="checkbox" className="h-4 w-4 accent-[#2563eb]" checked={activeSearchFields.length === defaultSearchFields.length} onChange={() => setActiveSearchFields([...defaultSearchFields])} />
+                                    Todos los campos
+                                </label>
+                                <div className="border-t border-[#e2e8f0]" />
+                                {searchFieldOptions.map((option) => (
+                                    <label key={option.key} className="flex min-h-11 cursor-pointer items-center gap-3 rounded px-2 text-sm font-semibold hover:bg-slate-50">
+                                        <input type="checkbox" className="h-4 w-4 accent-[#2563eb]" checked={activeSearchFields.length !== defaultSearchFields.length && activeSearchFields.includes(option.key)} onChange={() => setActiveSearchFields((current) => {
+                                            if (current.length === defaultSearchFields.length) return [option.key];
+                                            const next = current.includes(option.key) ? current.filter((field) => field !== option.key) : [...current, option.key];
+                                            return next.length ? next : [...defaultSearchFields];
+                                        })} />
+                                        {option.label}
+                                    </label>
+                                ))}
+                                <button type="button" className="mt-1 min-h-11 rounded-md bg-[#0f172a] text-sm font-bold text-white" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Listo</button>
+                            </div>
+                        </details>
+                    </div>
+                    <label className="grid min-w-0 gap-1">
+                        <span className="text-xs font-semibold text-[#475569]">Mostrar</span>
+                        <select
+                            className="h-11 w-full min-w-0 rounded-md border border-[#cbd5e1] bg-white px-2 text-sm font-semibold text-[#0f172a] focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/25"
+                            value={filters.prioridad ? 'priority:' + filters.prioridad : filters.estado ? 'state:' + filters.estado : 'all'}
+                            onChange={(event) => {
+                                const value = event.target.value;
+                                if (value === 'delivered') {
+                                    router.get(route('repairs.delivered'), cleanQuery({ q: filters.q, q_fields: filters.q ? searchFieldsQuery : undefined }));
+                                    return;
+                                }
+                                router.get(route('repairs.workbench'), filterQuery({
+                                    estado: value.startsWith('state:') ? value.slice(6) : undefined,
+                                    prioridad: value.startsWith('priority:') ? value.slice(9) : undefined,
+                                }), { preserveScroll: true });
+                            }}
+                        >
+                            <option value="all">Todas ({summary.active})</option>
+                            <option value="state:PENDIENTE">Pendientes ({summary.pending})</option>
+                            <option value="state:LISTA">Listas ({summary.ready})</option>
+                            <option value="priority:tareas">Tareas ({summary.tasks})</option>
+                            <option value="priority:vencidas">Vencidas ({summary.overdue})</option>
+                            <option value="priority:hoy">Hoy ({summary.today})</option>
+                            {filters.estado && !['PENDIENTE', 'LISTA'].includes(filters.estado) ? <option value={'state:' + filters.estado}>{filters.estado}</option> : null}
+                            <option value="delivered">Entregadas ({summary.delivered})</option>
+                        </select>
+                    </label>
+                    <div className="col-span-2 flex items-center justify-between border-t border-[#e2e8f0] pt-2">
+                        <button type="button" className="min-h-11 px-2 text-sm font-semibold text-[#2563eb]" onClick={() => { setMobileSearchOptionsOpen(false); setMobileFiltersOpen(true); }}>Filtros avanzados</button>
+                        <button type="button" className="min-h-11 rounded-md bg-[#0f172a] px-4 text-sm font-semibold text-white" onClick={() => setMobileSearchOptionsOpen(false)}>Listo</button>
+                    </div>
                 </div>
-                <div className="-mx-0.5 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5 text-[0.72rem] font-bold text-[#334155]">
-                    <Link
-                        href={route('repairs.workbench')}
-                        preserveScroll
-                        aria-current={!filters.estado && !filters.prioridad ? 'true' : undefined}
-                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', !filters.estado && !filters.prioridad ? 'bg-white text-[#1d4ed8] ring-2 ring-[#bfdbfe]' : 'bg-[#eff6ff] text-[#334155]')}
-                    >
-                        Todas {summary.active}
-                    </Link>
-                    <Link
-                        href={route('repairs.workbench', { estado: 'PENDIENTE' })}
-                        preserveScroll
-                        aria-current={filters.estado === 'PENDIENTE' ? 'true' : undefined}
-                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.estado === 'PENDIENTE' ? 'bg-white text-[#d97706] ring-2 ring-[#fed7aa]' : 'bg-[#fff7ed] text-[#334155]')}
-                    >
-                        Pend. {summary.pending}
-                    </Link>
-                    <Link
-                        href={route('repairs.workbench', { estado: 'LISTA' })}
-                        preserveScroll
-                        aria-current={filters.estado === 'LISTA' ? 'true' : undefined}
-                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.estado === 'LISTA' ? 'bg-white text-[#15803d] ring-2 ring-[#bbf7d0]' : 'bg-[#ecfdf5] text-[#334155]')}
-                    >
-                        Listas {summary.ready}
-                    </Link>
-                    <Link
-                        href={route('repairs.workbench', { prioridad: 'tareas' })}
-                        preserveScroll
-                        aria-current={filters.prioridad === 'tareas' ? 'true' : undefined}
-                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'tareas' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
-                    >
-                        Tareas {summary.tasks}
-                    </Link>
-                    <Link
-                        href={route('repairs.workbench', { prioridad: 'vencidas' })}
-                        preserveScroll
-                        aria-current={filters.prioridad === 'vencidas' ? 'true' : undefined}
-                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'vencidas' ? 'bg-white text-[#b91c1c] ring-2 ring-[#fecdd3]' : 'bg-[#fff1f2] text-[#334155]')}
-                    >
-                        Venc. {summary.overdue}
-                    </Link>
-                    <Link
-                        href={route('repairs.workbench', { prioridad: 'hoy' })}
-                        preserveScroll
-                        aria-current={filters.prioridad === 'hoy' ? 'true' : undefined}
-                        className={cn('inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md px-2.5 no-underline', filters.prioridad === 'hoy' ? 'bg-white text-[#854d0e] ring-2 ring-[#fde68a]' : 'bg-[#fefce8] text-[#334155]')}
-                    >
-                        Hoy {summary.today}
-                    </Link>
-                    <Link
-                        href={route('repairs.delivered')}
-                        preserveScroll
-                        className="inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-md bg-[#e0f2fe] px-2.5 text-[#0369a1] no-underline"
-                    >
-                        Entreg. {summary.delivered}
-                    </Link>
-                </div>
+                ) : null}
             </section>
             ) : null}
 
@@ -2492,6 +2482,8 @@ export default function WorkbenchPage({
                                         <div className="grid gap-1.5">
                                             <select
                                                 className={intakeControl}
+                                                {...(!job.failure_selected ? validationProps(`job-${index}-description`) : {})}
+                                                aria-label="Elegir falla o servicio"
                                                 value={pendingFailureOptions[index] ?? ''}
                                                 onChange={(event) => {
                                                     const optionKey = event.target.value;
@@ -2504,7 +2496,7 @@ export default function WorkbenchPage({
                                                 <option value="">Elegir falla o servicio frecuente...</option>
                                                 {descriptionOptions.map((option) => (<option key={option.key} value={option.key}>{option.label}</option>))}
                                             </select>
-                                            <p className="text-xs font-semibold text-[#475569]">Elegí una falla y se agrega automáticamente a la lista de abajo.</p>
+                                            <p className="text-xs font-semibold text-[#475569]">Elegí una falla de la lista. Para cargar el detalle y los valores a mano, elegí Otro servicio.</p>
                                         </div>
 
                                         <div className="grid gap-2">
@@ -2518,6 +2510,7 @@ export default function WorkbenchPage({
                                             </div>
                                             {groupedIndexes.map((jobIndex, rowIndex) => {
                                                 const rowJob = createForm.data.jobs[jobIndex];
+                                                if (!rowJob.failure_selected) return null;
                                                 const isOnlyRow = groupedIndexes.length === 1;
                                                 const showCashDiscount = !rowJob.a_presupuestar
                                                     && rowJob.estado.toUpperCase() !== 'PAGADO'
@@ -2611,6 +2604,7 @@ export default function WorkbenchPage({
                                                                 }
                                                                 updateJob(jobIndex, (current) => ({
                                                                     ...current,
+                                                                    failure_selected: false,
                                                                     tipo_servicio: '',
                                                                     descripcion: '',
                                                                     monto: '0',

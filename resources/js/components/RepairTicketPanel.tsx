@@ -26,6 +26,7 @@ import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import { RepairColorCombobox, normalizeRepairKey as normalizeRepairText, phoneBrandOptions, repairColorSwatchClass } from './RepairColorCombobox';
 import { PhoneUnlockFields, phoneUnlockLabel } from './PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, partAccessoriesLabel, type RepairPartAccessory } from './RepairPartAccessoriesFields';
+import { RepairBrandSelect } from './RepairBrandSelect';
 import { WebcamCaptureButton } from './WebcamCaptureButton';
 import type { RepairImageView, RepairOrderView, RepairTicketView } from '../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../repairUi';
@@ -350,9 +351,13 @@ function repairModelGroupKey(repair: RepairOrderView): string {
     return normalizeRepairText(displayRepairModel(repair));
 }
 
+function isSameRepair(left: RepairOrderView, right: RepairOrderView): boolean {
+    return left.id === right.id && left.reparacion === right.reparacion;
+}
+
 function repairSameModelPosition(ticket: RepairTicketView, repair: RepairOrderView): { index: number; total: number } {
     const modelKey = repairModelGroupKey(repair);
-    const currentIndex = ticket.repairs.findIndex((ticketRepair) => ticketRepair.registro_id === repair.registro_id);
+    const currentIndex = ticket.repairs.findIndex((ticketRepair) => isSameRepair(ticketRepair, repair));
 
     if (modelKey === '' || modelKey === '-' || currentIndex < 0) {
         return { index: 1, total: 1 };
@@ -386,14 +391,14 @@ function repairDeviceGroupPosition(ticket: RepairTicketView, repair: RepairOrder
         previousGroup.push(ticketRepair);
     });
 
-    const groupIndex = groups.findIndex((group) => group.some((ticketRepair) => ticketRepair.registro_id === repair.registro_id));
+    const groupIndex = groups.findIndex((group) => group.some((ticketRepair) => isSameRepair(ticketRepair, repair)));
 
     return { index: groupIndex >= 0 ? groupIndex + 1 : 1, total: groups.length || 1 };
 }
 
 function repairSameModelAdjacency(ticket: RepairTicketView, repair: RepairOrderView): { previous: boolean; next: boolean } {
     const modelKey = repairModelGroupKey(repair);
-    const currentIndex = ticket.repairs.findIndex((ticketRepair) => ticketRepair.registro_id === repair.registro_id);
+    const currentIndex = ticket.repairs.findIndex((ticketRepair) => isSameRepair(ticketRepair, repair));
 
     if (modelKey === '' || modelKey === '-' || currentIndex < 0) {
         return { previous: false, next: false };
@@ -848,13 +853,14 @@ function AddRepairModal({
     partInventory: RepairPartInventoryOption[];
     onClose: () => void;
 }): JSX.Element {
+    const [selectedBase, setSelectedBase] = useState(baseRepair ?? null);
     const today = new Date().toISOString().slice(0, 10);
     const pricing = (usePage().props.ticketPricing as RepairPricing | undefined) ?? defaultRepairPricing;
-    const baseBrand = baseRepair ? inferredRepairBrand(baseRepair) : '';
+    const baseBrand = selectedBase ? inferredRepairBrand(selectedBase) : '';
     const form = useForm<AddRepairFormData>({
         marca: baseBrand,
-        modelo: baseRepair?.modelo ?? '',
-        color: baseRepair?.color ?? '',
+        modelo: selectedBase?.modelo ?? '',
+        color: selectedBase?.color ?? '',
         tipo_servicio: '',
         descripcion: '',
         observaciones: 'sin observaciones',
@@ -868,13 +874,22 @@ function AddRepairModal({
         inventory_part_id: '',
         repuesto_agregados: [],
         repuesto_agregado_otro: '',
-        categorias_reparacion: String(baseRepair?.categorias_reparacion ?? 4),
-        unlock_type: baseRepair?.unlock_type ?? '',
-        unlock_value: baseRepair?.unlock_value ?? '',
+        categorias_reparacion: String(selectedBase?.categorias_reparacion ?? 4),
+        unlock_type: selectedBase?.unlock_type ?? '',
+        unlock_value: selectedBase?.unlock_value ?? '',
         images: null,
     });
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [partSearch, setPartSearch] = useState('');
+    const [selectedFailure, setSelectedFailure] = useState('');
+    const [quotePending, setQuotePending] = useState(false);
+    const pageProps = usePage().props;
+    const failureTemplates = (pageProps.failureTemplates as { value: string; label: string; description: string }[] | undefined) ?? [];
+    const optionUsage = (pageProps.serviceOptionUsage as Record<string, number> | undefined) ?? {};
+    const failureOptions = [
+        ...serviceTemplates.map((option) => ({ key: 'service:' + option.value, label: option.label, description: option.description, repuesto: option.repuesto, service: option.value })),
+        ...failureTemplates.map((option) => ({ key: 'failure:' + option.value, label: option.label, description: option.description, repuesto: '', service: '' })),
+    ].sort((a, b) => Number(a.key === 'service:otro') - Number(b.key === 'service:otro') || (optionUsage[b.key] ?? 0) - (optionUsage[a.key] ?? 0) || a.label.localeCompare(b.label, 'es'));
     const baseUpdateAction = ticket.repairs[0]?.actions?.update ?? '';
     const action = ticket.addRepairAction ?? (baseUpdateAction !== '' ? `${baseUpdateAction.replace(/\/$/, '')}/add-repair` : '');
 
@@ -900,7 +915,12 @@ function AddRepairModal({
 
     const submit = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
-        if (action === '') return;
+        if (action === '' || !selectedFailure) return;
+        if (isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) && !form.data.marca.trim()) {
+            form.setError('marca', 'Elegí una marca para el equipo.');
+            return;
+        }
+        form.clearErrors();
 
         form.post(action, {
             preserveScroll: true,
@@ -946,28 +966,11 @@ function AddRepairModal({
     };
 
     const applyDescriptionOption = (optionKey: string): void => {
-        if (optionKey === '') return;
-
-        const option = serviceTemplates.find((item) => item.value === optionKey);
+        const option = failureOptions.find((item) => item.key === optionKey);
+        setSelectedFailure(optionKey);
         if (!option) return;
-
-        form.setData((current) => {
-            const description = option.description.trim();
-            const nextDescription = [current.descripcion.trim(), description]
-                .filter(Boolean)
-                .join('\n');
-
-            return {
-                ...current,
-                tipo_servicio: option.value,
-                descripcion: nextDescription,
-                repuesto: current.repuesto.trim() !== '' ? current.repuesto : option.repuesto,
-            };
-        });
-
-        if (partSearch.trim() === '' && option.repuesto.trim() !== '') {
-            setPartSearch(option.repuesto);
-        }
+        form.setData((current) => ({ ...current, tipo_servicio: option.service, descripcion: option.description, repuesto: option.repuesto }));
+        setPartSearch(option.repuesto);
     };
 
     const matchingInventoryParts = (): RepairPartInventoryOption[] => {
@@ -1002,22 +1005,34 @@ function AddRepairModal({
     return (
         <ModalShell title={`Agregar reparacion al ticket #${ticket.id}`} onClose={onClose} tone="primary">
             <form className="grid gap-4" onSubmit={submit}>
+                {Object.keys(form.errors).length > 0 ? <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{Object.values(form.errors).map((error, index) => <p key={index}>{error}</p>)}</div> : null}
                 <div className="rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="min-w-0">
                             <div className="text-sm font-black text-[#0f172a]">{ticket.nombre_cliente}</div>
                             <div className="text-xs font-semibold text-[#475569]">
                                 Ticket #{ticket.id} - trabajo #{ticket.repairsCount + 1}
-                                {baseRepair ? ` - mismo modelo que trabajo #${baseRepair.reparacion}` : ''}
+                                {selectedBase ? ` - mismo modelo que trabajo #${selectedBase.reparacion}` : ''}
                             </div>
                         </div>
                         <span className="rounded-md border border-[#93c5fd] bg-white px-2.5 py-1 text-xs font-black text-[#1d4ed8]">
-                            {baseRepair ? 'Mismo equipo' : 'Nueva reparacion'}
+                            {selectedBase ? 'Mismo equipo' : 'Nueva reparacion'}
                         </span>
                     </div>
                 </div>
-                <EditSection title="Trabajo">
+                <EditSection title="Equipo">
                     <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2"><EditField label="Agregar a">
+                            <select aria-label="Agregar a" className={ui.input} value={selectedBase ? selectedBase.id + '-' + selectedBase.reparacion : 'new'} onChange={(event) => {
+                                const repair = ticket.repairs.find((item) => item.id + '-' + item.reparacion === event.target.value) ?? null;
+                                setSelectedBase(repair);
+                                form.setData((current) => ({ ...current, marca: repair ? inferredRepairBrand(repair) : '', modelo: repair?.modelo ?? '', color: repair?.color ?? '', categorias_reparacion: String(repair?.categorias_reparacion ?? 4), unlock_type: repair?.unlock_type ?? '', unlock_value: repair?.unlock_value ?? '', repuesto_agregados: normalizePartAccessories(repair?.repuesto_agregados ?? []), repuesto_agregado_otro: repair?.repuesto_agregado_otro ?? '' }));
+                            }}>
+                                <option value="new">Nuevo equipo</option>
+                                {ticket.repairs.filter((repair, index) => index === 0 || repairModelGroupKey(repair) !== repairModelGroupKey(ticket.repairs[index - 1])).map((repair, index) => <option key={repair.reparacion} value={repair.id + '-' + repair.reparacion}>Equipo {index + 1}: {displayRepairModel(repair)}</option>)}
+                                {selectedBase && !ticket.repairs.some((repair, index) => isSameRepair(repair, selectedBase) && (index === 0 || repairModelGroupKey(repair) !== repairModelGroupKey(ticket.repairs[index - 1]))) ? <option value={selectedBase.id + '-' + selectedBase.reparacion}>{displayRepairModel(selectedBase)}</option> : null}
+                            </select>
+                        </EditField></div>
                         <EditField label="Categoria">
                             <select className={ui.input} value={form.data.categorias_reparacion} onChange={(event) => changeCategory(event.target.value)}>
                                 {serviceCategories.map((category) => (
@@ -1027,16 +1042,11 @@ function AddRepairModal({
                         </EditField>
                         {isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) ? (
                             <EditField label="Marca">
-                                <select className={ui.input} value={form.data.marca} onChange={(event) => changeBrand(event.target.value)}>
-                                    <option value="">Elegir marca...</option>
-                                    {phoneBrandOptions.map((brand) => (
-                                        <option key={brand} value={brand}>{brand}</option>
-                                    ))}
-                                </select>
+                                <RepairBrandSelect className={ui.input} value={form.data.marca} onChange={changeBrand} />
                             </EditField>
                         ) : null}
                         <EditField label="Modelo">
-                            <input className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
+                            <input required className={ui.input} placeholder="Ej: SAMSUNG A51" value={form.data.modelo} onChange={(event) => form.setData('modelo', event.target.value)} />
                         </EditField>
                         <EditField label="Color">
                             <RepairColorCombobox className={ui.input} value={form.data.color} onChange={(value) => form.setData('color', value)} />
@@ -1062,28 +1072,34 @@ function AddRepairModal({
                                 />
                             </>
                         ) : null}
-                        <EditField label="Tipo de servicio">
-                            <select className={ui.input} value="" onChange={(event) => applyDescriptionOption(event.target.value)}>
-                                <option value="">Agregar tipo o falla...</option>
-                                {serviceTemplates.map((option) => (
-                                    <option key={option.value} value={option.value}>{option.label}</option>
-                                ))}
-                            </select>
-                        </EditField>
-                        <EditField label="Descripcion de la falla">
-                            <textarea className={ui.textarea} placeholder="Descripcion de la reparacion" value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} required />
-                        </EditField>
+                    </div>
+                </EditSection>
+                <EditSection title="Falla y presupuesto">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                            <EditField label="Falla o servicio">
+                                <select className={ui.input} value={selectedFailure} onChange={(event) => applyDescriptionOption(event.target.value)} required aria-label="Elegir falla o servicio">
+                                    <option value="">Elegir falla o servicio frecuente...</option>
+                                    {failureOptions.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                                </select>
+                            </EditField>
+                        </div>
+                        {selectedFailure ? <div className="sm:col-span-2"><EditField label="Detalle de la falla">
+                            <textarea className={ui.textarea} rows={2} placeholder="Detalle de la falla" value={form.data.descripcion} onChange={(event) => form.setData('descripcion', event.target.value)} required />
+                        </EditField></div> : null}
                     </div>
                 </EditSection>
 
-                <EditSection title="Agenda e importes">
+                {selectedFailure ? <EditSection title="Importes">
                     <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(10rem,1fr))]">
                         <EditField label="Fecha estimada">
-                            <input className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
+                            <input required className={ui.input} type="date" value={form.data.fecha_estimada} onChange={(event) => form.setData('fecha_estimada', event.target.value)} />
                         </EditField>
-                        <EditField label="Monto">
-                            <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
+                        <div><EditField label="Monto">
+                            <input className={ui.input} type="number" step="0.01" min="0" required disabled={quotePending} inputMode="decimal" placeholder="0" value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} />
                         </EditField>
+                            <label className="mt-2 flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={quotePending} onChange={(event) => { setQuotePending(event.target.checked); if (event.target.checked) form.setData('monto', '0'); }} />A presupuestar</label>
+                        </div>
                         <EditField label="Seña">
                             <input className={ui.input} inputMode="decimal" placeholder="0" value={form.data.senia} onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} />
                         </EditField>
@@ -1100,8 +1116,10 @@ function AddRepairModal({
                             </div>
                         )}
                     </div>
-                </EditSection>
+                </EditSection> : null}
 
+                <details className="rounded-md border border-[#cbd5e1] bg-white">
+                    <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-bold text-[#334155]">Repuesto</summary>
                 <EditSection title="Repuesto">
                     <div className="grid gap-3">
                         <EditField label="Buscar en cajas">
@@ -1164,6 +1182,9 @@ function AddRepairModal({
                         </label>
                     </div>
                 </EditSection>
+                </details>
+                <details className="rounded-md border border-[#cbd5e1] bg-white">
+                    <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-bold text-[#334155]">Observaciones</summary>
                 <EditSection title="Observaciones">
                     <textarea
                         className={ui.textarea}
@@ -1178,6 +1199,9 @@ function AddRepairModal({
                         onChange={(event) => form.setData('observaciones', event.target.value)}
                     />
                 </EditSection>
+                </details>
+                <details className="rounded-md border border-[#cbd5e1] bg-white">
+                    <summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-bold text-[#334155]">Fotos de ingreso</summary>
                 <EditSection title="Fotos de ingreso">
                     <ImageUploadPicker
                         title="Fotos de ingreso"
@@ -1188,9 +1212,10 @@ function AddRepairModal({
                         onRemove={removeImage}
                     />
                 </EditSection>
+                </details>
                 <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-[#bfdbfe] bg-white px-4 py-3">
                     <button type="button" className={buttonClass('soft', 'sm')} onClick={onClose}>Cancelar</button>
-                    <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing}>Agregar reparacion</button>
+                    <button type="submit" className={buttonClass('primary', 'sm')} disabled={form.processing || !selectedFailure}>Agregar reparacion</button>
                 </div>
             </form>
         </ModalShell>
@@ -1341,9 +1366,11 @@ function RepairEditCard({
     const deviceLabel = `Equipo ${deviceGroupPosition.index} de ${deviceGroupPosition.total}`;
     const failureLabel = sameModelPosition.total > 1 ? `Falla ${sameModelPosition.index} de ${sameModelPosition.total}` : 'Falla única';
     const desktopWorkLabel = `${deviceLabel} · ${failureLabel}`;
+    const mobileGroup = ticket.repairs.filter((item) => repairDeviceGroupPosition(ticket, item).index === deviceGroupPosition.index);
+    const sharedMobileDate = repair.fecha_estimada === mobileGroup[0]?.fecha_estimada;
     const mobileWorkLabel = `${deviceLabel} · ${failureLabel}`;
     const canCancelSameModel = repairDisplayModelKey !== '' && repairDisplayModelKey !== '-' && repair.entregado !== 'si' && ticket.repairs.some((item) => (
-        item.registro_id !== repair.registro_id
+        !isSameRepair(item, repair)
         && item.entregado !== 'si'
         && item.estado !== 'CANCELADA'
         && repairModelGroupKey(item) === repairDisplayModelKey
@@ -3109,31 +3136,24 @@ function RepairEditCard({
 
     return (
         <>
-            <details className="overflow-hidden rounded-md border border-[#cbd5e1] bg-white">
-                <summary className={cn('cursor-pointer list-none border-b border-[#e2e8f0] px-2.5 py-2', repairStatusHeaderClass(repair.estado))}>
-                    <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                            <div className="mb-1 flex items-center gap-1.5">
-                                <span className="text-[0.68rem] font-bold text-[#0f172a]">#{repair.id}</span>
-                                <span className="text-[0.68rem] font-bold text-[#475569]">{mobileWorkLabel}</span>
-                                <span className={cn('rounded-full border px-1.5 py-0.5 text-[0.62rem] font-bold', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
-                            </div>
-                            <h4 className="truncate text-[0.96rem] font-black leading-tight"><RepairModelLabel repair={repair} term={highlightTerm} /></h4>
-                            {repair.estado === 'LISTA' ? <p className="text-[0.72rem] font-semibold">Listo desde: {repair.listo_desde ? formatLegacyDate(repair.listo_desde) : 'sin registro'}</p> : null}
-                            <p className="truncate text-[0.78rem] font-bold opacity-90"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[0.72rem] font-black">
-                                <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}</span>
-                                {isToday(repair.fecha_estimada) ? <span className="rounded-full border border-[#fde68a] bg-[#fef3c7] px-1.5 py-0.5 text-[#92400e]">Hoy</span> : null}
-                                {overdueText ? <span className="rounded-full border border-[#fecdd3] bg-[#fff1f2] px-1.5 py-0.5 text-[#be123c]">{overdueText}</span> : null}
-                                <span className="rounded-full border border-[#cbd5e1] bg-white px-2 py-1 text-[0.78rem] font-black text-[#111827]">
-                                    Saldo: <PaymentStatus monto={monto} senia={senia} />
-                                </span>
-                                <SeniaBadge label={seniaLabel} />
+            <details name={'ticket-' + ticket.id + '-failures'} className="group/failure overflow-hidden border-b border-[#e2e8f0] bg-white last:border-b-0">
+                <summary className="min-h-14 cursor-pointer list-none px-3 py-2.5 [&::-webkit-details-marker]:hidden" aria-label={failureLabel + ': ' + displayDescription}>
+                    <div className="flex items-start gap-2.5">
+                        <span className="pt-0.5 text-xs font-bold text-[#64748b]">{sameModelPosition.index}.</span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[0.78rem] font-bold leading-snug text-[#0f172a]"><HighlightText value={displayDescription === '-' ? 'SIN DESCRIPCION' : displayDescription} term={highlightTerm} /></p>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.68rem] font-semibold">
+                                <span className={cn('rounded border px-1.5 py-0.5', repairStatusSelectClass(repair.estado))}>{displayStatus}</span>
+                                {!sharedMobileDate ? <span className="text-[#475569]">{formatLegacyDate(repair.fecha_estimada)}{isToday(repair.fecha_estimada) ? ' (Hoy)' : ''}</span> : null}
+                                {!sharedMobileDate && overdueText ? <span className="text-[#be123c]">{overdueText}</span> : null}
+                                {repair.estado === 'LISTA' ? <span className="text-[#475569]">Listo: {repair.listo_desde ? formatLegacyDate(repair.listo_desde) : 'sin registro'}</span> : null}
                             </div>
                         </div>
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-[#cbd5e1] bg-white text-[#334155]">
-                            <FaChevronDown aria-hidden="true" />
-                        </span>
+                        <div className="grid shrink-0 justify-items-end gap-0.5 text-[#0f172a]">
+                            <span className="text-[0.6rem] font-semibold text-[#64748b]">Saldo</span>
+                            <span className="text-[0.78rem] font-bold"><PaymentStatus monto={monto} senia={senia} /></span>
+                            <FaChevronDown className="mt-0.5 text-[0.65rem] text-[#64748b] transition-transform group-open/failure:rotate-180" aria-hidden="true" />
+                        </div>
                     </div>
                 </summary>
                 <div className="grid gap-2.5 p-2.5">
@@ -3338,9 +3358,9 @@ export function RepairTicketPanel({
                 <div className="min-w-0 max-xl:grid max-xl:grid-cols-[minmax(0,1fr)] max-xl:gap-2">
                     <div className="max-xl:rounded-lg max-xl:border max-xl:border-[#111827] max-xl:bg-[#111827] max-xl:px-3 max-xl:py-2">
                         <p className="text-[0.78rem] font-semibold text-[#475569] md:text-xs max-xl:text-[0.68rem] max-xl:font-black max-xl:uppercase max-xl:text-[#cbd5e1]">Ticket #{ticket.id}</p>
-                        <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl max-xl:text-[1.22rem] max-xl:font-black max-xl:uppercase max-xl:leading-tight max-xl:text-white">{ticket.nombre_cliente}</h3>
+                        <h3 className="truncate text-[1rem] font-extrabold tracking-tight text-[#0f172a] md:text-2xl max-xl:text-[1.22rem] max-xl:font-black max-xl:uppercase max-xl:leading-tight max-xl:text-white">{ticket.nombre_cliente}{Number(ticket.dni) > 0 && Number(ticket.dni) !== 12345678 ? <span className="xl:hidden"> - {ticket.dni}</span> : null}</h3>
                     </div>
-                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.78rem] font-semibold text-[#475569] md:gap-2 md:text-sm max-xl:gap-1.5 max-xl:text-[0.73rem]">
+                    <div className="hidden flex-wrap gap-x-2 gap-y-0.5 xl:flex text-[0.78rem] font-semibold text-[#475569] md:gap-2 md:text-sm max-xl:gap-1.5 max-xl:text-[0.73rem]">
                         <span>DNI: {ticket.dni}</span>
                         {ticket.contacto ? <span>Contacto: {ticket.contacto}</span> : null}
                         <span>Fecha: {formatLegacyDate(ticket.fecha)}</span>
@@ -3414,24 +3434,52 @@ export function RepairTicketPanel({
                 </div>
             </div>
 
-            <div className="grid gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 xl:hidden">
-                {ticket.repairs.map((repair, index) => (
-                    <RepairEditCard
-                        key={`mobile-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
-                        repair={repair}
-                        serviceCategories={serviceCategories}
-                        partInventory={partInventory}
-                        readOnly={readOnly}
-                        ticket={ticket}
-                        variant="mobile"
-                        rowIndex={index}
-                        rowTotal={ticket.repairs.length}
-                        archived={archived}
-                        statusLabel={statusLabel}
-                        highlightTerm={highlightTerm}
-                        onAddRepair={openAddRepair}
-                    />
-                ))}
+            <div className="grid gap-3 xl:hidden">
+                {ticket.repairs.reduce<RepairOrderView[][]>((groups, repair) => {
+                    const previous = groups[groups.length - 1];
+                    const key = repairModelGroupKey(repair);
+                    if (previous && key && key !== '-' && repairModelGroupKey(previous[0]) === key) previous.push(repair);
+                    else groups.push([repair]);
+                    return groups;
+                }, []).map((group, groupIndex) => {
+                    const first = group[0];
+                    const sharedDate = true;
+                    return (
+                        <div key={'device-' + first.id + '-' + first.reparacion} className={cn('overflow-hidden rounded-md border border-l-[3px] bg-white', groupIndex % 2 === 0 ? 'border-[#cbd5e1] border-l-[#334155]' : 'border-[#99c6c0] border-l-[#0f766e]')}>
+                            {(
+                                <div className={cn("grid gap-1 border-b px-3 py-2", groupIndex % 2 === 0 ? "border-[#cbd5e1] bg-[#f1f5f9]" : "border-[#b8d8d3] bg-[#edf7f5]")}>
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded text-sm font-bold text-white', groupIndex % 2 === 0 ? 'bg-[#334155]' : 'bg-[#0f766e]')} aria-label={'Equipo ' + (groupIndex + 1)}>{groupIndex + 1}</span>
+                                        <div className="min-w-0 flex-1"><h4 className="text-[0.9rem] font-black leading-tight"><RepairModelLabel repair={first} term={highlightTerm} /></h4><span className="text-[0.65rem] font-semibold text-[#64748b]">{group.length} {group.length === 1 ? 'falla' : 'fallas'}</span></div>
+                                        {!readOnly && allowAddRepair ? <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded-md text-[#334155] hover:bg-white" onClick={() => openAddRepair(first)} aria-label={'Agregar falla al equipo ' + (groupIndex + 1)}><FaPlus aria-hidden="true" /></button> : null}
+                                    </div>
+                                    {sharedDate ? <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-[#475569]">
+                                        <span>Estimada: {formatLegacyDate(first.fecha_estimada)}</span>
+                                        {isToday(first.fecha_estimada) ? <span className="text-[#92400e]">Hoy</span> : null}
+                                        {overdueLabel(first) ? <span className="text-[#be123c]">{overdueLabel(first)}</span> : null}
+                                    </div> : null}
+                                </div>
+                            )}
+                            {group.map((repair) => (
+                                <RepairEditCard
+                                    key={`mobile-${repair.id}-${repair.reparacion}-${repair.registro_id}`}
+                                    repair={repair}
+                                    serviceCategories={serviceCategories}
+                                    partInventory={partInventory}
+                                    readOnly={readOnly}
+                                    ticket={ticket}
+                                    variant="mobile"
+                                    rowIndex={ticket.repairs.indexOf(repair)}
+                                    rowTotal={ticket.repairs.length}
+                                    archived={archived}
+                                    statusLabel={statusLabel}
+                                    highlightTerm={highlightTerm}
+                                    onAddRepair={openAddRepair}
+                                />
+                            ))}
+                        </div>
+                    );
+                })}
             </div>
 
             <div className="grid grid-cols-2 gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-2 xl:hidden">
