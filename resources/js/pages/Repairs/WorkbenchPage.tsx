@@ -1,7 +1,7 @@
 import { prepareRepairImages } from '../../repairImageUpload';
 import { RepairBrandSelect } from '../../components/RepairBrandSelect';
-import { Link, router, useForm } from '@inertiajs/react';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { FaBan, FaCalendarDay, FaCamera, FaCheck, FaCheckCircle, FaChevronLeft, FaChevronRight, FaClipboardCheck, FaClipboardList, FaCopy, FaFilter, FaHourglassEnd, FaImages, FaPlusCircle, FaSave, FaSearch, FaSpinner, FaTimes, FaTrashAlt, FaTools, FaTruck, FaWrench } from 'react-icons/fa';
 import { PhoneUnlockFields } from '../../components/PhoneUnlockFields';
 import { RepairPartAccessoriesFields, normalizePartAccessories, type RepairPartAccessory } from '../../components/RepairPartAccessoriesFields';
@@ -10,7 +10,8 @@ import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from
 import { WebcamCaptureButton } from '../../components/WebcamCaptureButton';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import { groupTicketsByDate, type TicketDateGroup } from '../../repairDateGroups';
-import type { RepairTicketView } from '../../types';
+import { useIntakeDraft } from '../../hooks/useIntakeDraft';
+import type { RepairTicketView, SharedPageProps } from '../../types';
 import { repairButtonClass as buttonClass, repairUi as ui } from '../../repairUi';
 import { cn } from '../../utils';
 
@@ -503,6 +504,9 @@ export default function WorkbenchPage({
         contacto: initialCreateClient?.contacto ?? '',
         jobs: [createEmptyJob(states[0] ?? 'PENDIENTE')],
     });
+    const { auth } = usePage<SharedPageProps>().props;
+    const [editOrderId, setEditOrderId] = useState(false);
+    const [customOrderId, setCustomOrderId] = useState(false);
     const [lookupFeedback, setLookupFeedback] = useState<string>('');
     const [lookupBusy, setLookupBusy] = useState(false);
     const [clientPreview, setClientPreview] = useState<ClientLookupPreview | null>(null);
@@ -527,12 +531,61 @@ export default function WorkbenchPage({
     });
     const gridFilterSubmitTimeout = useRef<number | null>(null);
     const dniLookupTimeout = useRef<number | null>(null);
+    const dniLookupRequest = useRef<AbortController | null>(null);
+    const latestClient = useRef(createForm.data);
+    latestClient.current = createForm.data;
+    const autofilledClient = useRef<{ nombre_cliente: string; contacto: string } | null>(null);
     const overlaySearchInputRef = useRef<HTMLInputElement | null>(null);
+    const intakeClientSectionRef = useRef<HTMLElement | null>(null);
+    const intakeClientNameRef = useRef<HTMLInputElement | null>(null);
     const visibleRepairs = tickets.reduce((total, ticket) => total + ticket.repairs.length, 0);
     const ticketDateGroups = groupTicketsByDate(tickets, (ticket) => ticket.fecha);
     const isTaskQueueView = filters.prioridad === 'tareas';
     const taskTickets = splitTaskTickets(tickets);
     const isWizardIntake = configuredWizardIntake || (isIngreso && mobileWizardIntake);
+    const emptyJob = createEmptyJob(states[0] ?? 'PENDIENTE');
+    const hasDraftContent = Boolean(customOrderId || createForm.data.nombre_cliente || createForm.data.dni || createForm.data.contacto
+        || createForm.data.jobs.length > 1 || createForm.data.jobs.some((job) => JSON.stringify(job) !== JSON.stringify(emptyJob)));
+    const draftData = useMemo(() => ({ form: createForm.data, customOrderId }), [createForm.data, customOrderId]);
+    const intakeDraft = useIntakeDraft({
+        enabled: isIngreso,
+        storageKey: `intake-v1:${auth.user?.id ?? 'technician'}:${initialCreateClient?.dni ?? 'new'}`,
+        data: draftData,
+        hasContent: hasDraftContent,
+        restore: (draft) => {
+            if (!draft?.form || !Array.isArray(draft.form.jobs) || !draft.form.jobs.length) return;
+            const restored = {
+                ...draft.form,
+                id_orden: draft.customOrderId ? draft.form.id_orden : String(nextOrderId),
+                jobs: draft.form.jobs.map((job) => ({ ...createEmptyJob(states[0] ?? 'PENDIENTE'), ...job,
+                    images: job.images?.filter((file) => file instanceof File) ?? null,
+                })),
+            };
+            createForm.setData(restored);
+            setCustomOrderId(draft.customOrderId);
+            setImagePreviews(Object.fromEntries(restored.jobs.map((job, index) => [index, (job.images ?? []).map((file) => URL.createObjectURL(file))])));
+            setCustomEstimatedDateJobs(Object.fromEntries(restored.jobs.map((_, index) => [index, true])));
+        },
+    });
+
+    useEffect(() => {
+        if (!isIngreso || !intakeDraft.ready || !window.matchMedia('(max-width: 767px)').matches) return;
+
+        setActiveIntakeStep('client');
+        // Wait for Inertia's scroll reset and the sticky header's measured height.
+        let focusFrame = 0;
+        const layoutFrame = window.requestAnimationFrame(() => {
+            focusFrame = window.requestAnimationFrame(() => {
+                intakeClientNameRef.current?.focus({ preventScroll: true });
+                intakeClientSectionRef.current?.scrollIntoView({ block: 'start', behavior: 'instant' });
+            });
+        });
+
+        return () => {
+            window.cancelAnimationFrame(layoutFrame);
+            window.cancelAnimationFrame(focusFrame);
+        };
+    }, [isIngreso, intakeDraft.ready]);
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -573,6 +626,7 @@ export default function WorkbenchPage({
     }, []);
 
     useEffect(() => () => {
+        dniLookupRequest.current?.abort();
         if (gridFilterSubmitTimeout.current !== null) {
             window.clearTimeout(gridFilterSubmitTimeout.current);
         }
@@ -808,7 +862,7 @@ export default function WorkbenchPage({
 
     const preparingCreate = useRef(false);
     const submitCreateForm = async (): Promise<void> => {
-        if (createForm.processing || preparingCreate.current) return;
+        if (createForm.processing || preparingCreate.current || !intakeDraft.ready) return;
         preparingCreate.current = true;
         const jobs = normalizedJobsForSubmit().map((job) => ({ ...job }));
         try {
@@ -823,7 +877,12 @@ export default function WorkbenchPage({
         createForm.post(route('repairs.orders.store'), {
             preserveScroll: 'errors',
             forceFormData: true,
-            onSuccess: () => {
+            onSuccess: async () => {
+                await intakeDraft.clear();
+                dniLookupRequest.current?.abort();
+                autofilledClient.current = null;
+                setCustomOrderId(false);
+                setEditOrderId(false);
                 createForm.reset();
                 createForm.setData('id_orden', String(nextOrderId + 1));
                 createForm.setData('contacto', '');
@@ -838,6 +897,8 @@ export default function WorkbenchPage({
                 }
                 setPartSearches({});
                 setActiveIntakeStep('client');
+                setAttemptedIntakeStep(null);
+                focusIntakeField('customer-name');
             },
             onError: () => {
                 window.requestAnimationFrame(() => document.getElementById('intake-save-errors')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
@@ -1403,6 +1464,7 @@ export default function WorkbenchPage({
         'aria-describedby': showIntakeErrors && intakeMissing.some((item) => item.field === field) ? 'intake-validation' : undefined,
     });
     const focusIntakeField = (field: CreateFlowField): void => {
+        if (field === 'order-id') setEditOrderId(true);
         window.requestAnimationFrame(() => {
             const wrapper = document.querySelector<HTMLElement>(`[data-intake-field="${field}"]`);
             const control = wrapper?.matches('input, textarea, select, button') ? wrapper
@@ -1424,11 +1486,22 @@ export default function WorkbenchPage({
             }
         }
         setAttemptedIntakeStep(null);
-        setActiveIntakeStep(intakeSteps[targetIndex].key);
-        window.requestAnimationFrame(() => document.getElementById('intake-step-navigation')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+        const nextStep = intakeSteps[targetIndex].key;
+        setActiveIntakeStep(nextStep);
+        const pending = missingIntakeFields(nextStep)[0]?.field;
+        if (pending) focusIntakeField(pending);
+        else if (nextStep === 'client') focusIntakeField('customer-name');
+        else window.requestAnimationFrame(() => {
+            const section = document.querySelector<HTMLElement>(`[data-intake-section="${nextStep}"]`);
+            const control = section?.matches('[tabindex="-1"]') ? section : section?.querySelector<HTMLElement>('input:not([type="file"]):not([type="hidden"]):not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled)');
+            control?.focus({ preventScroll: true });
+            (section ?? document.getElementById('intake-step-navigation'))?.scrollIntoView({ block: 'start', behavior: 'instant' });
+        });
     };
     const goToPreviousIntakeStep = (): void => goToIntakeStep(Math.max(0, activeIntakeStepIndex - 1));
-    const goToNextIntakeStep = (): void => goToIntakeStep(Math.min(intakeSteps.length - 1, activeIntakeStepIndex + 1));
+    const goToNextIntakeStep = (): void => {
+        if (!lookupBusy) goToIntakeStep(Math.min(intakeSteps.length - 1, activeIntakeStepIndex + 1));
+    };
 
     const descriptionOptions = [
         ...serviceTemplates.map((template) => ({
@@ -1574,78 +1647,73 @@ export default function WorkbenchPage({
     };
 
     const handleDniChange = (value: string): void => {
-        createForm.setData('dni', value);
+        dniLookupRequest.current?.abort();
+        setLookupBusy(false);
+        const previous = autofilledClient.current;
+        createForm.setData((current) => ({ ...current, dni: value,
+            nombre_cliente: previous && current.nombre_cliente === previous.nombre_cliente ? '' : current.nombre_cliente,
+            contacto: previous && current.contacto === previous.contacto ? '' : current.contacto,
+        }));
+        autofilledClient.current = null;
         setClientPreview(null);
         setLookupFeedback('');
-
-        if (dniLookupTimeout.current !== null) {
-            window.clearTimeout(dniLookupTimeout.current);
-            dniLookupTimeout.current = null;
-        }
-
-        if (value.trim().length >= 7) {
-            dniLookupTimeout.current = window.setTimeout(() => {
-                void lookupByDni(value, true);
-            }, 650);
+        if (dniLookupTimeout.current !== null) window.clearTimeout(dniLookupTimeout.current);
+        if (/^\d{7,8}$/.test(value.trim())) {
+            dniLookupTimeout.current = window.setTimeout(() => void lookupByDni(value, true), 650);
         }
     };
 
-    const lookupByDni = async (dniValue = createForm.data.dni, automatic = false): Promise<void> => {
+    const lookupByDni = async (dniValue = latestClient.current.dni, automatic = false): Promise<void> => {
         const dni = dniValue.trim();
-
-        if (dni === '') {
-            setClientPreview(null);
-            if (automatic) {
-                return;
-            }
-            setLookupFeedback('Ingresá un DNI para recuperar datos previos.');
+        if (dniLookupTimeout.current !== null) window.clearTimeout(dniLookupTimeout.current);
+        dniLookupRequest.current?.abort();
+        if (!/^\d{1,8}$/.test(dni)) {
+            setLookupBusy(false);
+            if (!automatic && dni !== '') setLookupFeedback('Ingresá un DNI válido para recuperar datos.');
             return;
         }
-
+        const request = new AbortController();
+        dniLookupRequest.current = request;
         setLookupBusy(true);
         setLookupFeedback('');
-        setClientPreview(null);
-
         try {
             const response = await window.fetch(`${route('repairs.lookup')}?dni=${encodeURIComponent(dni)}`, {
-                headers: {
-                    Accept: 'application/json',
-                },
+                headers: { Accept: 'application/json' }, signal: request.signal,
             });
-
             const payload = (await response.json()) as ClientLookupPreview | null;
-
-            if (!response.ok || !payload) {
-                if (automatic) {
-                    return;
-                }
-                setLookupFeedback('No encontramos un cliente previo con ese DNI.');
+            if (request.signal.aborted || latestClient.current.dni.trim() !== dni) return;
+            if (!response.ok || !payload || String(payload.dni) !== String(Number(dni))) {
+                if (!automatic) setLookupFeedback('No encontramos un cliente previo con ese DNI.');
                 return;
             }
-
+            const previous = autofilledClient.current;
+            const filled = {
+                nombre_cliente: payload.nombre_cliente ?? '',
+                contacto: payload.contacto ?? '',
+            };
+            createForm.setData((current) => {
+                if (current.dni.trim() !== dni) return current;
+                return { ...current,
+                    nombre_cliente: !current.nombre_cliente.trim() || current.nombre_cliente === previous?.nombre_cliente ? filled.nombre_cliente : current.nombre_cliente,
+                    contacto: !current.contacto.trim() || current.contacto === previous?.contacto ? filled.contacto : current.contacto,
+                };
+            });
+            autofilledClient.current = filled;
             setClientPreview(payload);
+            setLookupFeedback('Datos previos recuperados. Podés corregirlos antes de continuar.');
         } catch {
-            if (automatic) {
-                return;
-            }
-            setLookupFeedback('No se pudo consultar el DNI en este momento.');
+            if (!request.signal.aborted && !automatic) setLookupFeedback('No se pudo consultar el DNI en este momento.');
         } finally {
-            setLookupBusy(false);
+            if (dniLookupRequest.current === request) setLookupBusy(false);
         }
     };
 
     const importClientPreview = (): void => {
-        if (!clientPreview) {
-            return;
-        }
-
-        createForm.setData((current) => ({
-            ...current,
-            nombre_cliente: clientPreview.nombre_cliente ?? current.nombre_cliente,
-            dni: clientPreview.dni ? String(clientPreview.dni) : current.dni,
-            contacto: clientPreview.contacto ?? current.contacto,
-        }));
-        setLookupFeedback(`Datos importados desde la orden #${clientPreview.ultima_orden ?? '-'}.`);
+        if (!clientPreview) return;
+        const filled = { nombre_cliente: clientPreview.nombre_cliente ?? '', contacto: clientPreview.contacto ?? '' };
+        createForm.setData((current) => ({ ...current, ...filled }));
+        autofilledClient.current = filled;
+        setLookupFeedback('Datos del cliente recuperados. Podés corregirlos.');
         setClientPreview(null);
     };
 
@@ -1817,7 +1885,7 @@ export default function WorkbenchPage({
         ));
 
     const intakeControl =
-        'min-h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-[0.92rem] font-semibold text-[#0f172a] outline-none transition placeholder:text-slate-400 focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/25 disabled:bg-slate-100 disabled:text-slate-500';
+        'min-h-11 w-full rounded-lg border border-[#cbd5e1] bg-white px-3 text-base font-semibold text-[#0f172a] outline-none transition placeholder:text-slate-400 focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/25 disabled:bg-slate-100 disabled:text-slate-500 md:text-[0.92rem]';
 
     return (
         <RepairLayout title={isConsultas ? 'Consultas' : 'Ingreso'}>
@@ -2278,16 +2346,28 @@ export default function WorkbenchPage({
 
                 <form
                     id="intake-flow-form"
+                    inert={!intakeDraft.ready}
+                    onKeyDown={(event) => {
+                        if (!isWizardIntake || activeIntakeStep !== 'client' || event.key !== 'Enter' || event.nativeEvent.isComposing || !(event.target instanceof HTMLInputElement)) return;
+                        event.preventDefault();
+                        const controls = Array.from(intakeClientSectionRef.current?.querySelectorAll<HTMLInputElement>('input:not(:disabled)') ?? []);
+                        const next = controls[controls.indexOf(event.target) + 1];
+                        if (next) {
+                            next.focus({ preventScroll: true });
+                            next.scrollIntoView({ block: 'center', behavior: 'instant' });
+                        } else goToNextIntakeStep();
+                    }}
                     onChange={(event) => {
                         if (event.target instanceof HTMLSelectElement && window.matchMedia('(max-width: 767px)').matches) {
                             event.target.blur();
                         }
                     }}
-                    className="grid gap-5 rounded-xl border border-[#dce5f2] bg-white p-3 shadow-sm md:p-5 [&_[aria-invalid=true]]:ring-2 [&_[aria-invalid=true]]:ring-red-500"
+                    className="grid gap-5 rounded-xl border border-[#dce5f2] bg-white p-3 pb-28 shadow-sm md:p-5 [&_[aria-invalid=true]]:ring-2 [&_[aria-invalid=true]]:ring-red-500"
                     noValidate={isWizardIntake}
                     onSubmit={(event) => {
                         event.preventDefault();
-                        submitCreateForm();
+                        if (isWizardIntake && activeIntakeStep !== 'summary') goToNextIntakeStep();
+                        else void submitCreateForm();
                     }}
                 >
                     {isWizardIntake ? (
@@ -2348,25 +2428,50 @@ export default function WorkbenchPage({
                     ) : null}
 
                     {/* ============ CLIENTE ============ */}
-                    <section className={cn('grid gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('client') && 'hidden')}>
+                    <section data-intake-section="client" ref={intakeClientSectionRef} className={cn('grid scroll-mt-[calc(var(--repair-header-offset,5.6rem)+0.5rem)] gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('client') && 'hidden')}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <h3 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#2563eb]" aria-hidden="true" />Cliente</h3>
                             <span className="text-xs font-semibold text-[#475569]">Campos con <span className="font-black text-[#dc2626]">*</span> obligatorios</span>
                         </div>
-                        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[12rem_minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
-                            <label className="grid content-start gap-1.5">
-                                <span className="text-[13px] font-bold text-[#334155]">ID de orden <span className="text-[#dc2626]">*</span></span>
-                                <input {...validationProps('order-id')} className={intakeControl} type="number" min="1" value={createForm.data.id_orden} onChange={(event) => createForm.setData('id_orden', event.target.value)} required />
-                                <span className="text-xs font-semibold text-[#475569]">Editable si está libre.</span>
-                            </label>
+                    {intakeDraft.message ? <p role="status" className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#475569]">{intakeDraft.message}<button type="button" className="min-h-11 px-2 font-semibold underline" onClick={async () => {
+                        await intakeDraft.clear();
+                        dniLookupRequest.current?.abort();
+                        if (dniLookupTimeout.current !== null) window.clearTimeout(dniLookupTimeout.current);
+                        autofilledClient.current = null;
+                        createForm.reset();
+                        createForm.setData('id_orden', String(nextOrderId));
+                        createForm.setData('jobs', [createEmptyJob(states[0] ?? 'PENDIENTE')]);
+                        createForm.clearErrors();
+                        setCustomOrderId(false);
+                        setEditOrderId(false);
+                        setImagePreviews({});
+                        setClientPreview(null);
+                        setLookupFeedback('');
+                        setActiveIntakeStep('client');
+                        setAttemptedIntakeStep(null);
+                        focusIntakeField('customer-name');
+                    }}>Descartar borrador</button></p> : null}
+                        <div className="flex items-center gap-2 text-xs text-[#475569]">
+                            <span>Orden <strong>#{createForm.data.id_orden || nextOrderId}</strong></span>
+                            <button type="button" className="min-h-11 px-2 font-semibold underline" onClick={() => {
+                                if (editOrderId) setEditOrderId(false);
+                                else focusIntakeField('order-id');
+                            }}>{editOrderId ? 'Listo' : 'Editar ID'}</button>
+                        </div>
+                        {editOrderId ? <label className="grid max-w-48 content-start gap-1.5">
+                            <span className="text-[13px] font-bold text-[#334155]">ID de orden</span>
+                            <input {...validationProps('order-id')} className={intakeControl} type="number" inputMode="numeric" min="1" value={createForm.data.id_orden} onChange={(event) => { setCustomOrderId(true); createForm.setData('id_orden', event.target.value); }} required />
+                            <span className="text-xs text-[#475569]">Editable si está libre.</span>
+                        </label> : null}
+                        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)]">
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">Nombre del cliente <span className="text-[#dc2626]">*</span></span>
-                                <input {...validationProps('customer-name')} className={intakeControl} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required placeholder="Ej: Juan Pérez" />
+                                <input ref={intakeClientNameRef} autoComplete="name" enterKeyHint="next" {...validationProps('customer-name')} className={intakeControl} value={createForm.data.nombre_cliente} onChange={(event) => createForm.setData('nombre_cliente', event.target.value)} required placeholder="Ej: Juan Pérez" />
                             </label>
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">DNI</span>
                                 <div className="relative">
-                                    <input className={cn(intakeControl, 'pr-11')} type="number" min="1" max="99999999" inputMode="numeric" value={createForm.data.dni} onChange={(event) => handleDniChange(event.target.value)} onBlur={() => void lookupByDni()} placeholder="00000000" />
+                                    <input className={cn(intakeControl, 'pr-11')} type="number" min="1" max="99999999" inputMode="numeric" enterKeyHint="next" autoComplete="off" value={createForm.data.dni} onChange={(event) => handleDniChange(event.target.value)} onBlur={() => void lookupByDni()} placeholder="00000000" />
                                     <button
                                         type="button"
                                         aria-label="Buscar por DNI"
@@ -2382,7 +2487,7 @@ export default function WorkbenchPage({
                             </label>
                             <label className="grid content-start gap-1.5">
                                 <span className="text-[13px] font-bold text-[#334155]">Teléfono / contacto</span>
-                                <input className={intakeControl} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} placeholder="Ej: 11 5555 5555" />
+                                <input type="tel" inputMode="tel" autoComplete="tel" enterKeyHint="next" className={intakeControl} value={createForm.data.contacto} onChange={(event) => createForm.setData('contacto', event.target.value)} placeholder="Ej: 11 5555 5555" />
                                 <span className="text-xs font-semibold text-[#475569]">Opcional.</span>
                             </label>
                         </div>
@@ -2394,7 +2499,7 @@ export default function WorkbenchPage({
                                     <span>Contacto: {clientPreview.contacto && clientPreview.contacto.trim() !== '' ? clientPreview.contacto : 'Sin contacto'}</span>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
-                                    <button className={buttonClass('success', 'sm')} type="button" onClick={importClientPreview}><FaCheckCircle aria-hidden="true" />Importar datos</button>
+                                    <button className={buttonClass('success', 'sm')} type="button" onClick={importClientPreview}><FaCheckCircle aria-hidden="true" />Usar datos anteriores</button>
                                     <button className={buttonClass('soft', 'sm')} type="button" onClick={() => setClientPreview(null)}>Ignorar</button>
                                 </div>
                             </div>
@@ -2556,10 +2661,11 @@ export default function WorkbenchPage({
                                                                             className={cn(intakeControl, 'pl-7')}
                                                                             style={{ paddingLeft: '1.6rem' }}
                                                                             inputMode="decimal"
+                                                                            enterKeyHint="next"
                                                                             value={rowJob.monto}
                                                                             onFocus={() => clearAmountForTyping(jobIndex, 'monto')}
                                                                             onKeyDown={preventAmountArrowStep}
-                                                                            onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value, a_presupuestar: Number(event.target.value) > 0 ? false : current.a_presupuestar }))}
+                                                                            onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, monto: event.target.value.replace(',', '.'), a_presupuestar: Number(event.target.value.replace(',', '.')) > 0 ? false : current.a_presupuestar }))}
                                                                             {...validationProps(`job-${jobIndex}-amount`)}
                                                                             aria-label="Monto"
                                                                         />
@@ -2579,10 +2685,11 @@ export default function WorkbenchPage({
                                                                     className={intakeControl}
                                                                     style={{ paddingLeft: '1.6rem' }}
                                                                     inputMode="decimal"
+                                                                    enterKeyHint="next"
                                                                     value={rowJob.senia}
                                                                     onFocus={() => clearAmountForTyping(jobIndex, 'senia')}
                                                                     onKeyDown={preventAmountArrowStep}
-                                                                    onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia: event.target.value }))}
+                                                                    onChange={(event) => updateJob(jobIndex, (current) => ({ ...current, senia: event.target.value.replace(',', '.') }))}
                                                                     aria-label="Seña"
                                                                 />
                                                             </div>
@@ -2638,7 +2745,7 @@ export default function WorkbenchPage({
                                     </div>
 
                                     {/* --- Entrega, fotos y repuesto --- */}
-                                    <div className={cn('grid gap-5', !showIntakeStep('extras') && 'hidden')}>
+                                    <div data-intake-section="extras" className={cn('grid scroll-mt-[calc(var(--repair-header-offset,5.6rem)+0.5rem)] gap-5', !showIntakeStep('extras') && 'hidden')}>
                                         <h4 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#475569]" aria-hidden="true" />Entrega, fotos y repuesto</h4>
 
                                         <div className="grid items-start gap-x-5 gap-y-4 lg:grid-cols-[12rem_minmax(0,1fr)]">
@@ -2748,7 +2855,7 @@ export default function WorkbenchPage({
                     </div>
 
                     {/* ============ RESUMEN ============ */}
-                    <section className={cn('grid gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('summary') && 'hidden')}>
+                    <section tabIndex={-1} data-intake-section="summary" className={cn('grid scroll-mt-[calc(var(--repair-header-offset,5.6rem)+0.5rem)] gap-4 rounded-xl border border-[#e6edf7] bg-[#fbfdff] p-4', !showIntakeStep('summary') && 'hidden')}>
                         <div className="grid gap-3">
                             <h3 className="flex items-center gap-2 text-sm font-black text-[#0f172a]"><span className="h-4 w-1 rounded-full bg-[#2563eb]" aria-hidden="true" />Resumen de trabajos</h3>
                             <div className="overflow-hidden rounded-xl border border-[#e2e9f4] bg-white">
@@ -2774,16 +2881,16 @@ export default function WorkbenchPage({
                     </section>
 
                     {isWizardIntake ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e6edf7] pt-4">
-                            <button className={buttonClass('soft')} type="button" onClick={goToPreviousIntakeStep} disabled={activeIntakeStepIndex === 0}>
+                        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-2 border-t border-[#cbd5e1] bg-white px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:static md:z-auto md:px-0 md:pb-0 md:pt-4">
+                            <button className={buttonClass('soft', 'default', 'min-h-11')} type="button" onClick={goToPreviousIntakeStep} disabled={activeIntakeStepIndex === 0}>
                                 Anterior
                             </button>
                             {activeIntakeStep === 'summary' ? (
-                                <button className={buttonClass('primary')} type="submit" disabled={createForm.processing}>
+                                <button className={buttonClass('primary', 'default', 'min-h-11 flex-1 md:flex-none')} type="submit" disabled={createForm.processing}>
                                     <FaSave aria-hidden="true" /> {createForm.processing ? (createForm.progress ? `Subiendo fotos... ${createForm.progress.percentage ?? 0}%` : 'Guardando...') : 'Guardar orden'}
                                 </button>
                             ) : (
-                                <button className={buttonClass('primary')} type="button" onClick={goToNextIntakeStep}>
+                                <button className={buttonClass('primary', 'default', 'min-h-11 flex-1 md:flex-none')} type="button" onClick={goToNextIntakeStep} disabled={lookupBusy}>
                                     Siguiente
                                 </button>
                             )}
