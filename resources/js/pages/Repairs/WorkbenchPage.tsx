@@ -1,3 +1,4 @@
+import { prepareRepairImages } from '../../repairImageUpload';
 import { RepairBrandSelect } from '../../components/RepairBrandSelect';
 import { Link, router, useForm } from '@inertiajs/react';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
@@ -805,12 +806,19 @@ export default function WorkbenchPage({
         return jobs;
     }, []);
 
-    const submitCreateForm = (): void => {
-        if (createForm.processing) return;
-        createForm.transform((data) => ({
-            ...data,
-            jobs: normalizedJobsForSubmit(),
-        }));
+    const preparingCreate = useRef(false);
+    const submitCreateForm = async (): Promise<void> => {
+        if (createForm.processing || preparingCreate.current) return;
+        preparingCreate.current = true;
+        const jobs = normalizedJobsForSubmit().map((job) => ({ ...job }));
+        try {
+            for (const job of jobs) job.images = await prepareRepairImages(job.images);
+        } catch (error) {
+            preparingCreate.current = false;
+            createForm.setError('jobs', (error as Error).message);
+            return;
+        }
+        createForm.transform((data) => ({ ...data, jobs }));
 
         createForm.post(route('repairs.orders.store'), {
             preserveScroll: 'errors',
@@ -834,7 +842,7 @@ export default function WorkbenchPage({
             onError: () => {
                 window.requestAnimationFrame(() => document.getElementById('intake-save-errors')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
             },
-            onFinish: () => createForm.transform((data) => data),
+            onFinish: () => { preparingCreate.current = false; createForm.transform((data) => data); },
         });
     };
 

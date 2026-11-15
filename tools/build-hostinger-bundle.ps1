@@ -176,6 +176,7 @@ $privateDirs = @(
     'bootstrap',
     'config',
     'database',
+    'lang',
     'resources',
     'routes',
     'vendor'

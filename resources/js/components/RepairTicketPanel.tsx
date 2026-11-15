@@ -1,5 +1,6 @@
+import { prepareRepairImage, prepareRepairImages } from '../repairImageUpload';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     FaArrowRight,
     FaArchive,
@@ -913,16 +914,28 @@ function AddRepairModal({
         setImagePreviews(selected.map((file) => URL.createObjectURL(file)));
     };
 
-    const submit = (event: FormEvent<HTMLFormElement>): void => {
+    const preparingSubmit = useRef(false);
+    const submit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
         event.preventDefault();
         if (action === '' || !selectedFailure) return;
         if (isPhoneCategoryValue(serviceCategories, form.data.categorias_reparacion) && !form.data.marca.trim()) {
             form.setError('marca', 'Elegí una marca para el equipo.');
             return;
         }
+        if (preparingSubmit.current || form.processing) return;
+        preparingSubmit.current = true;
         form.clearErrors();
 
+        try {
+            const images = await prepareRepairImages(form.data.images);
+            form.transform((data) => ({ ...data, images }));
+        } catch (error) {
+            preparingSubmit.current = false;
+            form.setError('images', (error as Error).message);
+            return;
+        }
         form.post(action, {
+            onFinish: () => { preparingSubmit.current = false; form.transform((data) => data); },
             preserveScroll: true,
             forceFormData: true,
             onSuccess: () => {
@@ -1224,8 +1237,13 @@ function AddRepairModal({
 
 function MobileDevicePhotos({ repairs, readOnly }: { repairs: RepairOrderView[]; readOnly: boolean }): JSX.Element | null {
     const [selectedImage, setSelectedImage] = useState<RepairImageView | null>(null);
+    const [singlePhotoSize, setSinglePhotoSize] = useState<{ filename: string; width: number; height: number } | null>(null);
     const images = Array.from(new Map(repairs.flatMap((repair) => [...repair.imagenes, ...repair.imagenes_finales]).map((image) => [image.filename, image])).values());
     const modelLabel = displayRepairModel(repairs[0]);
+    const singlePhoto = images.length === 1;
+    const photoSize = singlePhotoSize?.filename === images[0]?.filename ? singlePhotoSize : null;
+    const rotatePhoto = singlePhoto && photoSize !== null && photoSize.height > photoSize.width;
+    const photoRatio = photoSize ? Math.max(photoSize.width, photoSize.height) / Math.min(photoSize.width, photoSize.height) : 4 / 3;
 
     if (images.length === 0) {
         return !readOnly && repairs[0].actions?.addOriginalImages
@@ -1244,9 +1262,18 @@ function MobileDevicePhotos({ repairs, readOnly }: { repairs: RepairOrderView[];
                     const removeAction = isOriginal ? owner?.actions?.removeOriginalImage : owner?.actions?.removeFinalImage;
 
                     return (
-                        <div key={image.filename} className="relative h-28 w-24 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white">
-                            <button type="button" className="block h-full w-full" onClick={() => setSelectedImage(image)} aria-label={`Ver foto de ${modelLabel}`}>
-                                <img src={image.thumbnailUrl || image.url} alt={modelLabel} className="h-full w-full object-contain" />
+                        <div key={image.filename} className={cn('relative shrink-0 overflow-hidden rounded-md border border-slate-200 bg-white', singlePhoto ? 'w-full' : 'h-28 w-24')} style={singlePhoto ? { aspectRatio: photoRatio } : undefined}>
+                            <button type="button" className="relative block h-full w-full" onClick={() => setSelectedImage(image)} aria-label={`Ver foto de ${modelLabel}`}>
+                                <img
+                                    src={singlePhoto ? image.url : image.thumbnailUrl || image.url}
+                                    alt={modelLabel}
+                                    className={cn('object-contain', rotatePhoto ? 'absolute left-1/2 top-1/2 max-w-none' : 'h-full w-full')}
+                                    style={rotatePhoto ? { width: `${100 / photoRatio}%`, height: `${100 * photoRatio}%`, transform: 'translate(-50%, -50%) rotate(90deg)' } : undefined}
+                                    onLoad={singlePhoto ? (event) => {
+                                        const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
+                                        if (width > 0 && height > 0) setSinglePhotoSize({ filename: image.filename, width, height });
+                                    } : undefined}
+                                />
                             </button>
                             {!readOnly && removeAction ? (
                                 <button
@@ -1276,24 +1303,35 @@ function MobileDevicePhotos({ repairs, readOnly }: { repairs: RepairOrderView[];
 
 function MobileModelPhotoCapture({ repair, modelLabel }: { repair: RepairOrderView; modelLabel: string }): JSX.Element {
     const mobilePhotoForm = useForm<{ images: File[] }>({ images: [] });
-    const captureMobilePhoto = (event: ChangeEvent<HTMLInputElement>): void => {
+    const [preparing, setPreparing] = useState(false);
+    const captureMobilePhoto = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
         const file = event.currentTarget.files?.[0];
         event.currentTarget.value = '';
-        if (!file || mobilePhotoForm.processing || !repair.actions?.addOriginalImages) return;
+        if (!file || preparing || mobilePhotoForm.processing || !repair.actions?.addOriginalImages) return;
 
-        mobilePhotoForm.transform(() => ({ images: [file] }));
+        setPreparing(true);
+        mobilePhotoForm.clearErrors();
+        let prepared: File;
+        try {
+            prepared = await prepareRepairImage(file);
+        } catch (error) {
+            mobilePhotoForm.setError('images', (error as Error).message);
+            setPreparing(false);
+            return;
+        }
+        mobilePhotoForm.transform(() => ({ images: [prepared] }));
         mobilePhotoForm.post(repair.actions.addOriginalImages, {
             preserveScroll: true,
             forceFormData: true,
-            onFinish: () => mobilePhotoForm.transform((data) => data),
+            onFinish: () => { setPreparing(false); mobilePhotoForm.transform((data) => data); },
         });
     };
     return (
         <div className="mt-2 grid gap-1.5">
-        <label className={buttonClass('primary', 'sm', cn('min-h-11 w-full cursor-pointer', mobilePhotoForm.processing && 'pointer-events-none opacity-60'))}>
+        <label className={buttonClass('primary', 'sm', cn('min-h-11 w-full cursor-pointer', (preparing || mobilePhotoForm.processing) && 'pointer-events-none opacity-60'))}>
             <FaCamera aria-hidden="true" />
-            {mobilePhotoForm.processing ? 'Guardando foto...' : 'Sacar foto'}
-            <input className="sr-only" type="file" accept="image/*" capture="environment" aria-label={`Sacar foto de ${modelLabel}`} disabled={mobilePhotoForm.processing} onChange={captureMobilePhoto} />
+            {preparing || mobilePhotoForm.processing ? 'Guardando foto...' : 'Sacar foto'}
+            <input className="sr-only" type="file" accept="image/*" capture="environment" aria-label={`Sacar foto de ${modelLabel}`} disabled={preparing || mobilePhotoForm.processing} onChange={captureMobilePhoto} />
         </label>
         {Object.values(mobilePhotoForm.errors).length > 0 ? (
             <p role="alert" className="text-xs font-semibold text-[#be123c]">{Object.values(mobilePhotoForm.errors).join(' ')}</p>
@@ -1499,15 +1537,25 @@ function RepairEditCard({
         setPartSearch('');
     };
 
-    const postEdit = (overrideMonto?: number): void => {
+    const preparingEdit = useRef(false);
+    const postEdit = async (overrideMonto?: number): Promise<void> => {
         if (!repair.actions?.update) return;
 
-        form.transform((data) => overrideMonto === undefined
-            ? data
-            : ({
-                ...data,
-                monto: formatAmountInput(overrideMonto),
-            }));
+        if (preparingEdit.current || form.processing) return;
+        preparingEdit.current = true;
+        let images: File[] | null;
+        let finalImages: File[] | null;
+        try {
+            images = await prepareRepairImages(form.data.images);
+            finalImages = await prepareRepairImages(form.data.final_images);
+        } catch (error) {
+            preparingEdit.current = false;
+            form.setError('images', (error as Error).message);
+            return;
+        }
+        form.transform((data) => ({ ...data, images, final_images: finalImages,
+            monto: overrideMonto === undefined ? data.monto : formatAmountInput(overrideMonto),
+        }));
 
         form.post(repair.actions.update, {
             preserveScroll: true,
@@ -1523,6 +1571,7 @@ function RepairEditCard({
                 setInlineOpen(false);
             },
             onFinish: () => {
+                preparingEdit.current = false;
                 form.transform((data) => data);
             },
         });
