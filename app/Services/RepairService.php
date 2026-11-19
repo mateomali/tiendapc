@@ -129,6 +129,26 @@ class RepairService
         return $this->baseQuery(true, $filters)->get();
     }
 
+    public function deliveredPage(array $filters, int $perPage): array
+    {
+        $this->archiveStaleOrders();
+        $query = $this->baseQuery(true, $filters);
+        $direction = strtolower((string) ($filters['orden'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+        $aggregate = $direction === 'asc' ? 'MIN' : 'MAX';
+        $tickets = (clone $query)->reorder()->select('id')
+            ->selectRaw($aggregate . '(fecha_entregado) as delivered_date')->groupBy('id');
+        $total = DB::query()->fromSub((clone $tickets)->toBase(), 'delivered_tickets')->count();
+        $totalPages = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, (int) ($filters['page'] ?? 1)), $totalPages);
+        $ids = $tickets->orderByRaw('delivered_date IS NULL')->orderBy('delivered_date', $direction)
+            ->orderBy('id', $direction)->forPage($page, $perPage)->pluck('id');
+        $orders = (clone $query)->whereIn('id', $ids)->get();
+        $positions = $ids->flip();
+        $orders = $orders->sortBy(fn (RepairOrder $order): int => (int) $positions->get($order->id))->values();
+
+        return ['orders' => $orders, 'pagination' => compact('page', 'perPage', 'total', 'totalPages')];
+    }
+
     public function archivedOrders(array $filters = []): Collection
     {
         $this->archiveStaleOrders();
@@ -723,7 +743,7 @@ class RepairService
         }
 
         return DB::transaction(function () use ($order, $payload): RepairOrder {
-            $order = RepairOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $order = RepairOrder::query()->whereKey($order->getKey())->where('reparacion', $order->reparacion)->lockForUpdate()->firstOrFail();
             $repair = $this->addRepair($order, [
                 'marca' => $order->marca,
                 'modelo' => $order->modelo,
@@ -810,7 +830,7 @@ class RepairService
         }
 
         return DB::transaction(function () use ($order, $date, $via, $detail, $cashPayment): RepairOrder {
-            $locked = RepairOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $locked = RepairOrder::query()->whereKey($order->getKey())->where('reparacion', $order->reparacion)->lockForUpdate()->firstOrFail();
             $order->setRawAttributes($locked->getAttributes(), true);
             if ($order->entregado === 'si') {
                 return $order;
@@ -856,6 +876,7 @@ class RepairService
 
             $order->update($updates);
 
+            $this->syncTaskQueueForState($order, (string) $order->estado);
             $this->recordEvent($order, 'ENTREGADA', $previousState, $order->estado);
 
             if ($via !== null && trim($via) !== '') {
@@ -869,7 +890,7 @@ class RepairService
     public function updateDeliveryPayment(RepairOrder $order, bool $cashPayment): RepairOrder
     {
         return DB::transaction(function () use ($order, $cashPayment): RepairOrder {
-            $locked = RepairOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $locked = RepairOrder::query()->whereKey($order->getKey())->where('reparacion', $order->reparacion)->lockForUpdate()->firstOrFail();
             $order->setRawAttributes($locked->getAttributes(), true);
             if ($order->entregado !== 'si') {
                 return $order;
@@ -1044,12 +1065,18 @@ class RepairService
             $this->deleteImage($image);
         }
 
-        RepairPayment::query()
-            ->where('orden_id', $order->id)
-            ->where('reparacion', $order->reparacion)
-            ->delete();
+        DB::transaction(function () use ($order): void {
+            RepairEvent::query()->where('orden_id', $order->id)->where('reparacion', $order->reparacion)->delete();
+            if (Schema::hasTable('repair_task_items') && $order->registro_id !== null) {
+                RepairTaskItem::query()->where('repair_order_registro_id', $order->registro_id)->delete();
+            }
+            RepairPayment::query()
+                ->where('orden_id', $order->id)
+                ->where('reparacion', $order->reparacion)
+                ->delete();
 
-        $order->delete();
+            $order->delete();
+        });
     }
 
     public function addPayment(RepairOrder $order, array $payload): RepairOrder

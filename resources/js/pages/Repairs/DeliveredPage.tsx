@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { Fragment, useState } from 'react';
-import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass } from '../../components/RepairTicketPanel';
+import { RepairDesktopRow, RepairTicketPanel, repairDesktopTableGridClass, repairDeliveredTableGridClass } from '../../components/RepairTicketPanel';
 import { RepairLayout } from '../../layouts/RepairLayout';
 import { groupTicketsByDate, type TicketDateGroup } from '../../repairDateGroups';
 import type { RepairTicketView } from '../../types';
@@ -73,18 +73,19 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
         form.get(route(indexRoute), {
             preserveScroll: true,
             preserveState: true,
+            onFinish: () => form.transform((data) => data),
         });
     };
     const paginationBlock = (
         <div className={ui.pagination}>
             <span>
-                Mostrando {visibleRepairs} reparacion{visibleRepairs === 1 ? '' : 'es'} en {tickets.length} ticket{tickets.length === 1 ? '' : 's'}. Pagina {pagination.page} de {pagination.totalPages}. Total {listLabel}: {pagination.total}.
+                {pagination.total} {pagination.total === 1 ? 'orden' : 'órdenes'} · {visibleRepairs} {visibleRepairs === 1 ? 'trabajo' : 'trabajos'} en esta página · Página {pagination.page} de {pagination.totalPages}
             </span>
             <div className={ui.inlineActions}>
-                <button type="button" className={buttonClass('soft', 'sm')} disabled={pagination.page <= 1} onClick={() => goToPage(Math.max(1, pagination.page - 1))}>
+                <button type="button" className={buttonClass('soft', 'sm')} disabled={form.processing || pagination.page <= 1} onClick={() => goToPage(Math.max(1, pagination.page - 1))}>
                     Anterior
                 </button>
-                <button type="button" className={buttonClass('soft', 'sm')} disabled={pagination.page >= pagination.totalPages} onClick={() => goToPage(Math.min(pagination.totalPages, pagination.page + 1))}>
+                <button type="button" className={buttonClass('soft', 'sm')} disabled={form.processing || pagination.page >= pagination.totalPages} onClick={() => goToPage(Math.min(pagination.totalPages, pagination.page + 1))}>
                     Siguiente
                 </button>
             </div>
@@ -93,47 +94,27 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
 
     return (
         <RepairLayout title={pageTitle}>
-            <section className={cn(ui.statsGrid, 'grid-cols-2')}>
-                <article className={ui.statCard}>
-                    <p className={ui.statLabel}>Entregadas</p>
-                    <p className={ui.statValue}>{summary.delivered}</p>
-                </article>
-                <article className={ui.statCard}>
-                    <p className={ui.statLabel}>Archivadas</p>
-                    <p className={ui.statValue}>{summary.archived}</p>
-                </article>
-                <article className={ui.statCard}>
-                    <p className={ui.statLabel}>Activas</p>
-                    <p className={ui.statValue}>{summary.active}</p>
-                </article>
-                <article className={ui.statCard}>
-                    <p className={ui.statLabel}>Espera repuesto</p>
-                    <p className={ui.statValue}>{summary.waitingParts}</p>
-                </article>
-                <article className={ui.statCard}>
-                    <p className={ui.statLabel}>Lista</p>
-                    <p className={ui.statValue}>{summary.ready}</p>
-                </article>
+            <section className="flex flex-wrap gap-x-6 gap-y-2 border-b border-slate-200 pb-3 text-sm text-slate-600" aria-label="Resumen de reparaciones">
+                <span>Entregadas <strong className="ml-1 text-slate-900">{summary.delivered}</strong></span>
+                <span>Archivadas <strong className="ml-1 text-slate-900">{summary.archived}</strong></span>
+                <span>Activas <strong className="ml-1 text-slate-900">{summary.active}</strong></span>
+                <span>Listas <strong className="ml-1 text-slate-900">{summary.ready}</strong></span>
             </section>
 
             <section className={ui.repairGridSingle}>
                 <form
-                    className={ui.repairCard}
+                    className="grid gap-3 rounded-md border border-slate-200 bg-white p-4"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        form.setData('page', 1);
-                        form.get(route(indexRoute));
+                        goToPage(1);
                     }}
                 >
-                    <div className={ui.repairCardHeading}>
-                        <div className={ui.cardTitleWrap}>
-                            <p className={ui.eyebrow}>Detalle</p>
-                            <h2 className={ui.cardTitle}>Filtrar {listLabel}</h2>
-                        </div>
-                    </div>
-                    <div className="grid gap-3 lg:grid-cols-[minmax(320px,1fr)_220px_220px_auto] lg:items-center [&>*]:min-w-0">
-                        <input className={cn(ui.repairDenseInput, 'h-11 text-base lg:h-10 lg:text-sm')} placeholder="Buscar por ticket, cliente, modelo, descripcion o DNI" value={form.data.q} onChange={(event) => form.setData('q', event.target.value)} />
-                        <select className={cn(ui.repairDenseInput, 'h-11 text-base lg:h-10 lg:text-sm')} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_170px_210px_auto] xl:items-end [&>*]:min-w-0">
+                        <label className="grid gap-1 text-xs font-semibold text-slate-600">Buscar orden o teléfono
+                        <input className={cn(ui.repairDenseInput, 'h-10 text-sm')} placeholder="Orden, cliente, modelo o DNI" value={form.data.q} onChange={(event) => form.setData('q', event.target.value)} />
+                        </label>
+                        <label className="grid gap-1 text-xs font-semibold text-slate-600">Estado
+                        <select className={cn(ui.repairDenseInput, 'h-10 text-sm')} value={form.data.estado} onChange={(event) => form.setData('estado', event.target.value)}>
                             <option value="">Todos los estados</option>
                             {states.map((state) => (
                                 <option key={state} value={state}>
@@ -141,13 +122,23 @@ export default function DeliveredPage({ filters, tickets, summary, states, pagin
                                 </option>
                             ))}
                         </select>
-                        <select className={cn(ui.repairDenseInput, 'h-11 text-base lg:h-10 lg:text-sm')} value={form.data.orden} onChange={(event) => form.setData('orden', event.target.value)}>
-                            <option value="desc">Detalle: {isArchived ? 'archivo' : 'entrega'} mas reciente</option>
-                            <option value="asc">Detalle: {isArchived ? 'archivo' : 'entrega'} mas antigua</option>
+                        </label>
+                        <label className="grid gap-1 text-xs font-semibold text-slate-600">Ordenar por retiro
+                        <select className={cn(ui.repairDenseInput, 'h-10 text-sm')} value={form.data.orden} onChange={(event) => form.setData('orden', event.target.value)}>
+                            <option value="desc">{isArchived ? 'Archivo' : 'Retiro'} más reciente</option>
+                            <option value="asc">{isArchived ? 'Archivo' : 'Retiro'} más antiguo</option>
                         </select>
-                        <button className={cn(buttonClass('primary', 'default'), 'h-11 lg:h-10 lg:min-w-[132px]')} type="submit">
+                        </label>
+                        <div className="flex items-center gap-2">
+                        <button disabled={form.processing} className={cn(buttonClass('primary', 'default'), 'h-10')} type="submit">
                             Buscar
                         </button>
+                        <button type="button" className={cn(buttonClass('soft', 'sm'), 'h-10')} disabled={form.processing} onClick={() => {
+                            form.setData({ q: '', estado: '', orden: 'desc', page: 1 });
+                            form.transform(() => ({ q: '', estado: '', orden: 'desc', page: 1 }));
+                            form.get(route(indexRoute), { preserveState: true, onFinish: () => form.transform((data) => data) });
+                        }}>Limpiar</button>
+                        </div>
                     </div>
                 </form>
 
@@ -255,27 +246,26 @@ function DeliveredTicketList({
 
     return (
         <>
-            <div className="hidden overflow-x-auto rounded-[16px] border border-[#dbe7f6] bg-white shadow-[0_14px_32px_rgba(15,23,42,0.09)] ring-1 ring-white/70 xl:block">
+            <div className="hidden overflow-x-auto rounded-md border border-slate-200 bg-white xl:block">
                 <div className="w-full min-w-0">
-                    <div className={cn('grid w-full items-stretch divide-x divide-emerald-300/45 bg-[linear-gradient(180deg,#047857,#065f46)] text-[0.62rem] font-extrabold uppercase tracking-[0.015em] text-white [&>*]:min-w-0 [&>*]:px-2 [&>*]:py-2', repairDesktopTableGridClass)}>
+                    <div className={cn('grid w-full items-stretch border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 [&>*]:min-w-0 [&>*]:px-2.5 [&>*]:py-3', archived ? repairDesktopTableGridClass : repairDeliveredTableGridClass)}>
                         <span className="text-center">ID</span>
                         <span>Cliente</span>
-                        <span>DNI</span>
-                        <span>Contacto</span>
+                        {archived ? <><span>DNI</span><span>Contacto</span></> : null}
                         <span>Ingreso</span>
-                        <span className="text-center">Imagen</span>
+                        {archived ? <span className="text-center">Imagen</span> : null}
                         <span>Modelo</span>
                         <span>Falla</span>
-                        <span>Estimada</span>
-                        <span>Saldo</span>
-                        <span className="text-center">Estado</span>
-                        <span className="text-center">Detalle</span>
+                        {archived ? <span>Estimada</span> : null}
+                        <span>{archived ? 'Saldo' : 'Pago'}</span>
+                        <span className="text-center">{archived ? 'Estado' : 'Retiro'}</span>
+                        <span className="text-center">Acciones</span>
                     </div>
                     <div className="grid bg-white">
                         {tickets.length > 0 ? (
                             ticketDateGroups.map((group) => (
                                 <Fragment key={`delivered-desktop-group-${group.key}`}>
-                                    <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-l-4 border-b-[#0f2f63] border-l-[#38bdf8] bg-[#123f91] px-3 py-2 text-xs font-black text-white">
+                                    <div className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600">
                                         <span>{group.label}</span>
                                         <span>
                                             {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}
@@ -311,7 +301,7 @@ function DeliveredTicketList({
             <div className="grid gap-3 xl:hidden [&>*]:min-w-0">
                 {ticketDateGroups.map((group) => (
                     <Fragment key={`delivered-mobile-group-${group.key}`}>
-                        <div className="flex items-center justify-between gap-2 rounded-lg border border-[#123f91] bg-[#123f91] px-3 py-2 text-sm font-black text-white">
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-1 py-2 text-sm font-semibold text-slate-600">
                             <span>{group.label}</span>
                             <span>
                                 {group.repairCount} reparacion{group.repairCount === 1 ? '' : 'es'}
@@ -328,7 +318,7 @@ function DeliveredTicketList({
                         ))}
                     </Fragment>
                 ))}
-                {tickets.length === 0 ? <div className="rounded-lg border border-white/70 bg-white/90 p-6 text-center font-semibold text-[#475569] shadow-sm">{emptyLabel}</div> : null}
+                {tickets.length === 0 ? <div className="rounded-md border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">{emptyLabel}</div> : null}
             </div>
         </>
     );

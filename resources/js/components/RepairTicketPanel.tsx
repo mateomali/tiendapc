@@ -65,6 +65,9 @@ interface ServiceTemplateOption {
 export const repairDesktopTableGridClass =
     'grid-cols-[6.8rem_7.6rem_4.6rem_5.6rem_5.2rem_4.1rem_minmax(9.9rem,1.03fr)_minmax(9rem,0.92fr)_6rem_4.6rem_6rem_minmax(12.4rem,0.82fr)]';
 
+export const repairDeliveredTableGridClass =
+    'grid-cols-[6.8rem_minmax(8rem,1fr)_5.5rem_minmax(8rem,1fr)_minmax(10rem,1.3fr)_5.5rem_7rem_12rem]';
+
 interface RepairTicketPanelProps {
     ticket: RepairTicketView;
     serviceCategories: ServiceCategoryOption[];
@@ -1424,6 +1427,8 @@ function RepairEditCard({
     const [quickOpen, setQuickOpen] = useState(false);
     const [inlineOpen, setInlineOpen] = useState(false);
     const [deliveryOpen, setDeliveryOpen] = useState(false);
+    const [deliveryErrors, setDeliveryErrors] = useState<Record<string, string>>({});
+    const [deliveryProcessing, setDeliveryProcessing] = useState(false);
     const [deliveryVia, setDeliveryVia] = useState<DeliveryVia>('dni');
     const [deliveryDetail, setDeliveryDetail] = useState('');
     const [deliveryCashPayment, setDeliveryCashPayment] = useState(true);
@@ -1436,6 +1441,12 @@ function RepairEditCard({
     const [warrantyOpen, setWarrantyOpen] = useState(false);
     const [reentryOpen, setReentryOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [deletingHistory, setDeletingHistory] = useState<string | null>(null);
+    const deleteHistoryRecord = (action: string, message: string): void => {
+        if (deletingHistory || !window.confirm(message)) return;
+        setDeletingHistory(action);
+        router.post(action, {}, { preserveScroll: true, preserveState: true, onFinish: () => setDeletingHistory(null) });
+    };
     const reentryForm = useForm({ descripcion: '', monto: formatAmountInput(repair.monto) });
     const openReentry = (): void => {
         reentryForm.reset();
@@ -1451,7 +1462,7 @@ function RepairEditCard({
     const monto = Number(repair.monto ?? 0);
     const senia = Number(repair.senia ?? 0);
     const seniaLabel = seniaBadgeLabel(monto, senia);
-    const canDeliver = ['LISTA', 'CANCELADA'].includes(repair.estado) && repair.entregado !== 'si';
+    const canDeliver = repair.entregado !== 'si' && Boolean(repair.actions?.deliver);
     const repairIsFullyPaid = repair.isFullyPaid ?? (monto > 0 && senia >= monto);
     const ticketIsFullyPaid = Number(ticket.totalMonto ?? 0) > 0 && Number(ticket.totalSenia ?? 0) >= Number(ticket.totalMonto ?? 0);
     const canDeliverAll = canDeliver && ticket.repairs.filter((item) => item.entregado !== 'si').length > 1;
@@ -1469,7 +1480,6 @@ function RepairEditCard({
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA'].includes(repair.estado);
-    const canDeliverDirectly = !readOnly && canMarkReady && repair.entregado !== 'si' && Boolean(repair.actions?.deliver);
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA', 'LISTA'].includes(repair.estado);
     const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
@@ -1725,6 +1735,8 @@ function RepairEditCard({
     };
 
     const openDeliveryModal = (): void => {
+        setDeliveryErrors({});
+        setDeliveryArchive(false);
         form.setData('fecha_entregado', repair.fecha_entregado || form.data.fecha_entregado || todayInputValue());
         setDeliveryCashPayment(repair.deliveryPaymentMode !== 'regular');
         setDeliveryAll(false);
@@ -1892,7 +1904,9 @@ function RepairEditCard({
 
     const deliverRepair = (event: FormEvent<HTMLFormElement>): void => {
         event.preventDefault();
-        if (!repair.actions?.deliver) return;
+        if (!repair.actions?.deliver || deliveryProcessing) return;
+        setDeliveryErrors({});
+        setDeliveryProcessing(true);
 
         router.post(
             repair.actions.deliver,
@@ -1910,6 +1924,8 @@ function RepairEditCard({
                 },
             {
                 preserveScroll: true,
+                onError: (errors) => setDeliveryErrors(errors),
+                onFinish: () => setDeliveryProcessing(false),
                 onSuccess: () => {
                     setDeliveryOpen(false);
                     setDeliveryDetail('');
@@ -2284,13 +2300,6 @@ function RepairEditCard({
                     <FaReceipt aria-hidden="true" /> Historial del teléfono
                 </button>,
             );
-            if (canDeliverDirectly) {
-                secondaryItems.push(
-                    <button key="deliver" type="button" className={menuItem} onClick={openDeliveryModal}>
-                        <FaDollyFlatbed aria-hidden="true" /> Entregar
-                    </button>,
-                );
-            }
             if (!hasInfo && canShowInfoAction) {
                 secondaryItems.push(
                     <button key="add-info" type="button" className={menuItem} onClick={() => setInfoOpen(true)}>
@@ -2466,7 +2475,7 @@ function RepairEditCard({
                                 <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
                             </button>
                         ) : null}
-                        {canDeliver || canDeliverDirectly ? (
+                        {canDeliver ? (
                             <button type="button" className={cn(base, 'border border-[#f59e0b] bg-[#f59e0b] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
                                 <FaDollyFlatbed aria-hidden="true" />{iconOnly ? null : 'Entregar'}
                             </button>
@@ -2581,16 +2590,24 @@ function RepairEditCard({
                     <div className="grid gap-3">
                         {(ticket.historyRepairs ?? ticket.repairs).filter((item) => normalizeRepairText(item.modelo ?? '') === normalizeRepairText(repair.modelo ?? '') && normalizeRepairText(item.marca ?? '') === normalizeRepairText(repair.marca ?? '')).map((item) => (
                             <section key={item.registro_id} className="grid gap-2 rounded-md border border-[#e2e8f0] p-3 text-sm">
-                                <strong>Trabajo #{item.reparacion} · {item.estado}{item.entregado === 'si' ? ' · Retirado' : ''}</strong>
+                                <div className="flex items-start justify-between gap-3">
+                                    <strong>Trabajo #{item.reparacion}</strong>
+                                    {readOnly && item.actions?.delete ? (
+                                        <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50" disabled={Boolean(deletingHistory)} title="Eliminar trabajo completo" aria-label={`Eliminar trabajo completo #${item.reparacion}`} onClick={() => deleteHistoryRecord(item.actions!.delete, `Eliminar el trabajo #${item.reparacion} completo, con todos sus movimientos, pagos e imágenes? Los otros trabajos de la orden se conservan.`)}>
+                                            <FaTimes aria-hidden="true" />
+                                        </button>
+                                    ) : null}
+                                </div>
                                 <p className="whitespace-pre-wrap">{item.descripcion}</p>
-                                <p>Ingreso: {formatLegacyDate(item.fecha)} · Retiro: {item.fecha_entregado ? formatLegacyDate(item.fecha_entregado) : 'Pendiente'}</p>
-                                <p>Importe: {formatCurrency(item.monto)} · Pagado: {formatCurrency(item.senia)}</p>
-                                {item.events?.map((event) => (
-                                    <div key={event.id} className="border-t border-[#e2e8f0] pt-2 text-xs text-[#475569]">
-                                        <span>{event.created_at} · {event.evento === 'NUEVO_TRABAJO_REINGRESO' ? 'Reingreso como nuevo trabajo' : event.evento === 'GARANTIA_REINGRESO' ? 'Reingreso por garantía' : event.estado_nuevo === 'LISTA' ? 'Reparación lista' : event.evento}</span>
-                                        {event.detalle ? <p>{event.detalle}</p> : null}
-                                    </div>
-                                ))}
+                                <dl className="grid grid-cols-1 gap-x-6 gap-y-2 border-t border-slate-200 pt-3 sm:grid-cols-2 [&>div]:flex [&>div]:items-baseline [&>div]:justify-between [&>div]:gap-3 [&_dt]:text-slate-600 [&_dd]:text-right [&_dd]:font-semibold">
+                                    <div><dt>Fecha de ingreso</dt><dd>{item.fecha ? formatLegacyDate(item.fecha) : 'Sin registro'}</dd></div>
+                                    <div><dt>Fecha listo</dt><dd>{item.fecha_listo_historial ? formatLegacyDate(item.fecha_listo_historial) : 'Sin registro'}</dd></div>
+                                    <div><dt>Fecha de entrega</dt><dd>{item.fecha_entregado ? formatLegacyDate(item.fecha_entregado) : 'Pendiente'}</dd></div>
+                                    <div><dt>Total de la reparación</dt><dd>{formatCurrency(item.monto)}</dd></div>
+                                    <div><dt>Seña previa</dt><dd>{item.historyPaymentSummary?.deposit == null ? 'Sin registro' : item.historyPaymentSummary.deposit > 0 ? `Sí · ${formatCurrency(item.historyPaymentSummary.deposit)}` : 'Sin seña'}</dd></div>
+                                    <div><dt>Abonado al entregar</dt><dd>{item.historyPaymentSummary?.paidOnDelivery == null ? (item.entregado === 'si' ? 'Sin registro' : 'Pendiente') : formatCurrency(item.historyPaymentSummary.paidOnDelivery)}</dd></div>
+                                    <div className="border-t border-slate-200 pt-2 sm:col-span-2"><dt>Total abonado</dt><dd>{formatCurrency(item.historyPaymentSummary?.totalPaid ?? item.senia)}</dd></div>
+                                </dl>
                             </section>
                         ))}
                     </div>
@@ -3119,6 +3136,7 @@ function RepairEditCard({
             {deliveryOpen ? (
                 <ModalShell title={`${repair.entregado === 'si' ? 'Cambiar pago' : 'Entregar'} orden #${repair.id} trabajo #${repair.reparacion}`} onClose={() => setDeliveryOpen(false)}>
                     <form className="grid gap-3" onSubmit={deliverRepair}>
+                        {Object.keys(deliveryErrors).length > 0 ? <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{Object.entries(deliveryErrors).map(([field, message]) => <p key={field}>{message}</p>)}</div> : null}
                         {repair.entregado !== 'si' ? (
                             <>
                                 <input className={ui.input} type="date" value={form.data.fecha_entregado} onChange={(event) => form.setData('fecha_entregado', event.target.value)} />
@@ -3176,7 +3194,7 @@ function RepairEditCard({
                         ) : null}
                         <div className="flex flex-wrap justify-end gap-2">
                             <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setDeliveryOpen(false)}>Cancelar</button>
-                            <button type="submit" className={buttonClass('primary', 'sm')}>{repair.entregado === 'si' ? 'Guardar pago' : deliveryArchive ? 'Enviar a archivados' : 'Confirmar entrega'}</button>
+                            <button type="submit" disabled={deliveryProcessing} className={buttonClass('primary', 'sm')}>{deliveryProcessing ? 'Guardando…' : repair.entregado === 'si' ? 'Guardar pago' : deliveryArchive ? 'Enviar a archivados' : 'Confirmar entrega'}</button>
                         </div>
                     </form>
                 </ModalShell>
@@ -3217,7 +3235,7 @@ function RepairEditCard({
     if (variant === 'desktop') {
         return (
             <>
-                <div className={cn('group/repair-row grid min-h-[72px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.78rem] leading-snug transition hover:bg-[#f4f8fe] focus-within:bg-[#f4f8fe] [&>*]:min-w-0 [&>*]:px-2.5 [&>*]:py-2.5', repairDesktopTableGridClass, isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), hasRepeatedModelInTicket && desktopSameModelAccentClass(repairDisplayModelKey), showSameModelContinuity && sameModelAdjacency.next && 'border-b-transparent', showSameModelContinuity && sameModelAdjacency.previous && 'shadow-[inset_0_1px_0_#f8fafc]', isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
+                <div className={cn('group/repair-row grid min-h-[72px] w-full items-stretch divide-x divide-slate-200 border-b border-l-4 border-slate-200 bg-white text-[0.78rem] leading-snug transition hover:bg-[#f4f8fe] focus-within:bg-[#f4f8fe] [&>*]:min-w-0 [&>*]:px-2.5 [&>*]:py-2.5', readOnly ? repairDeliveredTableGridClass : repairDesktopTableGridClass, readOnly && '[&>:nth-child(3)]:hidden [&>:nth-child(4)]:hidden [&>:nth-child(6)]:hidden [&>:nth-child(9)]:hidden', isGroupedDesktopRow && 'border-r-2 border-r-[#cbd5e1]', isFirstGroupedDesktopRow && 'border-t-2 border-t-[#cbd5e1]', isLastGroupedDesktopRow && 'border-b-2 border-b-[#cbd5e1]', isGroupedDesktopRow && desktopGroupedRepairClass(rowIndex), hasRepeatedModelInTicket && desktopSameModelAccentClass(repairDisplayModelKey), showSameModelContinuity && sameModelAdjacency.next && 'border-b-transparent', showSameModelContinuity && sameModelAdjacency.previous && 'shadow-[inset_0_1px_0_#f8fafc]', isOverdue(repair) && 'bg-[#fff8f8]', isToday(repair.fecha_estimada) && 'bg-[#fffbeb]')}>
                     <div className="sticky left-0 z-[2] grid grid-cols-[minmax(0,1fr)_2.6rem] items-center gap-1 bg-inherit text-center shadow-[1px_0_0_#cbd5e1]">
                         {showDesktopTicketData ? (
                             <button type="button" className="text-base font-black leading-none text-[#0f172a]" onClick={() => { if (rowTotal > 1 && onToggleDesktopGroup) { if (!desktopGroupExpanded) onToggleDesktopGroup(); } else openQuickView(); }}>#<HighlightText value={repair.id} term={highlightTerm} /></button>
@@ -3266,6 +3284,9 @@ function RepairEditCard({
                         <SeniaBadge label={seniaLabel} />
                     </button>
                     <div className={cn('relative flex flex-col items-center justify-center gap-1 pl-2 before:absolute before:bottom-2 before:left-0 before:top-2 before:w-1 before:rounded-full', repairStatusRailFillClass(repair.estado))}>
+                        {readOnly ? (
+                            <><span className="text-center text-xs font-semibold text-slate-700">{formatLegacyDate(repair.fecha_entregado)}</span><span className="text-center text-[0.65rem] text-slate-500">{deliveredDetailLabel(repair.fecha_entregado)}</span></>
+                        ) : <>
                         <button
                             type="button"
                             className={cn('inline-flex min-w-[5.8rem] items-center justify-center gap-1.5 rounded-md px-2 py-1 text-[0.64rem] font-black uppercase leading-none', repairStatusBadgeClass(repair.estado), !readOnly && canCycleStatus && 'hover:brightness-95', (readOnly || !canCycleStatus) && 'cursor-default')}
@@ -3277,12 +3298,18 @@ function RepairEditCard({
                             <HighlightText value={compactStatusLabel(displayStatus)} term={highlightTerm} />
                         </button>
                         {repair.estado === 'LISTA' ? <span className="text-center text-[0.65rem] font-semibold text-[#475569]">Listo desde: {repair.listo_desde ? formatLegacyDate(repair.listo_desde) : 'sin registro'}</span> : null}
+                        </>}
                     </div>
                     <div className="flex items-center justify-end">
                         {readOnly ? (
-                            <div className="grid justify-items-end gap-1 text-right">
-                                <span className="text-[0.7rem] font-black text-[#0f172a]">{deliveredDetailLabel(repair.fecha_entregado)}</span>
-                                <span className="text-[0.66rem] font-bold text-[#475569]">{formatLegacyDate(repair.fecha_entregado)}</span>
+                            <div className="flex flex-wrap justify-end gap-1">
+                                {repair.entregado === 'si' && repair.actions?.reenter ? (
+                                    <button type="button" className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={openReentry} title="Reingresar como nuevo trabajo">Nuevo trabajo</button>
+                                ) : null}
+                                <button type="button" className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setHistoryOpen(true)}>Historial del teléfono</button>
+                                <details className="relative">
+                                    <summary className="cursor-pointer rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700">Más acciones</summary>
+                                    <div className="mt-1 grid w-44 gap-1 rounded-md border border-slate-200 bg-white p-2">
                                 {hasInfo ? (
                                     <button type="button" className="rounded-md border border-[#99f6e4] bg-[#f0fdfa] px-2 py-1 text-[0.66rem] font-black uppercase text-[#0f766e] transition hover:bg-[#ccfbf1]" onClick={() => setInfoOpen(true)}>
                                         Ver info
@@ -3290,13 +3317,9 @@ function RepairEditCard({
                                 ) : null}
                                 {repair.actions?.deliver ? (
                                     <button type="button" className="rounded-md border border-[#bfdbfe] bg-white px-2 py-1 text-[0.66rem] font-black uppercase text-[#1d4ed8] transition hover:bg-[#eff6ff]" onClick={openDeliveryModal}>
-                                        {archived ? 'Entregar' : 'Cambiar'}
+                                        {archived ? 'Entregar' : 'Cambiar pago'}
                                     </button>
                                 ) : null}
-                                {repair.entregado === 'si' && repair.actions?.reenter ? (
-                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={openReentry}>Reingresar como nuevo trabajo</button>
-                                ) : null}
-                                <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setHistoryOpen(true)}>Historial del teléfono</button>
                                 {repair.actions?.moveBack ? (
                                     <button type="button" className="rounded-md border border-[#f59e0b] bg-[#fff7ed] px-2 py-1 text-[0.66rem] font-black uppercase text-[#92400e] transition hover:bg-[#ffedd5]" onClick={moveBackToConsultas}>
                                         Garantia
@@ -3322,6 +3345,8 @@ function RepairEditCard({
                                         Eliminar
                                     </button>
                                 ) : null}
+                                    </div>
+                                </details>
                             </div>
                         ) : null}
                         {!readOnly && !inlineOpen ? <ActionButtons showGeneralTicketActions={rowIndex === 0} /> : null}

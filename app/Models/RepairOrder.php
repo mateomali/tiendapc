@@ -170,6 +170,17 @@ class RepairOrder extends Model
         return array_values(array_filter(array_map('trim', explode('|', $value))));
     }
 
+    protected function setKeysForSelectQuery($query): Builder
+    {
+        if ($this->usesLegacyPrimaryKey()) {
+            return $query
+                ->where('id', $this->getOriginal('id', $this->id))
+                ->where('reparacion', $this->getOriginal('reparacion', $this->reparacion));
+        }
+
+        return parent::setKeysForSelectQuery($query);
+    }
+
     protected function setKeysForSaveQuery($query): Builder
     {
         if ($this->usesLegacyPrimaryKey()) {

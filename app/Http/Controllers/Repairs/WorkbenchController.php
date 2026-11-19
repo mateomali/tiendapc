@@ -215,11 +215,8 @@ class WorkbenchController extends Controller
         ]);
         $filters['q_fields'] = $this->normalizeSearchFields($filters['q_fields'] ?? null);
 
-        $orders = $repairService->deliveredOrders($filters);
-        $allTickets = collect($this->groupTickets($orders, true));
-        $page = max(1, (int) ($filters['page'] ?? 1));
-        $perPage = $this->repairOrdersPerPage();
-        $tickets = $allTickets->forPage($page, $perPage)->values()->all();
+        $result = $repairService->deliveredPage($filters, $this->repairOrdersPerPage());
+        $tickets = $this->groupTickets($result['orders'], true);
 
         return Inertia::render('Repairs/DeliveredPage', [
             'filters' => $filters,
@@ -230,12 +227,7 @@ class WorkbenchController extends Controller
             'pageKind' => 'delivered',
             'pageTitle' => 'Entregados',
             'indexRoute' => 'repairs.delivered',
-            'pagination' => [
-                'page' => $page,
-                'perPage' => $perPage,
-                'total' => $allTickets->count(),
-                'totalPages' => max(1, (int) ceil(max(1, $allTickets->count()) / $perPage)),
-            ],
+            'pagination' => $result['pagination'],
         ]);
     }
 
@@ -1091,6 +1083,15 @@ class WorkbenchController extends Controller
         return back()->with('success', 'Seña actualizada.');
     }
 
+    public function deleteHistoryEvent(RepairOrder $repairOrder, RepairEvent $repairEvent): RedirectResponse
+    {
+        abort_unless((int) $repairEvent->orden_id === (int) $repairOrder->id
+            && (int) $repairEvent->reparacion === (int) $repairOrder->reparacion, 404);
+        $repairEvent->delete();
+
+        return back()->with('success', 'Movimiento eliminado del historial.');
+    }
+
     public function deletePayment(RepairOrder $repairOrder, RepairPayment $repairPayment, RepairService $repairService): RedirectResponse
     {
         try {
@@ -1264,7 +1265,8 @@ class WorkbenchController extends Controller
         }
 
         if ($deliverAll && ! filter_var($validated['enviar_archivados'] ?? false, FILTER_VALIDATE_BOOL)) {
-            RepairOrder::query()
+            DB::transaction(function () use ($repairOrder, $repairService, $validated, $cashPayment): void {
+                RepairOrder::query()
                 ->where('id', $repairOrder->id)
                 ->where('entregado', 'no')
                 ->orderBy('reparacion')
@@ -1277,6 +1279,7 @@ class WorkbenchController extends Controller
                     $cashPayment,
                     false,
                 ));
+            });
         } else {
             $repairService->deliver(
                 $repairOrder,
@@ -1411,11 +1414,12 @@ class WorkbenchController extends Controller
         $availableStates = app(RepairService::class)->availableStates($delivered);
         $historyOrders = RepairOrder::query()->whereIn('id', $orders->pluck('id')->unique())->orderBy('reparacion')->get();
         $historyEvents = $this->eventsForOrders($historyOrders);
+        $historyPayments = $this->paymentsForOrders($historyOrders);
         $historyByTicket = $historyOrders->groupBy('id');
 
         return $orders
             ->groupBy('id')
-            ->map(function (Collection $ticketOrders) use ($delivered, $eventsByRepair, $paymentsByRepair, $availableStates, $historyByTicket, $historyEvents): array {
+            ->map(function (Collection $ticketOrders) use ($delivered, $eventsByRepair, $paymentsByRepair, $availableStates, $historyByTicket, $historyEvents, $historyPayments): array {
                 /** @var RepairOrder $base */
                 $base = $ticketOrders->sortBy('reparacion')->first();
                 $ticketInfo = $ticketOrders
@@ -1446,7 +1450,7 @@ class WorkbenchController extends Controller
                     'addRepairAction' => route('repairs.orders.add_repair', $base),
                     'newOrderUrl' => route('repairs.ingress', ['from_order' => $base->id]),
                     'historyRepairs' => $historyByTicket->get($base->id, collect())->map(fn (RepairOrder $order): array => $this->serializeRepair(
-                        $order, $order->entregado === 'si', $historyEvents->get($this->repairCollectionKey($order), collect()), collect(), $availableStates,
+                        $order, $order->entregado === 'si', $historyEvents->get($this->repairCollectionKey($order), collect()), $historyPayments->get($this->repairCollectionKey($order), collect()), $availableStates,
                     ))->values()->all(),
                     'repairs' => $ticketOrders
                         ->sortBy('reparacion')
@@ -1472,10 +1476,17 @@ class WorkbenchController extends Controller
     {
         $events ??= $order->events()->get();
         $availableStates ??= app(RepairService::class)->availableStates($delivered);
-        $readyEvent = $order->estado === 'LISTA'
-            ? $events->filter(fn (RepairEvent $event): bool => $event->estado_nuevo === 'LISTA'
-                && $event->estado_anterior !== 'LISTA')->sortByDesc('created_at')->first()
-            : null;
+        $readyEvent = $events->filter(fn (RepairEvent $event): bool => $event->estado_nuevo === 'LISTA'
+            && $event->estado_anterior !== 'LISTA')->sortByDesc('created_at')->first();
+        $payments ??= RepairPayment::query()
+            ->where('orden_id', $order->id)->where('reparacion', $order->reparacion)->get();
+        $finalPayments = $payments->where('payment_type', 'senia')->where('notes', 'Pago final de entrega');
+        $finalPaid = round((float) $finalPayments->sum('amount'), 2);
+        $paid = max(0, (float) $order->senia);
+        $deposit = $finalPayments->isNotEmpty() || $order->entregado !== 'si'
+            ? round(max(0, $paid - $finalPaid), 2)
+            : ($payments->where('notes', 'Sena inicial')->isNotEmpty()
+                ? round((float) $payments->where('payment_type', 'senia')->sum('amount'), 2) : null);
 
         return [
             'registro_id' => $order->registro_id,
@@ -1500,7 +1511,13 @@ class WorkbenchController extends Controller
             'isFullyPaid' => $order->isWarrantyPaid() || ((float) $order->monto > 0 && (float) $order->senia >= (float) $order->monto),
             'fecha_estimada' => optional($order->fecha_estimada)->format('Y-m-d'),
             'estado' => $order->estado,
-            'listo_desde' => $readyEvent?->created_at?->format('Y-m-d'),
+            'listo_desde' => $order->estado === 'LISTA' ? $readyEvent?->created_at?->format('Y-m-d') : null,
+            'fecha_listo_historial' => $readyEvent?->created_at?->format('Y-m-d'),
+            'historyPaymentSummary' => [
+                'deposit' => $deposit,
+                'paidOnDelivery' => $order->entregado === 'si' && $deposit !== null ? $finalPaid : null,
+                'totalPaid' => $paid,
+            ],
             'entregado' => $order->entregado,
             'fecha_entregado' => optional($order->fecha_entregado)->format('Y-m-d'),
             'deliveryPaymentMode' => app(RepairService::class)->deliveryPaymentMode($order),
@@ -1528,6 +1545,7 @@ class WorkbenchController extends Controller
                 'estado_nuevo' => $event->estado_nuevo,
                 'created_at' => optional($event->created_at)->format('Y-m-d H:i'),
                 'usuario' => $event->usuario,
+                'deleteAction' => route('repairs.orders.history.delete', [$order, $event]),
             ])->all(),
             'payments' => $this->serializePayments($order, $payments),
             'actions' => [

@@ -233,6 +233,12 @@ export interface RepairOrderView {
     fecha_estimada?: string | null;
     estado: string;
     listo_desde?: string | null;
+    fecha_listo_historial?: string | null;
+    historyPaymentSummary?: {
+        deposit: number | null;
+        paidOnDelivery: number | null;
+        totalPaid: number;
+    };
     entregado: string;
     fecha_entregado?: string | null;
     deliveryPaymentMode?: 'cash' | 'regular' | null;
@@ -298,6 +304,7 @@ export interface RepairImageView {
 
 export interface RepairEventView {
     id: number;
+    deleteAction?: string;
     evento: string;
     detalle?: string | null;
     estado_anterior?: string | null;
