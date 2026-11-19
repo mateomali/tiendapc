@@ -181,6 +181,18 @@ class RepairOrder extends Model
         return parent::setKeysForSaveQuery($query);
     }
 
+    public function isWarrantyPaid(): bool
+    {
+        return trim((string) $this->garantia_motivo) !== '';
+    }
+
+    public function settledAmount(): float
+    {
+        return $this->isWarrantyPaid()
+            ? max((float) $this->monto, (float) $this->senia)
+            : (float) $this->senia;
+    }
+
     private function usesLegacyPrimaryKey(): bool
     {
         if (self::$legacyPrimaryKey !== null) {

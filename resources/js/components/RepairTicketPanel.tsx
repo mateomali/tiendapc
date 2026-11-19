@@ -509,7 +509,7 @@ function FailureDetailsEditor({
     return (
         <div className="grid gap-2">
             {items.map((failure, index) => (
-                <div key={`${index}-${failure}`} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                <div key={index} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-start gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
                     <span className="pt-2 text-center text-sm font-black text-[#475569]">{index + 1}</span>
                     <textarea
                         aria-label={`Falla ${index + 1}`}
@@ -1434,6 +1434,15 @@ function RepairEditCard({
     const [cancelReason, setCancelReason] = useState(repair.cancelado_motivo ?? '');
     const [cancelSameModel, setCancelSameModel] = useState(false);
     const [warrantyOpen, setWarrantyOpen] = useState(false);
+    const [reentryOpen, setReentryOpen] = useState(false);
+    const [historyOpen, setHistoryOpen] = useState(false);
+    const reentryForm = useForm({ descripcion: '', monto: formatAmountInput(repair.monto) });
+    const openReentry = (): void => {
+        reentryForm.reset();
+        reentryForm.clearErrors();
+        reentryForm.setData('monto', formatAmountInput(repair.monto));
+        setReentryOpen(true);
+    };
     const [warrantyReason, setWarrantyReason] = useState(repair.garantia_motivo ?? '');
     const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -1454,11 +1463,13 @@ function RepairEditCard({
         item.cash_discount_enabled ?? true,
         pricing,
     ));
-    const shouldAskDeliveryPayment = deliveryHasCashDiscount
-        && (repair.entregado === 'si' ? !repairIsFullyPaid : !(deliveryAll ? ticketIsFullyPaid : repairIsFullyPaid));
+    const shouldAskDeliveryPayment = repair.entregado === 'si'
+        ? Boolean(repair.payments?.some((payment) => payment.notes === 'Pago final de entrega')) || (deliveryHasCashDiscount && !repairIsFullyPaid)
+        : !(deliveryAll ? ticketIsFullyPaid : repairIsFullyPaid);
     const galleryImages = [...repair.imagenes, ...repair.imagenes_finales];
     const firstImage = galleryImages[0];
     const canMarkReady = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA'].includes(repair.estado);
+    const canDeliverDirectly = !readOnly && canMarkReady && repair.entregado !== 'si' && Boolean(repair.actions?.deliver);
     const canCancel = repair.estado !== 'CANCELADA' && repair.entregado !== 'si';
     const canCycleStatus = ['PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA', 'LISTA'].includes(repair.estado);
     const canAddToTasks = !['LISTA', 'CANCELADA'].includes(repair.estado);
@@ -1553,7 +1564,7 @@ function RepairEditCard({
             form.setError('images', (error as Error).message);
             return;
         }
-        form.transform((data) => ({ ...data, images, final_images: finalImages,
+        form.transform((data) => ({ ...data, senia: editOpen ? undefined : data.senia, images, final_images: finalImages,
             monto: overrideMonto === undefined ? data.monto : formatAmountInput(overrideMonto),
         }));
 
@@ -2268,6 +2279,18 @@ function RepairEditCard({
 
         if (!mobile) {
             const secondaryItems: ReactNode[] = [];
+            secondaryItems.push(
+                <button key="history" type="button" className={menuItem} onClick={() => setHistoryOpen(true)}>
+                    <FaReceipt aria-hidden="true" /> Historial del teléfono
+                </button>,
+            );
+            if (canDeliverDirectly) {
+                secondaryItems.push(
+                    <button key="deliver" type="button" className={menuItem} onClick={openDeliveryModal}>
+                        <FaDollyFlatbed aria-hidden="true" /> Entregar
+                    </button>,
+                );
+            }
             if (!hasInfo && canShowInfoAction) {
                 secondaryItems.push(
                     <button key="add-info" type="button" className={menuItem} onClick={() => setInfoOpen(true)}>
@@ -2443,7 +2466,7 @@ function RepairEditCard({
                                 <FaCheckCircle aria-hidden="true" />{iconOnly ? null : 'Listo'}
                             </button>
                         ) : null}
-                        {canDeliver ? (
+                        {canDeliver || canDeliverDirectly ? (
                             <button type="button" className={cn(base, 'border border-[#f59e0b] bg-[#f59e0b] text-[#111827]')} onClick={openDeliveryModal} title="Entregar">
                                 <FaDollyFlatbed aria-hidden="true" />{iconOnly ? null : 'Entregar'}
                             </button>
@@ -2532,6 +2555,47 @@ function RepairEditCard({
 
     const modals = (
         <>
+            {reentryOpen ? (
+                <ModalShell title={`Reingresar como nuevo trabajo · Orden #${repair.id}`} onClose={() => setReentryOpen(false)}>
+                    <form className="grid gap-4" onSubmit={(event) => {
+                        event.preventDefault();
+                        if (repair.actions?.reenter) reentryForm.post(repair.actions.reenter, { preserveScroll: true, onSuccess: () => setReentryOpen(false) });
+                    }}>
+                        <p className="text-sm text-[#475569]">{repairDisplayModel}. Se conserva la orden y el historial. El nuevo trabajo ingresa a Consultas sin pagos previos.</p>
+                        <EditField label="Nueva falla">
+                            <textarea className={ui.textarea} value={reentryForm.data.descripcion} onChange={(event) => reentryForm.setData('descripcion', event.target.value)} required maxLength={5000} autoFocus />
+                        </EditField>
+                        <EditField label="Importe del nuevo trabajo ($)">
+                            <input className={ui.input} type="number" min="0" step="0.01" value={reentryForm.data.monto} onChange={(event) => reentryForm.setData('monto', event.target.value)} required />
+                        </EditField>
+                        {Object.values(reentryForm.errors).map((error) => <p key={error} role="alert" className="text-sm text-red-700">{error}</p>)}
+                        <div className="flex justify-end gap-2">
+                            <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setReentryOpen(false)}>Cancelar</button>
+                            <button type="submit" className={buttonClass('primary', 'sm')} disabled={reentryForm.processing}>Ingresar nuevo trabajo</button>
+                        </div>
+                    </form>
+                </ModalShell>
+            ) : null}
+            {historyOpen ? (
+                <ModalShell title={`Historial del teléfono · Orden #${repair.id}`} onClose={() => setHistoryOpen(false)}>
+                    <div className="grid gap-3">
+                        {(ticket.historyRepairs ?? ticket.repairs).filter((item) => normalizeRepairText(item.modelo ?? '') === normalizeRepairText(repair.modelo ?? '') && normalizeRepairText(item.marca ?? '') === normalizeRepairText(repair.marca ?? '')).map((item) => (
+                            <section key={item.registro_id} className="grid gap-2 rounded-md border border-[#e2e8f0] p-3 text-sm">
+                                <strong>Trabajo #{item.reparacion} · {item.estado}{item.entregado === 'si' ? ' · Retirado' : ''}</strong>
+                                <p className="whitespace-pre-wrap">{item.descripcion}</p>
+                                <p>Ingreso: {formatLegacyDate(item.fecha)} · Retiro: {item.fecha_entregado ? formatLegacyDate(item.fecha_entregado) : 'Pendiente'}</p>
+                                <p>Importe: {formatCurrency(item.monto)} · Pagado: {formatCurrency(item.senia)}</p>
+                                {item.events?.map((event) => (
+                                    <div key={event.id} className="border-t border-[#e2e8f0] pt-2 text-xs text-[#475569]">
+                                        <span>{event.created_at} · {event.evento === 'NUEVO_TRABAJO_REINGRESO' ? 'Reingreso como nuevo trabajo' : event.evento === 'GARANTIA_REINGRESO' ? 'Reingreso por garantía' : event.estado_nuevo === 'LISTA' ? 'Reparación lista' : event.evento}</span>
+                                        {event.detalle ? <p>{event.detalle}</p> : null}
+                                    </div>
+                                ))}
+                            </section>
+                        ))}
+                    </div>
+                </ModalShell>
+            ) : null}
             {quickOpen ? (
                 <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/45" role="dialog" aria-modal="true">
                     <button type="button" className="min-w-0 flex-1 cursor-default" aria-label="Cerrar vista rápida" onClick={() => setQuickOpen(false)} />
@@ -2549,6 +2613,7 @@ function RepairEditCard({
                             </div>
                         </header>
                         <div className="grid gap-3 p-4 text-sm">
+                            <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setHistoryOpen(true)}>Historial del teléfono</button>
                             <section className="grid grid-cols-2 gap-2">
                                 <FieldSummary label="DNI" value={<HighlightText value={repair.dni === 12345678 ? 'SIN DNI' : repair.dni} term={highlightTerm} />} />
                                 <FieldSummary label="Contacto" value={<HighlightText value={repair.contacto || '-'} term={highlightTerm} />} />
@@ -2713,11 +2778,14 @@ function RepairEditCard({
                                 ) : null}
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={form.data.cash_discount_enabled} onChange={(event) => form.setData('cash_discount_enabled', event.target.checked)} disabled={readOnly} />Descuento en efectivo</label>
-                                    <EditField label="Monto ($)">
+                                    <EditField label="Total del trabajo ($)">
                                         <input className={changedInputClass(form.data.monto, formatAmountInput(repair.monto))} value={form.data.monto} onFocus={() => clearAmountForTyping('monto')} onChange={(event) => form.setData('monto', event.target.value)} disabled={readOnly} />
                                     </EditField>
-                                    <EditField label="Pagado ($)">
-                                        <input className={changedInputClass(form.data.senia, formatAmountInput(repair.senia))} value={form.data.senia} inputMode="decimal" onFocus={() => clearAmountForTyping('senia')} onChange={(event) => form.setData('senia', event.target.value)} disabled={readOnly} />
+                                    <EditField label="Total pagado">
+                                        <output className="block py-2 text-sm font-bold text-[#0f172a]">{formatCurrency(senia)}</output>
+                                    </EditField>
+                                    <EditField label="Saldo pendiente">
+                                        <output className="block py-2 text-sm font-bold text-[#0f172a]">{formatCurrency(Math.max(0, Number(form.data.monto || 0) - senia))}</output>
                                     </EditField>
                                     <div className="min-h-5 text-xs font-semibold leading-5 text-[#475569] sm:col-span-2">
                                         {transferPriceLabel(form.data.monto, form.data.cash_discount_enabled, pricing)}
@@ -2735,26 +2803,84 @@ function RepairEditCard({
                                     </div>
                                 ) : null}
                                 {!readOnly ? (
-                                    <div className="grid gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3">
+                                    <div className="grid gap-2 rounded-lg border border-[#e2e8f0] bg-white p-3">
+                                        <h4 className="text-sm font-bold text-[#0f172a]">Registrar pago parcial</h4>
+                                        <p className="text-xs text-[#475569]">Cada pago se suma al total pagado. Se guarda al registrarlo y puede modificarse o eliminarse del historial.</p>
                                         <div className="grid items-end gap-2 [grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr))]">
-                                            <EditField label="Importe de seña">
-                                                <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} inputMode="decimal" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
+                                            <EditField label="Importe del pago ($)">
+                                                <input className={changedInputClass(paymentForm.data.amount, '', undefined, false)} type="number" min="0" step="100" inputMode="numeric" placeholder="Importe" value={paymentForm.data.amount} onChange={(event) => paymentForm.setData('amount', event.target.value)} />
                                             </EditField>
                                             <EditField label="Medio">
-                                                <select disabled={!discountEligible(form.data.monto, form.data.cash_discount_enabled, pricing)} className={changedInputClass(paymentForm.data.method, 'efectivo', undefined, false)} value={paymentForm.data.method || 'efectivo'} onChange={(event) => paymentForm.setData('method', event.target.value)}>
+                                                <select className={changedInputClass(paymentForm.data.method, 'efectivo', undefined, false)} value={paymentForm.data.method || 'efectivo'} onChange={(event) => paymentForm.setData('method', event.target.value)}>
                                                     <option value="efectivo">Efectivo</option>
                                                     <option value="transferencia">Transferencia</option>
                                                 </select>
                                             </EditField>
-                                            <EditField label="Fecha de seña">
+                                            <EditField label="Fecha del pago">
                                                 <input className={changedInputClass(paymentForm.data.paid_at, todayInputValue(), undefined, false)} type="date" value={paymentForm.data.paid_at} onChange={(event) => paymentForm.setData('paid_at', event.target.value)} />
                                             </EditField>
                                             <button type="button" className={buttonClass('primary', 'sm', 'min-h-9 w-full whitespace-nowrap px-4')} disabled={paymentForm.processing || paymentForm.data.amount.trim() === ''} onClick={submitPayment}>
-                                                Registrar seña
+                                                Registrar pago
                                             </button>
                                         </div>
+                                        {Object.values(paymentForm.errors).map((error) => <p key={error} role="alert" className="text-sm text-red-700">{error}</p>)}
                                     </div>
                                 ) : null}
+                                <details open={payments.length > 0} className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
+                                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
+                                        <span className="font-black text-[#0f172a]">Historial de pagos e incrementos ({payments.length})</span>
+                                        <span className="flex items-center gap-2 font-black text-[#0f172a]">
+                                            {formatCurrency(senia)}
+                                            <FaChevronDown className="text-xs text-[#475569]" aria-hidden="true" />
+                                        </span>
+                                    </summary>
+                                    <div className="grid gap-3 border-t border-[#e2e8f0] p-3">
+                                        {payments.length > 0 ? (
+                                            <div className="grid gap-1">
+                                                {payments.map((payment) => {
+                                                    const isIncrement = payment.payment_type === 'incremento';
+                                                    const detail = isIncrement ? payment.notes || 'Sin concepto' : `${payment.method === 'transferencia' ? 'Transferencia' : 'Efectivo'}${payment.notes ? ` · ${payment.notes}` : ''}`;
+
+                                                    return (
+                                                        <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
+                                                        <div className="min-w-0">
+                                                            <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - {isIncrement ? 'incremento' : payment.notes === 'Pago final de entrega' ? 'pago final de entrega' : 'pago parcial'}</strong>
+                                                            <span className="block truncate text-xs font-semibold text-[#475569]">{detail}</span>
+                                                        </div>
+                                                        <span className={cn('font-black', isIncrement ? 'text-[#b45309]' : 'text-[#0f172a]')}>{isIncrement ? '+' : ''}{formatCurrency(payment.amount)}</span>
+                                                        {!readOnly && !isIncrement && payment.updateAction ? (
+                                                            <div className="col-span-2">
+                                                                {editingPayment === payment.id ? (
+                                                                    <div className="grid gap-2 sm:grid-cols-4">
+                                                                        <label>Importe<input aria-label="Importe del pago" className={ui.input} type="number" min="0" step="100" value={editPaymentForm.data.amount} onChange={(event) => editPaymentForm.setData('amount', event.target.value)} /></label>
+                                                                        <label>Medio<select className={ui.input} value={editPaymentForm.data.method} onChange={(event) => editPaymentForm.setData('method', event.target.value)}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
+                                                                        <label>Fecha<input className={ui.input} type="date" value={editPaymentForm.data.paid_at} onChange={(event) => editPaymentForm.setData('paid_at', event.target.value)} /></label>
+                                                                        <div className="flex gap-2"><button type="button" disabled={editPaymentForm.processing} className={buttonClass('primary', 'sm')} onClick={() => editPaymentForm.post(payment.updateAction!, { preserveScroll: true, onSuccess: () => setEditingPayment(null) })}>Guardar pago</button><button type="button" onClick={() => setEditingPayment(null)}>Cancelar</button></div>
+                                                                        {Object.values(editPaymentForm.errors).map((error) => <span key={error} className="text-red-700">{error}</span>)}
+                                                                    </div>
+                                                                ) : <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setEditingPayment(payment.id); editPaymentForm.setData({ amount: String(payment.amount), method: payment.method || 'efectivo', paid_at: payment.paid_at || todayInputValue() }); }}>Modificar pago</button>}
+                                                            </div>
+                                                        ) : null}
+                                                        {!readOnly && payment.deleteAction ? (
+                                                            <button
+                                                                type="button"
+                                                                className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md border border-[#fecdd3] bg-[#fff1f2] text-sm font-black text-[#dc2626] transition hover:bg-[#fee2e2]"
+                                                                onClick={() => deletePayment(payment.deleteAction)}
+                                                                title={isIncrement ? 'Quitar incremento' : 'Eliminar pago'}
+                                                                aria-label={isIncrement ? 'Quitar incremento' : 'Eliminar pago'}
+                                                            >
+                                                                <FaTimes aria-hidden="true" />
+                                                            </button>
+                                                        ) : null}
+                                                    </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <span className="rounded-md border border-dashed border-[#cbd5e1] bg-white px-3 py-3 text-center text-sm font-semibold text-[#475569]">Sin pagos registrados.</span>
+                                        )}
+                                    </div>
+                                </details>
                                 {!readOnly ? (
                                     <div className="grid gap-2 rounded-lg border border-[#fed7aa] bg-[#fff7ed] p-3">
                                         <div className="grid gap-2 sm:grid-cols-[minmax(0,1.35fr)_minmax(7.5rem,0.7fr)]">
@@ -2775,61 +2901,6 @@ function RepairEditCard({
                                         </div>
                                     </div>
                                 ) : null}
-                                <details open={payments.length > 0} className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc]">
-                                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
-                                        <span className="font-black text-[#0f172a]">Historial de pagos e incrementos ({payments.length})</span>
-                                        <span className="flex items-center gap-2 font-black text-[#0f172a]">
-                                            {formatCurrency(senia)}
-                                            <FaChevronDown className="text-xs text-[#475569]" aria-hidden="true" />
-                                        </span>
-                                    </summary>
-                                    <div className="grid gap-3 border-t border-[#e2e8f0] p-3">
-                                        {payments.length > 0 ? (
-                                            <div className="grid gap-1">
-                                                {payments.map((payment) => {
-                                                    const isIncrement = payment.payment_type === 'incremento';
-                                                    const detail = isIncrement ? payment.notes || 'Sin concepto' : 'Seña registrada';
-
-                                                    return (
-                                                        <div key={payment.id} className="relative grid grid-cols-[1fr_auto] gap-2 rounded-md border border-[#e2e8f0] bg-white px-3 py-2 pr-8 text-sm">
-                                                        <div className="min-w-0">
-                                                            <strong className="block text-[#0f172a]">{formatLegacyDate(payment.paid_at)} - {isIncrement ? 'incremento' : 'seña'}</strong>
-                                                            <span className="block truncate text-xs font-semibold text-[#475569]">{detail}</span>
-                                                        </div>
-                                                        <span className={cn('font-black', isIncrement ? 'text-[#b45309]' : 'text-[#0f172a]')}>{isIncrement ? '+' : ''}{formatCurrency(payment.amount)}</span>
-                                                        {!readOnly && !isIncrement && payment.updateAction ? (
-                                                            <div className="col-span-2">
-                                                                {editingPayment === payment.id ? (
-                                                                    <div className="grid gap-2 sm:grid-cols-4">
-                                                                        <label>Importe<input aria-label="Importe de seña" className={ui.input} type="number" min="0.01" step="0.01" value={editPaymentForm.data.amount} onChange={(event) => editPaymentForm.setData('amount', event.target.value)} /></label>
-                                                                        <label>Medio<select disabled={!discountEligible(form.data.monto, form.data.cash_discount_enabled, pricing)} className={ui.input} value={editPaymentForm.data.method} onChange={(event) => editPaymentForm.setData('method', event.target.value)}><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option></select></label>
-                                                                        <label>Fecha<input className={ui.input} type="date" value={editPaymentForm.data.paid_at} onChange={(event) => editPaymentForm.setData('paid_at', event.target.value)} /></label>
-                                                                        <div className="flex gap-2"><button type="button" disabled={editPaymentForm.processing} className={buttonClass('primary', 'sm')} onClick={() => editPaymentForm.post(payment.updateAction!, { preserveScroll: true, onSuccess: () => setEditingPayment(null) })}>Guardar seña</button><button type="button" onClick={() => setEditingPayment(null)}>Cancelar</button></div>
-                                                                        {Object.values(editPaymentForm.errors).map((error) => <span key={error} className="text-red-700">{error}</span>)}
-                                                                    </div>
-                                                                ) : <button type="button" className={buttonClass('soft', 'sm')} onClick={() => { setEditingPayment(payment.id); editPaymentForm.setData({ amount: String(payment.amount), method: payment.method || 'efectivo', paid_at: payment.paid_at || todayInputValue() }); }}>Modificar seña</button>}
-                                                            </div>
-                                                        ) : null}
-                                                        {!readOnly && payment.deleteAction ? (
-                                                            <button
-                                                                type="button"
-                                                                className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-md border border-[#fecdd3] bg-[#fff1f2] text-sm font-black text-[#dc2626] transition hover:bg-[#fee2e2]"
-                                                                onClick={() => deletePayment(payment.deleteAction)}
-                                                                title={isIncrement ? 'Quitar incremento' : 'Quitar seña registrada'}
-                                                                aria-label={isIncrement ? 'Quitar incremento' : 'Quitar seña registrada'}
-                                                            >
-                                                                <FaTimes aria-hidden="true" />
-                                                            </button>
-                                                        ) : null}
-                                                    </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <span className="rounded-md border border-dashed border-[#cbd5e1] bg-white px-3 py-3 text-center text-sm font-semibold text-[#475569]">Sin pagos registrados.</span>
-                                        )}
-                                    </div>
-                                </details>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <EditField label="Fecha de ingreso">
                                         <input className={changedInputClass(form.data.fecha, repair.fecha ?? '')} type="date" value={form.data.fecha} onChange={(event) => form.setData('fecha', event.target.value)} disabled={readOnly} />
@@ -3083,8 +3154,8 @@ function RepairEditCard({
                             <label className="grid gap-1.5 text-sm font-black text-[#334155]">
                                 Forma de pago
                                 <select className={ui.input} value={deliveryCashPayment ? '1' : '0'} onChange={(event) => setDeliveryCashPayment(event.target.value === '1')}>
-                                    <option value="1">SI - EFECTIVO</option>
-                                    <option value="0">NO - PRECIO REGULAR</option>
+                                    <option value="1">Efectivo</option>
+                                    <option value="0">{deliveryHasCashDiscount ? 'Transferencia - precio regular' : 'Transferencia'}</option>
                                 </select>
                             </label>
                         ) : null}
@@ -3222,6 +3293,10 @@ function RepairEditCard({
                                         {archived ? 'Entregar' : 'Cambiar'}
                                     </button>
                                 ) : null}
+                                {repair.entregado === 'si' && repair.actions?.reenter ? (
+                                    <button type="button" className={buttonClass('soft', 'sm')} onClick={openReentry}>Reingresar como nuevo trabajo</button>
+                                ) : null}
+                                <button type="button" className={buttonClass('soft', 'sm')} onClick={() => setHistoryOpen(true)}>Historial del teléfono</button>
                                 {repair.actions?.moveBack ? (
                                     <button type="button" className="rounded-md border border-[#f59e0b] bg-[#fff7ed] px-2 py-1 text-[0.66rem] font-black uppercase text-[#92400e] transition hover:bg-[#ffedd5]" onClick={moveBackToConsultas}>
                                         Garantia
@@ -3325,6 +3400,10 @@ function RepairEditCard({
                             {archived ? 'Entregar' : 'Cambiar forma de entrega'}
                         </button>
                     ) : null}
+                    {readOnly && repair.entregado === 'si' && repair.actions?.reenter ? (
+                        <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={openReentry}>Reingresar como nuevo trabajo</button>
+                    ) : null}
+                    <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={() => setHistoryOpen(true)}>Historial del teléfono</button>
                     {readOnly && repair.actions?.moveBack ? (
                         <button type="button" className={buttonClass('soft', 'sm', 'w-full')} onClick={moveBackToConsultas}>
                             Reingresar por garantia

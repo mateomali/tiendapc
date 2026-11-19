@@ -1338,6 +1338,19 @@ class WorkbenchController extends Controller
             : 'Orden cancelada. Queda pendiente de retiro.');
     }
 
+    public function reenter(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
+    {
+        abort_unless($repairOrder->entregado === 'si', 422);
+        $validated = $request->validate([
+            'descripcion' => ['required', 'string', 'max:5000'],
+            'monto' => ['nullable', 'numeric', 'min:0'],
+        ]);
+        $repairService->reenterAsNewWork($repairOrder, $validated);
+
+        return redirect()->route('repairs.workbench', ['q' => $repairOrder->id])
+            ->with('success', 'Nuevo trabajo ingresado con la misma orden, sin pagos previos.');
+    }
+
     public function moveBack(Request $request, RepairOrder $repairOrder, RepairService $repairService): RedirectResponse
     {
         if ($repairOrder->entregado === 'si') {
@@ -1396,10 +1409,13 @@ class WorkbenchController extends Controller
         $eventsByRepair = $this->eventsForOrders($orders);
         $paymentsByRepair = $this->paymentsForOrders($orders);
         $availableStates = app(RepairService::class)->availableStates($delivered);
+        $historyOrders = RepairOrder::query()->whereIn('id', $orders->pluck('id')->unique())->orderBy('reparacion')->get();
+        $historyEvents = $this->eventsForOrders($historyOrders);
+        $historyByTicket = $historyOrders->groupBy('id');
 
         return $orders
             ->groupBy('id')
-            ->map(function (Collection $ticketOrders) use ($delivered, $eventsByRepair, $paymentsByRepair, $availableStates): array {
+            ->map(function (Collection $ticketOrders) use ($delivered, $eventsByRepair, $paymentsByRepair, $availableStates, $historyByTicket, $historyEvents): array {
                 /** @var RepairOrder $base */
                 $base = $ticketOrders->sortBy('reparacion')->first();
                 $ticketInfo = $ticketOrders
@@ -1419,7 +1435,7 @@ class WorkbenchController extends Controller
                     'fecha' => optional($base->fecha)->format('Y-m-d'),
                     'repairsCount' => $ticketOrders->count(),
                     'totalMonto' => $ticketOrders->sum(fn (RepairOrder $order): float => (float) $order->monto),
-                    'totalSenia' => $ticketOrders->sum(fn (RepairOrder $order): float => (float) $order->senia),
+                    'totalSenia' => $ticketOrders->sum(fn (RepairOrder $order): float => $order->settledAmount()),
                     'trackingUrl' => route('repairs.tracking', [
                         'id_buscado' => $base->id,
                         'dni_buscado' => $base->trackingVerifier(),
@@ -1429,6 +1445,9 @@ class WorkbenchController extends Controller
                     'whatsappUrl' => $this->customerWhatsappUrl($base),
                     'addRepairAction' => route('repairs.orders.add_repair', $base),
                     'newOrderUrl' => route('repairs.ingress', ['from_order' => $base->id]),
+                    'historyRepairs' => $historyByTicket->get($base->id, collect())->map(fn (RepairOrder $order): array => $this->serializeRepair(
+                        $order, $order->entregado === 'si', $historyEvents->get($this->repairCollectionKey($order), collect()), collect(), $availableStates,
+                    ))->values()->all(),
                     'repairs' => $ticketOrders
                         ->sortBy('reparacion')
                         ->map(fn (RepairOrder $order): array => $this->serializeRepair(
@@ -1477,8 +1496,8 @@ class WorkbenchController extends Controller
             'info' => $order->info,
             'monto' => $order->monto,
             'cash_discount_enabled' => $order->cash_discount_enabled ?? true,
-            'senia' => $order->senia,
-            'isFullyPaid' => (float) $order->monto > 0 && (float) $order->senia >= (float) $order->monto,
+            'senia' => $order->isWarrantyPaid() ? number_format($order->settledAmount(), 2, '.', '') : $order->senia,
+            'isFullyPaid' => $order->isWarrantyPaid() || ((float) $order->monto > 0 && (float) $order->senia >= (float) $order->monto),
             'fecha_estimada' => optional($order->fecha_estimada)->format('Y-m-d'),
             'estado' => $order->estado,
             'listo_desde' => $readyEvent?->created_at?->format('Y-m-d'),
@@ -1521,6 +1540,7 @@ class WorkbenchController extends Controller
                 'markReady' => route('repairs.orders.mark_ready', $order),
                 'cancel' => route('repairs.orders.cancel', $order),
                 'moveBack' => route('repairs.orders.move_back', $order),
+                'reenter' => $order->entregado === 'si' ? route('repairs.orders.reenter', $order) : null,
                 'delete' => route('repairs.orders.delete', $order),
                 'restoreTracking' => $order->tracking_disabled ? route('repairs.orders.tracking.restore', $order) : null,
                 'removeTracking' => $order->tracking_disabled ? null : route('repairs.orders.tracking.remove', $order),
@@ -1573,6 +1593,7 @@ class WorkbenchController extends Controller
             'CANCELADA' => 'Orden cancelada',
             'ENTREGADA' => 'Orden entregada',
             'GARANTIA_REINGRESO' => 'Reingreso por garantia',
+            'NUEVO_TRABAJO_REINGRESO' => 'Reingreso como nuevo trabajo',
             'INCREMENTO_REGISTRADO' => 'Incremento registrado',
             'INCREMENTO_ELIMINADO' => 'Incremento eliminado',
             'PAGO_REGISTRADO' => 'Pago registrado',

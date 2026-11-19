@@ -831,10 +831,10 @@ it('renders repair business metrics', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Repairs/MetricsPage')
-            ->where('metrics.totals.monthBilled', 60000)
-            ->where('metrics.totals.monthPaid', 60000)
+            ->where('metrics.totals.billed', 60000)
+            ->where('metrics.totals.collected', 20000)
             ->where('metrics.totals.profitPercentage', 20)
-            ->where('metrics.totals.monthRealProfit', 10000)
+            ->where('metrics.totals.realProfit', 10000)
             ->where('metrics.totals.openBalance', 60000)
             ->where('metrics.counts.delivered', 1)
             ->where('metrics.topWorkTypes.0.label', 'Cambio de modulo/pantalla'));
@@ -852,10 +852,10 @@ it('renders repair business metrics', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('metrics.totals.profitPercentage', 50)
-            ->where('metrics.totals.monthRealProfit', 20000));
+            ->where('metrics.totals.realProfit', 20000));
 });
 
-it('allows delivering repairs with explicit date and delivery channel', function (): void {
+it('allows delivering repairs with explicit date and delivery channel', function (string $state): void {
     $order = RepairOrder::query()->create([
         'id' => 777,
         'reparacion' => 1,
@@ -864,7 +864,7 @@ it('allows delivering repairs with explicit date and delivery channel', function
         'dni' => 33444555,
         'modelo' => 'iPhone 11',
         'descripcion' => 'Cambio de bateria',
-        'estado' => 'LISTA',
+        'estado' => $state,
         'entregado' => 'no',
     ]);
 
@@ -879,10 +879,11 @@ it('allows delivering repairs with explicit date and delivery channel', function
     $updated = $order->fresh();
 
     expect($updated?->entregado)->toBe('si');
+    expect($updated?->estado)->toBe(in_array($state, ['LISTA', 'EN REPARACION / ESPERA REPUESTO'], true) ? $state : 'ENTREGADA');
     expect(optional($updated?->fecha_entregado)->format('Y-m-d'))->toBe('2026-04-23');
     expect($updated?->observaciones)->toContain('Pago de entrega: PRECIO REGULAR');
     expect(RepairEvent::query()->where('orden_id', 777)->where('evento', 'ENTREGA_VIA_TICKET')->exists())->toBeTrue();
-});
+})->with(['LISTA', 'PENDIENTE', 'EN REPARACION', 'EN REPARACION / ESPERA REPUESTO', 'GARANTIA']);
 
 it('allows correcting delivery payment after a repair was delivered', function (): void {
     $order = RepairOrder::query()->create([

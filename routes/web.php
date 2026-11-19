@@ -105,6 +105,7 @@ Route::middleware(['repair.tech'])->group(function (): void {
     Route::post('/repairs/orders/{repairOrder}/mark-ready', [WorkbenchController::class, 'markReady'])->name('repairs.orders.mark_ready');
     Route::post('/repairs/orders/{repairOrder}/cancel', [WorkbenchController::class, 'cancel'])->name('repairs.orders.cancel');
     Route::post('/repairs/orders/{repairOrder}/move-back', [WorkbenchController::class, 'moveBack'])->name('repairs.orders.move_back');
+    Route::post('/repairs/orders/{repairOrder}/reenter', [WorkbenchController::class, 'reenter'])->name('repairs.orders.reenter');
     Route::post('/repairs/orders/{repairOrder}/delete', [WorkbenchController::class, 'destroy'])->name('repairs.orders.delete');
     Route::get('/tareas', [TaskController::class, 'index'])->name('tasks.index');
     Route::post('/tareas/agregar/{repairOrder}', [TaskController::class, 'addRepair'])->name('tasks.add_repair');

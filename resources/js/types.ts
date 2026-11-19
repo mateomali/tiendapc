@@ -264,6 +264,7 @@ export interface RepairOrderView {
         markReady: string;
         cancel: string;
         moveBack: string;
+        reenter?: string | null;
         delete: string;
         restoreTracking?: string | null;
         removeTracking?: string | null;
@@ -325,6 +326,7 @@ export interface RepairTicketView {
     addRepairAction?: string | null;
     newOrderUrl?: string | null;
     repairs: RepairOrderView[];
+    historyRepairs?: RepairOrderView[];
 }
 
 export interface PublicRepairFeedback {

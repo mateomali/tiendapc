@@ -659,7 +659,7 @@ class RepairService
                 'info' => $info !== '' ? $info : null,
                 'cash_discount_enabled' => $payload['cash_discount_enabled'] ?? ($order->cash_discount_enabled ?? true),
                 'monto' => $payload['monto'] ?? 0,
-                'senia' => max(0, (float) ($payload['senia'] ?? $this->paymentTotal($order))),
+                'senia' => $order->isWarrantyPaid() ? $order->senia : max(0, (float) ($payload['senia'] ?? $this->paymentTotal($order))),
                 'fecha_estimada' => $payload['fecha_estimada'] ?? null,
                 'estado' => $nextState,
                 'cancelado_motivo' => $nextCancellationReason,
@@ -684,7 +684,9 @@ class RepairService
                 $this->consumeInventoryReservation($order);
             }
             $this->syncTaskQueueForState($order, (string) $order->estado);
-            $this->reconcileManualPaymentTotal($order, $payload['senia'] ?? null);
+            if (! $order->isWarrantyPaid()) {
+                $this->reconcileManualPaymentTotal($order, $payload['senia'] ?? null);
+            }
 
             $this->recordEvent($order, $order->entregado === 'si' ? 'ACTUALIZADA_ENTREGADA' : 'ACTUALIZADA', $previousState, $order->estado);
 
@@ -694,6 +696,10 @@ class RepairService
 
             if ($this->hasMeaningfulCommentChange($previousComment, $order->observaciones)) {
                 $this->recordEvent($order, 'COMENTARIO_TECNICO', $previousState, $order->estado);
+            }
+
+            if (Str::upper($order->estado) === 'ENTREGADA' && $order->entregado !== 'si') {
+                return $this->deliver($order, $payload['fecha_entregado'] ?? null);
             }
 
             return $order->refresh();
@@ -707,7 +713,33 @@ class RepairService
 
     public function updateState(RepairOrder $order, string $state, ?string $cancellationReason = null): RepairOrder
     {
-        return $this->setState($order, $state, 'CAMBIO_ESTADO_DIRECTO', $cancellationReason);
+        return DB::transaction(fn (): RepairOrder => $this->setState($order, $state, 'CAMBIO_ESTADO_DIRECTO', $cancellationReason));
+    }
+
+    public function reenterAsNewWork(RepairOrder $order, array $payload): RepairOrder
+    {
+        if ($order->entregado !== 'si') {
+            throw new \RuntimeException('Solo se puede reingresar un trabajo entregado.');
+        }
+
+        return DB::transaction(function () use ($order, $payload): RepairOrder {
+            $order = RepairOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $repair = $this->addRepair($order, [
+                'marca' => $order->marca,
+                'modelo' => $order->modelo,
+                'color' => $order->color,
+                'categorias_reparacion' => $order->categorias_reparacion,
+                'cash_discount_enabled' => $order->cash_discount_enabled ?? true,
+                'descripcion' => $payload['descripcion'],
+                'monto' => $payload['monto'] ?? $order->monto,
+                'senia' => 0,
+            ]);
+            $this->recordEvent($repair, 'NUEVO_TRABAJO_REINGRESO', null, 'PENDIENTE',
+                sprintf('Nuevo ingreso del mismo telefono. Trabajo anterior #%d, retirado el %s.',
+                    $order->reparacion, optional($order->fecha_entregado)->format('d/m/Y') ?? 'sin fecha'));
+
+            return $repair;
+        });
     }
 
     public function reopenWarranty(RepairOrder $order, string $reason): RepairOrder
@@ -777,54 +809,108 @@ class RepairService
             return $this->archive($order, 'manual');
         }
 
-        $previousState = $order->estado;
-        $updates = [
-            'entregado' => 'si',
-            'fecha_entregado' => $date ?: now()->toDateString(),
-            'archivado_at' => null,
-            'archivado_motivo' => null,
-            'estado' => in_array($order->estado, self::DELIVERED_STATES, true) ? $order->estado : 'ENTREGADA',
-        ];
+        return DB::transaction(function () use ($order, $date, $via, $detail, $cashPayment): RepairOrder {
+            $locked = RepairOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $order->setRawAttributes($locked->getAttributes(), true);
+            if ($order->entregado === 'si') {
+                return $order;
+            }
 
-        $deliveryNote = $this->deliveryObservation($via, $detail);
-        if ($deliveryNote !== null) {
-            $updates['observaciones'] = $this->replaceDeliveryObservation($order->observaciones, $deliveryNote);
-        }
+            $previousState = $order->estado;
+            $paidAt = $date ?: now()->toDateString();
+            if (! $order->isWarrantyPaid()) {
+                $paid = max((float) $order->senia, $this->paymentTotal($order));
+                $total = $this->deliveryTotal($order, $cashPayment, $paid);
+                $remaining = round(max(0, $total - $paid), 2);
+                if ($remaining > 0) {
+                    RepairPayment::query()->create([
+                        'orden_id' => $order->id,
+                        'reparacion' => $order->reparacion,
+                        'amount' => $remaining,
+                        'payment_type' => 'senia',
+                        'method' => $cashPayment === false ? 'transferencia' : 'efectivo',
+                        'notes' => 'Pago final de entrega',
+                        'paid_at' => $paidAt,
+                    ]);
+                    $order->senia = $paid + $remaining;
+                    $this->recordEvent($order, 'PAGO_REGISTRADO', $previousState, $previousState, 'Pago final de entrega');
+                }
+            }
+            $updates = [
+                'entregado' => 'si',
+                'fecha_entregado' => $paidAt,
+                'archivado_at' => null,
+                'archivado_motivo' => null,
+                'estado' => in_array($order->estado, self::DELIVERED_STATES, true) ? $order->estado : 'ENTREGADA',
+            ];
 
-        $paymentNote = $this->deliveryPaymentObservation($cashPayment);
-        if ($paymentNote !== null) {
-            $updates['observaciones'] = $this->replaceDeliveryPaymentObservation($updates['observaciones'] ?? $order->observaciones, $paymentNote);
-        }
+            $deliveryNote = $this->deliveryObservation($via, $detail);
+            if ($deliveryNote !== null) {
+                $updates['observaciones'] = $this->replaceDeliveryObservation($order->observaciones, $deliveryNote);
+            }
 
-        $order->update($updates);
+            $paymentNote = $this->deliveryPaymentObservation($cashPayment);
+            if ($paymentNote !== null) {
+                $updates['observaciones'] = $this->replaceDeliveryPaymentObservation($updates['observaciones'] ?? $order->observaciones, $paymentNote);
+            }
 
-        $this->recordEvent($order, 'ENTREGADA', $previousState, $order->estado);
+            $order->update($updates);
 
-        if ($via !== null && trim($via) !== '') {
-            $this->recordEvent($order, 'ENTREGA_VIA_' . Str::upper(Str::slug($via, '_')), $order->estado, $order->estado);
-        }
+            $this->recordEvent($order, 'ENTREGADA', $previousState, $order->estado);
 
-        return $order->refresh();
+            if ($via !== null && trim($via) !== '') {
+                $this->recordEvent($order, 'ENTREGA_VIA_' . Str::upper(Str::slug($via, '_')), $order->estado, $order->estado);
+            }
+
+            return $order->refresh();
+        });
     }
 
     public function updateDeliveryPayment(RepairOrder $order, bool $cashPayment): RepairOrder
     {
-        if ($order->entregado !== 'si') {
-            return $order;
+        return DB::transaction(function () use ($order, $cashPayment): RepairOrder {
+            $locked = RepairOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $order->setRawAttributes($locked->getAttributes(), true);
+            if ($order->entregado !== 'si') {
+                return $order;
+            }
+
+            $paymentNote = $this->deliveryPaymentObservation($cashPayment);
+            if ($paymentNote === null) {
+                return $order;
+            }
+
+            $finalPayment = RepairPayment::query()->where('orden_id', $order->id)
+                ->where('reparacion', $order->reparacion)->where('notes', 'Pago final de entrega')->first();
+            if ($finalPayment !== null && ! $order->isWarrantyPaid()) {
+                $paidBefore = max(0, max((float) $order->senia, $this->paymentTotal($order)) - (float) $finalPayment->amount);
+                $remaining = round(max(0, $this->deliveryTotal($order, $cashPayment, $paidBefore) - $paidBefore), 2);
+                $finalPayment->update(['amount' => $remaining, 'method' => $cashPayment ? 'efectivo' : 'transferencia']);
+                $order->senia = $paidBefore + $remaining;
+            }
+
+            $order->update([
+                'observaciones' => $this->replaceDeliveryPaymentObservation($order->observaciones, $paymentNote),
+            ]);
+
+            $this->recordEvent($order, 'PAGO_ENTREGA_ACTUALIZADO', $order->estado, $order->estado);
+
+            return $order->refresh();
+        });
+    }
+
+    private function deliveryTotal(RepairOrder $order, ?bool $cashPayment, float $paid): float
+    {
+        $total = (float) $order->monto;
+        $discountApplies = ($order->cash_discount_enabled ?? true)
+            && filter_var(SiteGlobalConfig::value('repair_cash_discount_enabled', '1'), FILTER_VALIDATE_BOOL)
+            && $total > max(0, (float) SiteGlobalConfig::value('repair_cash_discount_threshold', '30000'));
+        if ($cashPayment === false && $discountApplies && $paid < $total) {
+            $percentage = max(0, min(100, (float) SiteGlobalConfig::value('repair_cash_discount_percentage', '10')));
+            $total = round($total * (1 + $percentage / 100), 2);
         }
 
-        $paymentNote = $this->deliveryPaymentObservation($cashPayment);
-        if ($paymentNote === null) {
-            return $order;
-        }
-
-        $order->update([
-            'observaciones' => $this->replaceDeliveryPaymentObservation($order->observaciones, $paymentNote),
-        ]);
-
-        $this->recordEvent($order, 'PAGO_ENTREGA_ACTUALIZADO', $order->estado, $order->estado);
-
-        return $order->refresh();
+        return $total;
     }
 
     public function deliveryPaymentMode(RepairOrder $order): ?string
@@ -1170,7 +1256,7 @@ class RepairService
             ->where('entregado', '!=', 'si')
             ->where('estado', 'LISTA')
             ->get()
-            ->sum(fn (RepairOrder $order): float => max(0, (float) $order->monto - (float) $order->senia));
+            ->sum(fn (RepairOrder $order): float => max(0, (float) $order->monto - $order->settledAmount()));
     }
 
     /**
@@ -1464,6 +1550,10 @@ class RepairService
 
         if ($event !== 'CAMBIO_ESTADO_DIRECTO' || $previousState !== $state) {
             $this->recordEvent($order, $event, $previousState, $state);
+        }
+
+        if (Str::upper($state) === 'ENTREGADA' && $order->entregado !== 'si') {
+            return $this->deliver($order);
         }
 
         return $order->refresh();
@@ -1911,9 +2001,11 @@ class RepairService
         } elseif ($balance === 'sin_senia') {
             $query->where('senia', '<=', 0);
         } elseif ($balance === 'pagado') {
-            $query->where('monto', '>', 0)->whereColumn('senia', '>=', 'monto');
+            $query->where(fn ($builder) => $builder
+                ->where(fn ($paid) => $paid->where('monto', '>', 0)->whereColumn('senia', '>=', 'monto'))
+                ->orWhere(fn ($warranty) => $warranty->whereNotNull('garantia_motivo')->where('garantia_motivo', '!=', '')));
         } elseif ($balance !== '' && is_numeric($balance)) {
-            $query->whereRaw('(monto - senia) = ?', [(float) $balance]);
+            $query->whereRaw("(CASE WHEN COALESCE(TRIM(garantia_motivo), '') <> '' THEN 0 ELSE monto - senia END) = ?", [(float) $balance]);
         }
 
         $state = trim((string) ($filters['filter_estado'] ?? ''));
@@ -2090,7 +2182,7 @@ class RepairService
             'modelo' => $query->orderBy('modelo', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             'falla' => $query->orderBy('descripcion', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             'estado' => $query->orderBy('estado', $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
-            'saldo' => $query->orderByRaw('(monto - senia) ' . $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
+            'saldo' => $query->orderByRaw("(CASE WHEN COALESCE(TRIM(garantia_motivo), '') <> '' THEN 0 ELSE monto - senia END) " . $direction)->orderBy('id', 'desc')->orderBy('reparacion'),
             default => $query->orderBy('id', $direction)->orderBy('reparacion'),
         };
     }

@@ -38,9 +38,16 @@ it('edits and deletes an individual deposit while preserving other deposits', fu
         ->post(route('repairs.orders.payments.update', [$order, $payment]), ['amount' => 12000, 'method' => 'transferencia', 'paid_at' => '2026-09-29'])
         ->assertSessionHasNoErrors()->assertRedirect();
     expect((float) $order->refresh()->senia)->toBe(17000.0)
-        ->and($payment->refresh()->method)->toBe('transferencia');
+        ->and($payment->refresh()->method)->toBe('transferencia')
+        ->and($payment->paid_at->format('Y-m-d'))->toBe('2026-09-29');
     $this->post(route('repairs.orders.payments.delete', [$order, $payment]))->assertRedirect();
     expect((float) $order->refresh()->senia)->toBe(5000.0);
+    $service->update($order, ['nombre_cliente' => 'Cliente prueba', 'descripcion' => 'Falla editada', 'monto' => 50000]);
+    expect((float) $order->refresh()->senia)->toBe(5000.0);
+    $remaining = RepairPayment::where('orden_id', $order->id)->firstOrFail();
+    $this->post(route('repairs.orders.payments.delete', [$order, $remaining]))->assertRedirect();
+    expect((float) $order->refresh()->senia)->toBe(0.0)
+        ->and(RepairPayment::where('orden_id', $order->id)->count())->toBe(0);
 });
 
 it('rejects deposit edits from another work', function (): void {
